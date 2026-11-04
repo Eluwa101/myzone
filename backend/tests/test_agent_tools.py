@@ -1,0 +1,126 @@
+"""
+Unit tests for the agent's tools, bypassing the LLM entirely (no API key
+needed, no network calls). These are the safety-critical paths: dedup
+conflicts, the confirm-before-destructive-write flow, and audit logging.
+"""
+from uuid import UUID
+
+import pytest
+
+from app.agent.tools import build_tools
+from app.controllers import agent_controller, customer_controller
+from app.models.agent_action import AgentAction
+from app.models.pending_action import PendingAction
+
+
+@pytest.fixture
+def tools(db_session, seeded_org):
+    org_id, user_id = seeded_org
+    return {t.name: t for t in build_tools(db_session, org_id, user_id)}
+
+
+def test_create_customer_tool_creates_and_logs(db_session, seeded_org, tools):
+    org_id, user_id = seeded_org
+    result = tools["create_customer"].invoke({"name": "Ada Obi", "phone": "08012345678"})
+    assert result["action"] == "created"
+    assert result["name"] == "Ada Obi"
+    assert result["status"] == "customer"  # the customer's own lifecycle status, untouched
+
+    logged = db_session.query(AgentAction).filter(AgentAction.org_id == org_id).all()
+    assert len(logged) == 1
+    assert logged[0].tool_name == "create_customer"
+
+
+def test_create_customer_tool_flags_duplicate_instead_of_creating(db_session, seeded_org, tools):
+    org_id, _ = seeded_org
+    tools["create_customer"].invoke({"name": "Ada Obi", "phone": "08012345678"})
+    result = tools["create_customer"].invoke({"name": "Ada O.", "phone": "+234 801 234 5678"})
+    assert result["status"] == "conflict"
+
+    _, total = customer_controller.list_customers(db_session, org_id)
+    assert total == 1
+
+
+def test_create_customer_as_new_bypasses_duplicate_check(db_session, seeded_org, tools):
+    org_id, _ = seeded_org
+    tools["create_customer"].invoke({"name": "Ada Obi", "phone": "08012345678"})
+    result = tools["create_customer_as_new"].invoke({"name": "Ada Obi", "phone": "08012345678"})
+    assert result["action"] == "created"
+
+    _, total = customer_controller.list_customers(db_session, org_id)
+    assert total == 2
+
+
+def test_delete_customer_tool_does_not_delete_immediately(db_session, seeded_org, tools):
+    org_id, _ = seeded_org
+    created = tools["create_customer"].invoke({"name": "Ada Obi"})
+    result = tools["delete_customer"].invoke({"customer_id": created["id"]})
+
+    assert result["status"] == "confirm_required"
+    assert "action_id" in result
+
+    # still exists - nothing was deleted yet
+    customer_controller.get_customer(db_session, org_id, UUID(created["id"]))
+    pending = db_session.query(PendingAction).filter(PendingAction.id == UUID(result["action_id"])).first()
+    assert pending is not None
+    assert pending.tool_name == "delete_customer"
+
+
+def test_confirming_pending_delete_actually_deletes(db_session, seeded_org, tools):
+    org_id, user_id = seeded_org
+    created = tools["create_customer"].invoke({"name": "Ada Obi"})
+    result = tools["delete_customer"].invoke({"customer_id": created["id"]})
+
+    agent_controller.confirm_pending_action(db_session, org_id, user_id, UUID(result["action_id"]))
+
+    with pytest.raises(customer_controller.CustomerNotFoundError):
+        customer_controller.get_customer(db_session, org_id, UUID(created["id"]))
+
+    logged = db_session.query(AgentAction).filter(AgentAction.tool_name == "delete_customer").all()
+    assert len(logged) == 1
+
+
+def test_rejecting_pending_delete_keeps_the_customer(db_session, seeded_org, tools):
+    org_id, user_id = seeded_org
+    created = tools["create_customer"].invoke({"name": "Ada Obi"})
+    result = tools["delete_customer"].invoke({"customer_id": created["id"]})
+
+    agent_controller.reject_pending_action(db_session, org_id, UUID(result["action_id"]))
+
+    customer_controller.get_customer(db_session, org_id, UUID(created["id"]))  # does not raise
+    assert db_session.query(PendingAction).count() == 0
+
+
+def test_merge_customers_tool_requires_confirmation(db_session, seeded_org, tools):
+    org_id, user_id = seeded_org
+    a = tools["create_customer"].invoke({"name": "Ada Obi", "email": "ada@mail.com"})
+    b = tools["create_customer_as_new"].invoke({"name": "Ada Obi", "email": "ada@mail.com", "pet": "Dog - Max"})
+
+    result = tools["merge_customers"].invoke({"keep_id": a["id"], "merge_id": b["id"]})
+    assert result["status"] == "confirm_required"
+
+    # both still exist until confirmed
+    customer_controller.get_customer(db_session, org_id, UUID(a["id"]))
+    customer_controller.get_customer(db_session, org_id, UUID(b["id"]))
+
+    confirmed = agent_controller.confirm_pending_action(db_session, org_id, user_id, UUID(result["action_id"]))
+    assert confirmed["status"] == "merged"
+    with pytest.raises(customer_controller.CustomerNotFoundError):
+        customer_controller.get_customer(db_session, org_id, UUID(b["id"]))
+
+
+def test_add_transaction_then_dashboard_summary_reflects_it(db_session, seeded_org, tools):
+    created = tools["create_customer"].invoke({"name": "Ada Obi"})
+    tools["add_transaction"].invoke({"customer_id": created["id"], "date": "2026-11-01", "item": "Rice", "amount": 15000, "qty": 2, "currency": "ngn"})
+
+    summary = tools["get_dashboard_summary"].invoke({})
+    assert summary["all_time_by_currency"]["NGN"] == 30000
+
+
+def test_search_customers_tool(db_session, seeded_org, tools):
+    tools["create_customer"].invoke({"name": "Ada Obi", "interests": "Generator"})
+    tools["create_customer_as_new"].invoke({"name": "Bo Chen"})
+
+    result = tools["search_customers"].invoke({"query": "generator"})
+    assert result["total"] == 1
+    assert result["customers"][0]["name"] == "Ada Obi"

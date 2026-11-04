@@ -39,6 +39,30 @@ def client():
 
 
 @pytest.fixture
+def db_session():
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@pytest.fixture
+def seeded_org(db_session):
+    from app.core.security import hash_password
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    org = Organization(name="Ada's Store")
+    db_session.add(org)
+    db_session.flush()
+    user = User(org_id=org.id, email="ada@example.com", hashed_password=hash_password("supersecret"))
+    db_session.add(user)
+    db_session.commit()
+    return org.id, user.id
+
+
+@pytest.fixture
 def auth_headers(client):
     client.post(
         "/api/auth/signup",

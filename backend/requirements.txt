@@ -11,3 +11,7 @@ python-jose[cryptography]
 python-multipart
 pytest
 httpx
+langchain
+langchain-groq
+langchain-google-genai
+langgraph
