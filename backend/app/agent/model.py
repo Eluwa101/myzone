@@ -17,7 +17,10 @@ def get_model():
         return _cached_model
 
     try:
-        model = ChatGroq(model="llama-3.3-70b-versatile", api_key=settings.groq_api_key)
+        # groq retired the llama-3.3 models; openai/gpt-oss-120b is current
+        # as of this writing - check https://console.groq.com/docs/models if
+        # this starts 404ing again.
+        model = ChatGroq(model="openai/gpt-oss-120b", api_key=settings.groq_api_key)
         model.invoke("ping")
         _cached_model = model
     except Exception:

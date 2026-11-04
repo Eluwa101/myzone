@@ -153,7 +153,7 @@ from langchain_groq import ChatGroq
 load_dotenv()
 
 # the brain: a free groq model
-model = ChatGroq(model="llama-3.3-70b-versatile")
+model = ChatGroq(model="openai/gpt-oss-120b")
 
 # the agent: model + a system prompt telling it how to behave
 agent = create_agent(
@@ -184,8 +184,11 @@ running on a free model, no card, entirely from your own machine.
 
 - `load_dotenv()` reads your groq key out of the `.env` file so the code can use it
   without the key ever being written into the code itself.
-- `ChatGroq(model="llama-3.3-70b-versatile")` picks the brain. this is a free llama
+- `ChatGroq(model="openai/gpt-oss-120b")` picks the brain. this is a free open-weight
   model served by groq, fast enough that replies feel instant.
+  > groq's free-tier lineup changes — check
+  > [console.groq.com/docs/models](https://console.groq.com/docs/models) if this
+  > model name ever 404s on you.
 - `create_agent(...)` builds the agent. right now `tools=[]` is empty, so this is
   really just a smart chatbot. the `system_prompt` is the standing instruction it
   follows every time.
@@ -228,7 +231,7 @@ from langchain_community.tools import DuckDuckGoSearchRun
 
 load_dotenv()
 
-model = ChatGroq(model="llama-3.3-70b-versatile")
+model = ChatGroq(model="openai/gpt-oss-120b")
 
 # tool 1 — web search (prebuilt, free, no key)
 search = DuckDuckGoSearchRun()
@@ -307,7 +310,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 load_dotenv()
 
-model = ChatGroq(model="llama-3.3-70b-versatile")
+model = ChatGroq(model="openai/gpt-oss-120b")
 
 # the checkpointer saves conversation state between calls
 agent = create_agent(
@@ -408,7 +411,7 @@ load_dotenv()
 def get_model():
     try:
         # first choice: groq (fastest)
-        model = ChatGroq(model="llama-3.3-70b-versatile")
+        model = ChatGroq(model="openai/gpt-oss-120b")
         model.invoke("ping")  # quick test that it actually responds
         print("using groq")
         return model
