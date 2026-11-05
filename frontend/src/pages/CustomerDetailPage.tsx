@@ -1,6 +1,6 @@
 import { Check, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   addOrder,
   addTransaction,
@@ -33,6 +33,7 @@ export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const isNew = id === "new";
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [form, setForm] = useState<CustomerInput>(BLANK);
@@ -41,7 +42,10 @@ export default function CustomerDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ message: string; existingId: string } | null>(null);
   const [armedDelete, setArmedDelete] = useState(false);
-  const [tab, setTab] = useState<"info" | "transactions" | "orders">("info");
+  const initialTab = searchParams.get("tab");
+  const [tab, setTab] = useState<"info" | "transactions" | "orders">(
+    initialTab === "transactions" || initialTab === "orders" ? initialTab : "info"
+  );
 
   function loadCustomer() {
     if (!id || isNew) return;
@@ -123,7 +127,7 @@ export default function CustomerDetailPage() {
   if (isNew) {
     return (
       <div>
-        <TopBar title="New customer" />
+        <TopBar title="New customer" backTo="/customers" />
         <form className="card" onSubmit={onCreate}>
           <label htmlFor="cf-name">Full name *</label>
           <input id="cf-name" value={form.name} onChange={(e) => set("name", e.target.value)} required autoFocus />
@@ -165,7 +169,7 @@ export default function CustomerDetailPage() {
 
   return (
     <div>
-      <TopBar title={customer.name} />
+      <TopBar title={customer.name} backTo="/customers" />
       <Tabs
         tabs={[
           { key: "info", label: "Info" },
@@ -350,11 +354,13 @@ function TransactionsTab({ customer, onChanged }: { customer: Customer; onChange
   }
 
   return (
-    <div className="card">
-      {customer.transactions.length === 0 && !adding && <p className="muted small">No transactions yet.</p>}
-      {customer.transactions.map((t) => (
-        <TransactionRow key={t.id} customerId={customer.id} transaction={t} onChanged={onChanged} />
-      ))}
+    <div>
+      <PurchaseSummary transactions={customer.transactions} />
+      <div className="card">
+        {customer.transactions.length === 0 && !adding && <p className="muted small">No transactions yet.</p>}
+        {customer.transactions.map((t) => (
+          <TransactionRow key={t.id} customerId={customer.id} transaction={t} onChanged={onChanged} />
+        ))}
 
       {adding ? (
         <form className="info-row-editing" onSubmit={onAdd}>
@@ -395,6 +401,44 @@ function TransactionsTab({ customer, onChanged }: { customer: Customer; onChange
           <Plus size={15} /> Add transaction
         </button>
       )}
+      </div>
+    </div>
+  );
+}
+
+function PurchaseSummary({ transactions }: { transactions: Customer["transactions"] }) {
+  if (transactions.length === 0) return null;
+
+  const byCurrency = new Map<string, number>();
+  for (const t of transactions) {
+    const key = t.currency || "";
+    byCurrency.set(key, (byCurrency.get(key) ?? 0) + Number(t.amount || 0) * Number(t.qty || 1));
+  }
+  const dates = transactions.map((t) => t.date).sort();
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+
+  return (
+    <div className="card">
+      <h3>Purchase summary</h3>
+      <div className="row-between">
+        <span className="muted small">Total spent</span>
+        <span>
+          {Array.from(byCurrency.entries())
+            .map(([cur, total]) => `${cur ? cur + " " : ""}${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`)
+            .join(" + ")}
+        </span>
+      </div>
+      <div className="row-between">
+        <span className="muted small">Transactions</span>
+        <span>{transactions.length}</span>
+      </div>
+      <div className="row-between">
+        <span className="muted small">First · last purchase</span>
+        <span>
+          {first} · {last}
+        </span>
+      </div>
     </div>
   );
 }

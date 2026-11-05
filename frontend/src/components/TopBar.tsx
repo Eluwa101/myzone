@@ -1,11 +1,21 @@
+import { ChevronLeft } from "lucide-react";
 import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import NotesBell from "./NotesBell";
 import UserMenu from "./UserMenu";
 
-export default function TopBar({ title, actions }: { title: string; actions?: ReactNode }) {
+export default function TopBar({ title, actions, backTo }: { title: string; actions?: ReactNode; backTo?: string }) {
+  const navigate = useNavigate();
   return (
     <header className="top-bar">
-      <h1>{title}</h1>
+      <div className="top-bar-title">
+        {backTo && (
+          <button type="button" className="icon-btn btn-ghost" aria-label="Back" onClick={() => navigate(backTo)}>
+            <ChevronLeft size={20} />
+          </button>
+        )}
+        <h1>{title}</h1>
+      </div>
       <div className="top-bar-actions">
         {actions}
         <NotesBell />

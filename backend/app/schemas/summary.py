@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel
 
 
@@ -27,3 +29,5 @@ class SummaryOut(BaseModel):
     last_6_months: list[MonthTotal]
     top_customers: list[TopCustomer]
     interests: list[InterestRollup]
+    range_start: date | None = None
+    range_end: date | None = None

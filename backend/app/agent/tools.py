@@ -275,6 +275,34 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         return result
 
     @tool
+    def create_shared_note(customer_ids: str, title: str, content: str) -> dict:
+        """Create a note and attach it to one or more specific customers,
+        when the user directly instructs you to add/save a note (e.g. "add
+        a note on Ada and Bola that they're both creditors who still owe for
+        last month"). customer_ids is a comma-separated list of customer
+        ids - look them up first with search_customers if you only have
+        names. Use this (not add_customer_note) whenever the user explicitly
+        asked for a note to be created; it does not need human review since
+        the user instructed it directly."""
+        ids = [cid.strip() for cid in customer_ids.split(",") if cid.strip()]
+        if not ids:
+            return {"status": "error", "message": "customer_ids is required - look up the customer(s) with search_customers first."}
+        try:
+            parsed_ids = [UUID(cid) for cid in ids]
+        except ValueError:
+            return {"status": "error", "message": "customer_ids must be valid customer ids, not names - use search_customers first."}
+        from app.schemas.note import NoteOut
+
+        note = note_controller.create_note(
+            db, org_id,
+            NoteCreate(title=title.strip() or "Note", content=content.strip(), customer_ids=parsed_ids),
+            created_by_agent=True, is_pending_review=False,
+        )
+        result = {"status": "created", **NoteOut.model_validate(note).model_dump(mode="json")}
+        log("create_shared_note", {"customer_ids": customer_ids, "title": title, "content": content}, result)
+        return result
+
+    @tool
     def add_customer_note(customer_id: str, title: str, content: str) -> dict:
         """Record free-form, ambiguous, or multi-part information about a
         customer as a note rather than a structured field - use this whenever
@@ -350,6 +378,7 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         create_order,
         set_customer_custom_field,
         add_customer_note,
+        create_shared_note,
         get_dashboard_summary,
         delete_customer,
         merge_customers,

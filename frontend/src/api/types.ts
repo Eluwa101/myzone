@@ -100,6 +100,15 @@ export interface Summary {
   last_6_months: MonthTotal[];
   top_customers: TopCustomer[];
   interests: InterestRollup[];
+  range_start?: string | null;
+  range_end?: string | null;
+}
+
+export interface SavedWidget {
+  id: string;
+  question: string;
+  title: string;
+  created_at: string;
 }
 
 export interface PendingAction {

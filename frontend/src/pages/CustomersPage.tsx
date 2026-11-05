@@ -1,6 +1,6 @@
 import { Plus, Search, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { listCustomers } from "../api/customers";
 import { errorMessage } from "../api/errorMessage";
 import type { Customer, CustomerStatus } from "../api/types";
@@ -10,8 +10,9 @@ import StatusBadge from "../components/StatusBadge";
 import TopBar from "../components/TopBar";
 
 export default function CustomersPage() {
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<CustomerStatus | "">("");
+  const [status, setStatus] = useState<CustomerStatus | "">((searchParams.get("status") as CustomerStatus | "") || "");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);

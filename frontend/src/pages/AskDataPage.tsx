@@ -1,7 +1,8 @@
-import { Mic, Send, Square, SquarePen } from "lucide-react";
+import { Bookmark, BookmarkCheck, Mic, Send, Square, SquarePen } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { askData } from "../api/agent";
 import { errorMessage } from "../api/errorMessage";
+import { createWidget } from "../api/widgets";
 import ErrorText from "../components/ErrorText";
 import MarkdownMessage from "../components/MarkdownMessage";
 import TopBar from "../components/TopBar";
@@ -10,6 +11,8 @@ import { useVoiceInput } from "../hooks/useVoiceInput";
 interface Message {
   role: "user" | "assistant";
   content: string;
+  question?: string;
+  saved?: boolean;
 }
 
 const CHIPS = [
@@ -44,7 +47,7 @@ export default function AskDataPage() {
     setBusy(true);
     try {
       const res = await askData(question);
-      setMessages((m) => [...m, { role: "assistant", content: res.answer }]);
+      setMessages((m) => [...m, { role: "assistant", content: res.answer, question }]);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -60,6 +63,17 @@ export default function AskDataPage() {
   function onMicClick() {
     baseTextRef.current = input;
     voice.toggle();
+  }
+
+  async function saveToDashboard(index: number) {
+    const msg = messages[index];
+    if (!msg.question) return;
+    try {
+      await createWidget(msg.question);
+      setMessages((m) => m.map((mm, i) => (i === index ? { ...mm, saved: true } : mm)));
+    } catch (err) {
+      setError(errorMessage(err));
+    }
   }
 
   return (
@@ -93,6 +107,25 @@ export default function AskDataPage() {
         {messages.map((m, i) => (
           <div key={i} className={`chat-bubble ${m.role}`}>
             {m.role === "assistant" ? <MarkdownMessage content={m.content} /> : m.content}
+            {m.role === "assistant" && m.question && (
+              <button
+                type="button"
+                className={`btn-ghost small${m.saved ? "" : " icon-btn"}`}
+                style={{ marginTop: 8, padding: "4px 8px" }}
+                onClick={() => saveToDashboard(i)}
+                disabled={m.saved}
+              >
+                {m.saved ? (
+                  <>
+                    <BookmarkCheck size={13} /> Saved
+                  </>
+                ) : (
+                  <>
+                    <Bookmark size={13} /> Save to Dashboard
+                  </>
+                )}
+              </button>
+            )}
           </div>
         ))}
         {busy && <div className="chat-bubble assistant muted">Thinking…</div>}

@@ -5,6 +5,9 @@ import ChatPage from "./pages/ChatPage";
 import CustomerDetailPage from "./pages/CustomerDetailPage";
 import CustomersPage from "./pages/CustomersPage";
 import DashboardPage from "./pages/DashboardPage";
+import DashboardInterestsPage from "./pages/DashboardInterestsPage";
+import DashboardMonthlyPage from "./pages/DashboardMonthlyPage";
+import DashboardTopCustomersPage from "./pages/DashboardTopCustomersPage";
 import LoginPage from "./pages/LoginPage";
 import NotesPage from "./pages/NotesPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -21,6 +24,9 @@ export default function App() {
         <Route path="/customers/:id" element={<CustomerDetailPage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/dashboard/top-customers" element={<DashboardTopCustomersPage />} />
+        <Route path="/dashboard/monthly" element={<DashboardMonthlyPage />} />
+        <Route path="/dashboard/interests" element={<DashboardInterestsPage />} />
         <Route path="/ask" element={<AskDataPage />} />
         <Route path="/notes" element={<NotesPage />} />
         <Route path="/settings" element={<SettingsPage />} />

@@ -77,6 +77,23 @@ def test_agent_set_custom_field_tool(db_session, seeded_org, tools):
     assert result["extra"]["Car"] == "Toyota Camry"
 
 
+def test_agent_create_shared_note_tool_attaches_multiple_customers_without_review(db_session, seeded_org, tools):
+    from app.controllers import customer_controller
+    from app.schemas.customer import CustomerCreate
+
+    org_id, _ = seeded_org
+    a = customer_controller.create_customer(db_session, org_id, CustomerCreate(name="Ada Obi"))
+    b = customer_controller.create_customer(db_session, org_id, CustomerCreate(name="Bola Ade"))
+
+    result = tools["create_shared_note"].invoke(
+        {"customer_ids": f"{a.id}, {b.id}", "title": "Creditors", "content": "Owes for last delivery"}
+    )
+    assert result["status"] == "created"
+    assert result["is_pending_review"] is False
+    assert result["created_by_agent"] is True
+    assert {c["id"] for c in result["customers"]} == {str(a.id), str(b.id)}
+
+
 def test_agent_add_customer_note_tool_creates_pending_note(db_session, seeded_org, tools):
     from app.controllers import customer_controller, note_controller
     from app.schemas.customer import CustomerCreate

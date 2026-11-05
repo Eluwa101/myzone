@@ -71,7 +71,20 @@ export default function NotesBell() {
               <p className="small" style={{ margin: "2px 0 4px" }}>
                 {n.content}
               </p>
-              <div className="muted small">{n.customers.map((c) => c.name).join(", ") || "Not attached to a customer"}</div>
+              <div className="muted small">
+                {n.customers.length === 0 ? (
+                  "Not attached to a customer"
+                ) : (
+                  n.customers.map((c, i) => (
+                    <span key={c.id}>
+                      {i > 0 && ", "}
+                      <Link to={`/customers/${c.id}`} onClick={() => setOpen(false)}>
+                        {c.name}
+                      </Link>
+                    </span>
+                  ))
+                )}
+              </div>
               <div className="row" style={{ marginTop: 8 }}>
                 <button type="button" onClick={() => markReviewed(n.id)}>
                   Mark reviewed

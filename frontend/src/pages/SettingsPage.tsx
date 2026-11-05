@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { exportCsv, importCsv } from "../api/customers";
+import ThemeToggle from "../components/ThemeToggle";
 import { errorMessage } from "../api/errorMessage";
 import { getSettings, updateSettings } from "../api/settings";
 import type { ImportResult } from "../api/types";
@@ -112,6 +113,12 @@ export default function SettingsPage() {
   return (
     <div>
       <TopBar title="Settings" />
+
+      <div className="card">
+        <h3>Appearance</h3>
+        <p className="muted small">Choose how the app looks, or follow your device's setting.</p>
+        <ThemeToggle />
+      </div>
 
       <div className="card">
         <h3>

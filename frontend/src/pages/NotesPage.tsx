@@ -1,6 +1,6 @@
 import { Check, ChevronRight, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { listCustomers } from "../api/customers";
 import { createNote, deleteNote, listNotes, updateNote } from "../api/notes";
 import { errorMessage } from "../api/errorMessage";
@@ -35,7 +35,7 @@ export default function NotesPage() {
 
   return (
     <div>
-      <TopBar title="Notes" />
+      <TopBar title="Notes" backTo="/settings" />
       <p className="muted small page-note">
         Define your own notes - creditors, VIPs, anything you want to flag - and attach them to one or many customers.
       </p>
@@ -210,9 +210,9 @@ function NoteCard({ note, customers, onChanged }: { note: OrgNote; customers: Cu
       {note.customers.length > 0 && (
         <div className="note-card-customers">
           {note.customers.map((c) => (
-            <span key={c.id} className="chip">
+            <Link key={c.id} to={`/customers/${c.id}`} className="chip">
               {c.name}
-            </span>
+            </Link>
           ))}
         </div>
       )}

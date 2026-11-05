@@ -101,6 +101,74 @@
   }
 }
 
+/* Explicit theme overrides (via the toggle in Settings), applied through a
+   data-theme attribute on <html>. These win over the OS-preference media
+   query above purely on selector specificity (an attribute selector beats a
+   plain :root), so "system" just means no data-theme attribute is set. */
+:root[data-theme="dark"] {
+  --bg: #0a0e17;
+  --surface: #131826;
+  --surface-hover: #1a2032;
+  --text: #e8eaf0;
+  --text-muted: #8b93a7;
+  --border: #232a3d;
+
+  --accent: var(--accent-500);
+  --accent-strong: #818cf8;
+  --accent-contrast: #ffffff;
+  --accent-soft-bg: rgba(99, 102, 241, 0.16);
+  --accent-soft-text: #a5b4fc;
+
+  --danger: #f87171;
+  --danger-soft-bg: rgba(239, 68, 68, 0.14);
+  --danger-soft-text: #fca5a5;
+
+  --success-50: rgba(5, 150, 105, 0.16);
+  --success-600: #34d399;
+  --success-700: #6ee7b7;
+  --warning-50: rgba(217, 119, 6, 0.16);
+  --warning-600: #fbbf24;
+  --warning-700: #fcd34d;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 16px 40px -12px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: var(--gray-50);
+  --surface: #ffffff;
+  --surface-hover: var(--gray-50);
+  --text: var(--gray-900);
+  --text-muted: var(--gray-500);
+  --border: var(--gray-200);
+
+  --accent: var(--accent-600);
+  --accent-strong: var(--accent-700);
+  --accent-contrast: #ffffff;
+  --accent-soft-bg: var(--accent-50);
+  --accent-soft-text: var(--accent-700);
+
+  --danger: var(--danger-600);
+  --danger-soft-bg: var(--danger-50);
+  --danger-soft-text: var(--danger-700);
+
+  --success-50: #ecfdf5;
+  --success-600: #059669;
+  --success-700: #047857;
+  --warning-50: #fffbeb;
+  --warning-600: #d97706;
+  --warning-700: #b45309;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.16);
+  --shadow-lg: 0 16px 40px -12px rgba(15, 23, 42, 0.24);
+
+  color-scheme: light;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -173,7 +241,7 @@ label {
   margin: 14px 0 6px;
 }
 
-input,
+input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
   width: 100%;
@@ -283,6 +351,12 @@ button:disabled {
   border-bottom: none;
 }
 
+a.row-between:hover {
+  background: var(--surface-hover);
+  margin: 0 -8px;
+  padding: 7px 8px;
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -334,10 +408,24 @@ button:disabled {
   padding: 20px 20px 10px;
 }
 
+.top-bar-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.top-bar-title h1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .top-bar-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .user-menu {
