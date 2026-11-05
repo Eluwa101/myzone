@@ -1,4 +1,4 @@
-import { ClipboardList, Copy, Download, QrCode, StickyNote, Upload } from "lucide-react";
+import { ClipboardList, Copy, Download, QrCode, StickyNote, Upload, Users } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -118,6 +118,19 @@ export default function SettingsPage() {
         <h3>Appearance</h3>
         <p className="muted small">Choose how the app looks, or follow your device's setting.</p>
         <ThemeToggle />
+      </div>
+
+      <div className="card">
+        <h3>
+          <Users size={15} className="h3-icon" /> Segments
+        </h3>
+        <p className="muted small">
+          Group customers by filters - status, interest, purchase recency - then email or WhatsApp everyone in the group
+          at once.
+        </p>
+        <Link to="/segments" className="btn-primary" style={{ display: "inline-flex" }}>
+          Open segments
+        </Link>
       </div>
 
       <div className="card">

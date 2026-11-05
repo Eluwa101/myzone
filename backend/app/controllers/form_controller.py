@@ -1,12 +1,14 @@
+import datetime
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from app.controllers import customer_controller
+from app.controllers import customer_controller, transaction_controller
 from app.models.custom_form import CustomForm, FormSubmission, generate_public_token
 from app.models.customer import Customer
 from app.schemas.customer import CustomerCreate
-from app.schemas.form import STANDARD_FIELD_KEYS, FormCreate, FormUpdate
+from app.schemas.form import CUSTOMER_FIELD_KEYS, TRANSACTION_FIELD_KEYS, FormCreate, FormUpdate
+from app.schemas.transaction import TransactionCreate
 
 
 class FormNotFoundError(Exception):
@@ -62,6 +64,7 @@ def list_submissions(db: Session, org_id: UUID, form_id: UUID) -> list[FormSubmi
     get_form(db, org_id, form_id)  # raises FormNotFoundError if not owned by this org
     return (
         db.query(FormSubmission)
+        .options(joinedload(FormSubmission.customer))
         .filter(FormSubmission.org_id == org_id, FormSubmission.form_id == form_id)
         .order_by(FormSubmission.created_at.desc())
         .all()
@@ -98,30 +101,62 @@ def _upsert_customer(db: Session, org_id: UUID, data: CustomerCreate) -> tuple[C
     return customer, True
 
 
-def submit_public_form(db: Session, token: str, payload: dict[str, str]) -> tuple[FormSubmission, bool]:
+def _log_submission_transaction(db: Session, org_id: UUID, customer_id: UUID, tx_fields: dict[str, str]) -> bool:
+    """A transaction only gets logged if the submission actually included
+    both an item and an amount - the two fields Transaction itself
+    requires. Anything else (date/qty/currency) is optional and defaults
+    the same way the add_transaction agent tool does."""
+    item = tx_fields.get("tx_item")
+    amount_raw = tx_fields.get("tx_amount")
+    if not item or not amount_raw:
+        return False
+    try:
+        amount = float(amount_raw)
+    except ValueError:
+        return False
+    qty_raw = tx_fields.get("tx_qty")
+    try:
+        qty = float(qty_raw) if qty_raw else 1
+    except ValueError:
+        qty = 1
+    tx_date = tx_fields.get("tx_date") or datetime.date.today().isoformat()
+    transaction_controller.add_transaction(
+        db, org_id, customer_id,
+        TransactionCreate(date=tx_date, item=item, qty=qty, amount=amount, currency=(tx_fields.get("tx_currency") or "").upper()),
+    )
+    return True
+
+
+def submit_public_form(db: Session, token: str, payload: dict[str, str]) -> tuple[FormSubmission, bool, bool]:
     form = get_public_form(db, token)
 
     missing = [f["label"] for f in form.fields if f.get("required") and not str(payload.get(f["key"], "")).strip()]
     if missing:
         raise MissingRequiredFieldsError(missing)
 
-    standard: dict[str, str] = {}
+    customer_fields: dict[str, str] = {}
+    transaction_fields: dict[str, str] = {}
     extra: dict[str, str] = {}
     for f in form.fields:
         value = payload.get(f["key"])
         if value is None or not str(value).strip():
             continue
         value = str(value).strip()
-        if f["standard"] and f["key"] in STANDARD_FIELD_KEYS:
-            standard[f["key"]] = value
-        elif not f["standard"]:
+        category = f.get("category", "custom")
+        if category == "customer" and f["key"] in CUSTOMER_FIELD_KEYS:
+            customer_fields[f["key"]] = value
+        elif category == "transaction" and f["key"] in TRANSACTION_FIELD_KEYS:
+            transaction_fields[f["key"]] = value
+        elif category == "custom":
             extra[f["label"]] = value
 
-    data = CustomerCreate(name=standard.get("name", ""), **{k: v for k, v in standard.items() if k != "name"}, extra=extra)
+    data = CustomerCreate(name=customer_fields.get("name", ""), **{k: v for k, v in customer_fields.items() if k != "name"}, extra=extra)
     customer, created = _upsert_customer(db, form.org_id, data)
+
+    transaction_logged = _log_submission_transaction(db, form.org_id, customer.id, transaction_fields)
 
     submission = FormSubmission(form_id=form.id, org_id=form.org_id, customer_id=customer.id, raw_payload=payload)
     db.add(submission)
     db.commit()
     db.refresh(submission)
-    return submission, created
+    return submission, created, transaction_logged

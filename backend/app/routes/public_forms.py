@@ -26,9 +26,9 @@ def submit_form(token: str, payload: dict[str, str], db: Session = Depends(get_d
     if not check_rate_limit(token):
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many submissions - please try again shortly.")
     try:
-        _submission, created = form_controller.submit_public_form(db, token, payload)
+        _submission, created, tx_logged = form_controller.submit_public_form(db, token, payload)
     except form_controller.FormNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Form not found.")
     except form_controller.MissingRequiredFieldsError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Missing required field(s): {', '.join(e.missing)}")
-    return FormSubmitResult(status="ok", customer_created=created)
+    return FormSubmitResult(status="ok", customer_created=created, transaction_logged=tx_logged)

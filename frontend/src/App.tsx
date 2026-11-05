@@ -12,6 +12,7 @@ import FormsPage from "./pages/FormsPage";
 import LoginPage from "./pages/LoginPage";
 import NotesPage from "./pages/NotesPage";
 import PublicFormPage from "./pages/PublicFormPage";
+import SegmentsPage from "./pages/SegmentsPage";
 import SettingsPage from "./pages/SettingsPage";
 import SignupPage from "./pages/SignupPage";
 
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="/ask" element={<AskDataPage />} />
         <Route path="/notes" element={<NotesPage />} />
         <Route path="/forms" element={<FormsPage />} />
+        <Route path="/segments" element={<SegmentsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
 

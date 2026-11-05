@@ -1,29 +1,50 @@
-import { Check, Copy, ExternalLink, Plus, QrCode, Trash2, X } from "lucide-react";
+import { Check, Copy, ExternalLink, QrCode, ShoppingBag, Trash2, User, X } from "lucide-react";
 import QRCodeLib from "qrcode";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { createForm, deleteForm, listForms, listSubmissions, updateForm } from "../api/forms";
 import { errorMessage } from "../api/errorMessage";
-import type { CustomForm, FormFieldDef, FormSubmission } from "../api/types";
+import type { CustomForm, FormFieldCategory, FormFieldDef, FormFieldType, FormSubmission } from "../api/types";
 import ErrorText from "../components/ErrorText";
 import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
 
-const STANDARD_FIELD_OPTIONS: { key: string; label: string }[] = [
-  { key: "name", label: "Full name" },
-  { key: "phone", label: "Phone / WhatsApp" },
-  { key: "email", label: "Email" },
-  { key: "job", label: "Job / occupation" },
-  { key: "nationality", label: "Nationality" },
-  { key: "pet", label: "Pet(s)" },
-  { key: "address", label: "Address / city" },
-  { key: "notes", label: "Notes" },
-  { key: "interests", label: "Interested in" },
+const CUSTOMER_FIELD_OPTIONS: { key: string; label: string; type: FormFieldType }[] = [
+  { key: "name", label: "Full name", type: "text" },
+  { key: "phone", label: "Phone / WhatsApp", type: "tel" },
+  { key: "email", label: "Email", type: "email" },
+  { key: "job", label: "Job / occupation", type: "text" },
+  { key: "nationality", label: "Nationality", type: "text" },
+  { key: "pet", label: "Pet(s)", type: "text" },
+  { key: "address", label: "Address / city", type: "text" },
+  { key: "notes", label: "Notes", type: "textarea" },
+  { key: "interests", label: "Interested in", type: "text" },
 ];
 
-const DEFAULT_FIELDS: FormFieldDef[] = [{ key: "name", label: "Full name", type: "text", required: true, standard: true }];
+const TRANSACTION_FIELD_OPTIONS: { key: string; label: string; type: FormFieldType }[] = [
+  { key: "tx_item", label: "Item purchased", type: "text" },
+  { key: "tx_qty", label: "Quantity", type: "number" },
+  { key: "tx_amount", label: "Amount", type: "number" },
+  { key: "tx_currency", label: "Currency", type: "text" },
+  { key: "tx_date", label: "Purchase date", type: "date" },
+];
+
+const CUSTOM_FIELD_TYPES: FormFieldType[] = ["text", "textarea", "tel", "email", "number", "date"];
+
+const DEFAULT_FIELDS: FormFieldDef[] = [{ key: "name", label: "Full name", type: "text", required: true, category: "customer" }];
 
 function publicFormUrl(token: string): string {
   return `${window.location.origin}/f/${token}`;
+}
+
+function slugify(label: string): string {
+  return (
+    label
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || `field_${Date.now()}`
+  );
 }
 
 export default function FormsPage() {
@@ -53,7 +74,7 @@ export default function FormsPage() {
           <FormBuilder onCancel={() => setCreating(false)} onSaved={() => { setCreating(false); load(); }} />
         ) : (
           <button type="button" className="icon-btn btn-ghost" onClick={() => setCreating(true)}>
-            <Plus size={15} /> New form
+            + New form
           </button>
         )}
       </div>
@@ -159,7 +180,7 @@ function FormCard({ form, onChanged }: { form: CustomForm; onChanged: () => void
           <img src={qrDataUrl} alt="Form QR code" width={160} height={160} />
         </div>
       )}
-      {showSubmissions && <SubmissionsList formId={form.id} />}
+      {showSubmissions && <SubmissionsList formId={form.id} fields={form.fields} />}
 
       <ErrorText message={error} />
       <div className="row" style={{ marginTop: 10 }}>
@@ -180,8 +201,10 @@ function FormCard({ form, onChanged }: { form: CustomForm; onChanged: () => void
   );
 }
 
-function SubmissionsList({ formId }: { formId: string }) {
+function SubmissionsList({ formId, fields }: { formId: string; fields: FormFieldDef[] }) {
   const [items, setItems] = useState<FormSubmission[] | null>(null);
+  const labelByKey = new Map(fields.map((f) => [f.key, f.label]));
+  const categoryByKey = new Map(fields.map((f) => [f.key, f.category]));
 
   useEffect(() => {
     listSubmissions(formId).then(setItems);
@@ -191,12 +214,29 @@ function SubmissionsList({ formId }: { formId: string }) {
   if (items.length === 0) return <p className="muted small">No submissions yet.</p>;
 
   return (
-    <div style={{ marginTop: 8 }}>
+    <div className="submissions-list">
       {items.map((s) => (
-        <div key={s.id} className="info-row" style={{ cursor: "default" }}>
-          <div className="info-row-text">
-            <div className="info-row-value muted small">{new Date(s.created_at).toLocaleString()}</div>
-            <div className="small">{Object.entries(s.raw_payload).map(([k, v]) => `${k}: ${v}`).join(" · ")}</div>
+        <div key={s.id} className="submission-card">
+          <div className="row-between" style={{ borderBottom: "none", padding: "2px 0" }}>
+            <span className="muted small">{new Date(s.created_at).toLocaleString()}</span>
+            {s.customer_id ? (
+              <Link to={`/customers/${s.customer_id}`} className="chip">
+                <User size={12} /> {s.customer_name ?? "View customer"}
+              </Link>
+            ) : (
+              <span className="muted small">No record created</span>
+            )}
+          </div>
+          <div className="submission-fields">
+            {Object.entries(s.raw_payload).map(([k, v]) => (
+              <div key={k} className="row-between" style={{ padding: "3px 0" }}>
+                <span className="muted small">
+                  {categoryByKey.get(k) === "transaction" && <ShoppingBag size={11} className="h3-icon" />}
+                  {labelByKey.get(k) ?? k}
+                </span>
+                <span className="small">{v}</span>
+              </div>
+            ))}
           </div>
         </div>
       ))}
@@ -204,13 +244,42 @@ function SubmissionsList({ formId }: { formId: string }) {
   );
 }
 
-function slugify(label: string): string {
+function AddFieldPicker({ usedKeys, onAdd }: { usedKeys: Set<string>; onAdd: (f: FormFieldDef) => void }) {
+  function onChange(e: ChangeEvent<HTMLSelectElement>) {
+    const value = e.target.value;
+    e.target.value = "";
+    if (!value) return;
+    if (value === "__custom__") {
+      onAdd({ key: slugify(`field_${Date.now()}`), label: "", type: "text", required: false, category: "custom" });
+      return;
+    }
+    const [category, key] = value.split(":") as [FormFieldCategory, string];
+    const options = category === "customer" ? CUSTOMER_FIELD_OPTIONS : TRANSACTION_FIELD_OPTIONS;
+    const opt = options.find((o) => o.key === key);
+    if (opt) onAdd({ key: opt.key, label: opt.label, type: opt.type, required: false, category });
+  }
+
   return (
-    label
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "") || `field_${Date.now()}`
+    <select value="" onChange={onChange} aria-label="Add field">
+      <option value="" disabled>
+        + Add field…
+      </option>
+      <optgroup label="Customer fields">
+        {CUSTOMER_FIELD_OPTIONS.filter((o) => !usedKeys.has(`customer:${o.key}`)).map((o) => (
+          <option key={o.key} value={`customer:${o.key}`}>
+            {o.label}
+          </option>
+        ))}
+      </optgroup>
+      <optgroup label="Transaction fields">
+        {TRANSACTION_FIELD_OPTIONS.filter((o) => !usedKeys.has(`transaction:${o.key}`)).map((o) => (
+          <option key={o.key} value={`transaction:${o.key}`}>
+            {o.label}
+          </option>
+        ))}
+      </optgroup>
+      <option value="__custom__">+ Custom field…</option>
+    </select>
   );
 }
 
@@ -228,7 +297,7 @@ function FormBuilder({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const usedStandardKeys = new Set(fields.filter((f) => f.standard).map((f) => f.key));
+  const usedKeys = new Set(fields.filter((f) => f.category !== "custom").map((f) => `${f.category}:${f.key}`));
 
   function update(i: number, patch: Partial<FormFieldDef>) {
     setFields((f) => f.map((field, idx) => (idx === i ? { ...field, ...patch } : field)));
@@ -238,14 +307,8 @@ function FormBuilder({
     setFields((f) => f.filter((_, idx) => idx !== i));
   }
 
-  function addStandard() {
-    const next = STANDARD_FIELD_OPTIONS.find((o) => !usedStandardKeys.has(o.key));
-    if (!next) return;
-    setFields((f) => [...f, { key: next.key, label: next.label, type: "text", required: false, standard: true }]);
-  }
-
-  function addCustom() {
-    setFields((f) => [...f, { key: slugify(""), label: "", type: "text", required: false, standard: false }]);
+  function addField(f: FormFieldDef) {
+    setFields((prev) => [...prev, f]);
   }
 
   async function onSubmit(e: FormEvent) {
@@ -254,7 +317,7 @@ function FormBuilder({
     setBusy(true);
     setError(null);
     try {
-      const cleaned = fields.map((f) => (f.standard ? f : { ...f, key: slugify(f.label) }));
+      const cleaned = fields.map((f) => (f.category === "custom" ? { ...f, key: slugify(f.label || f.key) } : f));
       if (initialForm) await updateForm(initialForm.id, { name: name.trim(), fields: cleaned });
       else await createForm({ name: name.trim(), fields: cleaned });
       onSaved();
@@ -273,39 +336,38 @@ function FormBuilder({
       <label>Fields</label>
       {fields.map((f, i) => (
         <div key={i} className="card" style={{ margin: "8px 0", padding: 12 }}>
-          {f.standard ? (
+          <div className="row-between" style={{ borderBottom: "none", padding: 0, marginBottom: 6 }}>
+            <span className="muted small">
+              {f.category === "customer" && (
+                <>
+                  <User size={11} className="h3-icon" /> Customer field
+                </>
+              )}
+              {f.category === "transaction" && (
+                <>
+                  <ShoppingBag size={11} className="h3-icon" /> Transaction field
+                </>
+              )}
+              {f.category === "custom" && "Custom field"}
+            </span>
+          </div>
+          <label htmlFor={`field-label-${i}`}>Label shown on the form</label>
+          <input id={`field-label-${i}`} value={f.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="e.g. Preferred delivery day" disabled={f.key === "name"} />
+          {f.category === "custom" && (
             <>
-              <label htmlFor={`field-key-${i}`}>Standard field</label>
-              <select
-                id={`field-key-${i}`}
-                value={f.key}
-                onChange={(e) => {
-                  const opt = STANDARD_FIELD_OPTIONS.find((o) => o.key === e.target.value);
-                  update(i, { key: e.target.value, label: opt?.label ?? e.target.value });
-                }}
-                disabled={f.key === "name"}
-              >
-                {STANDARD_FIELD_OPTIONS.filter((o) => o.key === f.key || !usedStandardKeys.has(o.key)).map((o) => (
-                  <option key={o.key} value={o.key}>
-                    {o.label}
+              <label htmlFor={`field-type-${i}`}>Input type</label>
+              <select id={`field-type-${i}`} value={f.type} onChange={(e) => update(i, { type: e.target.value as FormFieldType })}>
+                {CUSTOM_FIELD_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
                   </option>
                 ))}
               </select>
             </>
-          ) : (
-            <>
-              <label htmlFor={`field-label-${i}`}>Custom field label</label>
-              <input id={`field-label-${i}`} value={f.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="e.g. Preferred delivery day" />
-            </>
           )}
           <div className="row" style={{ marginTop: 8 }}>
             <label className="row" style={{ gap: 6 }}>
-              <input
-                type="checkbox"
-                checked={f.required}
-                onChange={(e) => update(i, { required: e.target.checked })}
-                disabled={f.key === "name"}
-              />
+              <input type="checkbox" checked={f.required} onChange={(e) => update(i, { required: e.target.checked })} disabled={f.key === "name"} />
               Required
             </label>
             {f.key !== "name" && (
@@ -317,13 +379,8 @@ function FormBuilder({
         </div>
       ))}
 
-      <div className="row" style={{ marginTop: 4 }}>
-        <button type="button" onClick={addStandard} disabled={usedStandardKeys.size >= STANDARD_FIELD_OPTIONS.length}>
-          <Plus size={14} /> Standard field
-        </button>
-        <button type="button" onClick={addCustom}>
-          <Plus size={14} /> Custom field
-        </button>
+      <div style={{ marginTop: 4 }}>
+        <AddFieldPicker usedKeys={usedKeys} onAdd={addField} />
       </div>
 
       <ErrorText message={error} />

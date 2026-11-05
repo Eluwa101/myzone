@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.agent.checkpointer import close_checkpointer
 from app.core.config import settings as app_settings
-from app.routes import agent, auth, customers, forms, notes, orders, public_forms, saved_widgets, settings, summary, transactions
+from app.routes import agent, auth, customers, forms, notes, orders, public_forms, saved_widgets, segments, settings, summary, transactions
 
 
 @asynccontextmanager
@@ -32,6 +32,7 @@ app.include_router(notes.router)
 app.include_router(saved_widgets.router)
 app.include_router(forms.router)
 app.include_router(public_forms.router)
+app.include_router(segments.router)
 app.include_router(summary.router)
 app.include_router(agent.router)
 app.include_router(settings.router)

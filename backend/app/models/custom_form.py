@@ -3,7 +3,7 @@ import secrets
 import uuid
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Uuid as UUID, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -38,3 +38,9 @@ class FormSubmission(Base):
     raw_payload: Mapped[dict] = mapped_column(JSON, default=dict)
 
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    customer = relationship("Customer")
+
+    @property
+    def customer_name(self) -> str | None:
+        return self.customer.name if self.customer else None

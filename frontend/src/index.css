@@ -534,6 +534,26 @@ a.row-between:hover {
   margin-bottom: 10px;
 }
 
+.submissions-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.submission-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  background: var(--surface-hover);
+}
+
+.submission-fields {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 2px;
+}
+
 .note-card-customers {
   display: flex;
   flex-wrap: wrap;

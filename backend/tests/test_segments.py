@@ -1,0 +1,87 @@
+def _create_customer(client, auth_headers, **kwargs):
+    return client.post("/api/customers", json={"name": "Unnamed", **kwargs}, headers=auth_headers).json()
+
+
+def test_create_and_list_segments(client, auth_headers):
+    resp = client.post("/api/segments", json={"name": "Leads", "filters": {"status": "lead"}}, headers=auth_headers)
+    assert resp.status_code == 201
+    listing = client.get("/api/segments", headers=auth_headers).json()
+    assert len(listing) == 1
+    assert listing[0]["name"] == "Leads"
+
+
+def test_segment_members_filters_by_status(client, auth_headers):
+    _create_customer(client, auth_headers, name="Ada Obi", status="lead")
+    _create_customer(client, auth_headers, name="Bo Chen", status="customer")
+
+    segment = client.post("/api/segments", json={"name": "Leads", "filters": {"status": "lead"}}, headers=auth_headers).json()
+    result = client.get(f"/api/segments/{segment['id']}/members", headers=auth_headers).json()
+    assert result["total"] == 1
+    assert result["members"][0]["name"] == "Ada Obi"
+
+
+def test_segment_members_filters_by_interest_substring(client, auth_headers):
+    _create_customer(client, auth_headers, name="Ada Obi", interests="Generator, Rice")
+    _create_customer(client, auth_headers, name="Bo Chen", interests="Shoes")
+
+    segment = client.post(
+        "/api/segments", json={"name": "Generator leads", "filters": {"interest_contains": "generator"}}, headers=auth_headers
+    ).json()
+    result = client.get(f"/api/segments/{segment['id']}/members", headers=auth_headers).json()
+    assert result["total"] == 1
+    assert result["members"][0]["name"] == "Ada Obi"
+
+
+def test_segment_members_filters_by_last_purchase_within_days(client, auth_headers):
+    recent = _create_customer(client, auth_headers, name="Ada Obi")
+    stale = _create_customer(client, auth_headers, name="Bo Chen")
+    client.post(
+        f"/api/customers/{recent['id']}/transactions",
+        json={"date": "2026-11-01", "item": "Rice", "amount": 1000, "currency": "NGN"},
+        headers=auth_headers,
+    )
+    client.post(
+        f"/api/customers/{stale['id']}/transactions",
+        json={"date": "2026-01-01", "item": "Rice", "amount": 1000, "currency": "NGN"},
+        headers=auth_headers,
+    )
+
+    segment = client.post(
+        "/api/segments", json={"name": "Recent buyers", "filters": {"last_purchase_within_days": 30}}, headers=auth_headers
+    ).json()
+    result = client.get(f"/api/segments/{segment['id']}/members", headers=auth_headers).json()
+    assert {m["name"] for m in result["members"]} == {"Ada Obi"}
+
+
+def test_segment_members_filters_by_last_purchase_over_days_includes_never_purchased(client, auth_headers):
+    never_bought = _create_customer(client, auth_headers, name="Ada Obi")
+    recent_buyer = _create_customer(client, auth_headers, name="Bo Chen")
+    client.post(
+        f"/api/customers/{recent_buyer['id']}/transactions",
+        json={"date": "2026-11-01", "item": "Rice", "amount": 1000, "currency": "NGN"},
+        headers=auth_headers,
+    )
+
+    segment = client.post(
+        "/api/segments", json={"name": "Win-back", "filters": {"last_purchase_over_days": 60}}, headers=auth_headers
+    ).json()
+    result = client.get(f"/api/segments/{segment['id']}/members", headers=auth_headers).json()
+    assert {m["name"] for m in result["members"]} == {"Ada Obi"}
+    assert never_bought["id"] in [m["id"] for m in result["members"]]
+
+
+def test_preview_segment_without_saving(client, auth_headers):
+    _create_customer(client, auth_headers, name="Ada Obi", status="lead")
+    resp = client.post("/api/segments/preview", json={"status": "lead"}, headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+
+
+def test_update_and_delete_segment(client, auth_headers):
+    segment = client.post("/api/segments", json={"name": "Leads", "filters": {"status": "lead"}}, headers=auth_headers).json()
+    updated = client.patch(f"/api/segments/{segment['id']}", json={"name": "Hot leads"}, headers=auth_headers).json()
+    assert updated["name"] == "Hot leads"
+
+    resp = client.delete(f"/api/segments/{segment['id']}", headers=auth_headers)
+    assert resp.status_code == 204
+    assert client.get("/api/segments", headers=auth_headers).json() == []

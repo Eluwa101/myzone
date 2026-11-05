@@ -72,7 +72,7 @@ export default function PublicFormPage() {
                 ) : (
                   <input
                     id={`pf-${f.key}`}
-                    type={f.type === "tel" ? "tel" : f.type === "email" ? "email" : "text"}
+                    type={f.type}
                     required={f.required}
                     value={values[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
