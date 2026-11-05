@@ -172,7 +172,13 @@ export default function DashboardPage() {
                 <div key={i.interest} className="row-between" style={{ alignItems: "flex-start" }}>
                   <b>{i.interest}</b>
                   <span className="muted small" style={{ textAlign: "right" }}>
-                    ({i.customers.length}) {i.customers.join(", ")}
+                    ({i.customers.length}){" "}
+                    {i.customers.map((c, idx) => (
+                      <span key={c.id}>
+                        {idx > 0 && ", "}
+                        <Link to={`/customers/${c.id}`}>{c.name}</Link>
+                      </span>
+                    ))}
                   </span>
                 </div>
               ))

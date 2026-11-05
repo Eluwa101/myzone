@@ -1,5 +1,6 @@
 import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { getSummary } from "../api/summary";
 import { errorMessage } from "../api/errorMessage";
 import type { InterestRollup } from "../api/types";
@@ -28,7 +29,7 @@ export default function DashboardInterestsPage() {
     downloadCsv(
       "interests.csv",
       ["Interest", "Customer count", "Customers"],
-      interests.map((i) => [i.interest, i.customers.length, i.customers.join("; ")])
+      interests.map((i) => [i.interest, i.customers.length, i.customers.map((c) => c.name).join("; ")])
     );
   }
 
@@ -67,7 +68,13 @@ export default function DashboardInterestsPage() {
               <div key={i.interest} className="row-between" style={{ alignItems: "flex-start" }}>
                 <b>{i.interest}</b>
                 <span className="muted small" style={{ textAlign: "right" }}>
-                  ({i.customers.length}) {i.customers.join(", ")}
+                  ({i.customers.length}){" "}
+                  {i.customers.map((c, idx) => (
+                    <span key={c.id}>
+                      {idx > 0 && ", "}
+                      <Link to={`/customers/${c.id}`}>{c.name}</Link>
+                    </span>
+                  ))}
                 </span>
               </div>
             ))

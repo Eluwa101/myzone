@@ -86,9 +86,14 @@ export interface TopCustomer {
   total: number;
 }
 
+export interface InterestCustomer {
+  id: string;
+  name: string;
+}
+
 export interface InterestRollup {
   interest: string;
-  customers: string[];
+  customers: InterestCustomer[];
 }
 
 export interface Summary {

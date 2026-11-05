@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.customer import Customer
-from app.schemas.summary import InterestRollup, MonthTotal, SummaryOut, TopCustomer
+from app.schemas.summary import InterestCustomer, InterestRollup, MonthTotal, SummaryOut, TopCustomer
 
 
 def _month_key(d: date) -> str:
@@ -91,7 +91,7 @@ def get_summary(db: Session, org_id: UUID, start_date: date | None = None, end_d
             if not name:
                 continue
             entry = interest_map.setdefault(name.lower(), {"name": name, "customers": []})
-            entry["customers"].append(c.name)
+            entry["customers"].append(InterestCustomer(id=str(c.id), name=c.name))
 
     all_time, by_month, per_customer_currency = _transaction_aggregates(customers, start_date, end_date)
 

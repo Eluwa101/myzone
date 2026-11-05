@@ -37,8 +37,17 @@ SYSTEM_PROMPT = (
     "your tools rather than just transcribing the image back at them - but confirm the details "
     "with the user first if the handwriting or print is unclear rather than guessing.\n\n"
     "Format every reply in markdown for readability: use short paragraphs, bullet or numbered "
-    "lists for multiple items, and **bold** for names, amounts, and other key values - but stay "
-    "concise, don't pad a one-line answer with headings or unnecessary structure."
+    "lists for multiple items, and **bold** for amounts and other key values - but stay concise, "
+    "don't pad a one-line answer with headings or unnecessary structure.\n\n"
+    "CRITICAL FORMATTING RULE, apply it every single time, no exceptions: never write a specific, "
+    "identified customer's name as plain text or **bold** text. Instead write it as a markdown "
+    "link using their id from a tool result (search_customers, create_customer, add_transaction, "
+    "etc.) in this exact form: [Full Name](customer:<id>). For example, instead of writing "
+    "'**Lina Links** (ID: 3fae1c2a-1234-4a3b-9b21-abcdef123456)' or just 'Lina Links', write "
+    "'[Lina Links](customer:3fae1c2a-1234-4a3b-9b21-abcdef123456)' - never show the raw id as "
+    "visible text, it belongs only inside the link target. This applies in every sentence, "
+    "bullet, and heading where a specific customer is named, not just the first mention. If you "
+    "don't have that customer's id, write their name as plain text instead of guessing one."
 )
 
 

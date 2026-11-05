@@ -15,9 +15,14 @@ class TopCustomer(BaseModel):
     total: float
 
 
+class InterestCustomer(BaseModel):
+    id: str
+    name: str
+
+
 class InterestRollup(BaseModel):
     interest: str
-    customers: list[str]
+    customers: list[InterestCustomer]
 
 
 class SummaryOut(BaseModel):
