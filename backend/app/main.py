@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.agent.checkpointer import close_checkpointer
 from app.core.config import settings as app_settings
-from app.routes import agent, auth, customers, settings, summary, transactions
+from app.routes import agent, auth, customers, orders, settings, summary, transactions
 
 
 @asynccontextmanager
@@ -27,6 +27,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(customers.router)
 app.include_router(transactions.router)
+app.include_router(orders.router)
 app.include_router(summary.router)
 app.include_router(agent.router)
 app.include_router(settings.router)

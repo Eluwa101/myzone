@@ -120,7 +120,7 @@ def recompute_derived_fields(customer: Customer) -> None:
 def get_customer(db: Session, org_id: UUID, customer_id: UUID) -> Customer:
     customer = (
         db.query(Customer)
-        .options(joinedload(Customer.transactions))
+        .options(joinedload(Customer.transactions), joinedload(Customer.orders))
         .filter(Customer.org_id == org_id, Customer.id == customer_id)
         .first()
     )

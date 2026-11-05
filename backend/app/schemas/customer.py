@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.models.customer import CustomerStatus
+from app.schemas.order import OrderOut
 from app.schemas.transaction import TransactionOut
 
 
@@ -51,6 +52,7 @@ class CustomerOut(CustomerBase):
     created_at: datetime
     updated_at: datetime
     transactions: list[TransactionOut] = []
+    orders: list[OrderOut] = []
 
     model_config = {"from_attributes": True}
 

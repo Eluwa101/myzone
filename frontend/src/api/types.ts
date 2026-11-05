@@ -10,6 +10,24 @@ export interface Transaction {
   currency: string;
 }
 
+export interface OrderItem {
+  name: string;
+  qty: number;
+}
+
+export interface Order {
+  id: string;
+  customer_id: string;
+  order_date: string;
+  delivery_date?: string | null;
+  items: OrderItem[];
+  amount?: number | null;
+  currency?: string | null;
+  paid: boolean;
+  delivered: boolean;
+  notes?: string | null;
+}
+
 export interface Customer {
   id: string;
   org_id: string;
@@ -30,6 +48,7 @@ export interface Customer {
   created_at: string;
   updated_at: string;
   transactions: Transaction[];
+  orders: Order[];
 }
 
 export interface CustomerListResult {

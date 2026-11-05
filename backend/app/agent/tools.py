@@ -20,9 +20,10 @@ from uuid import UUID
 from langchain.tools import tool
 from sqlalchemy.orm import Session
 
-from app.controllers import agent_controller, customer_controller, transaction_controller
+from app.controllers import agent_controller, customer_controller, order_controller, transaction_controller
 from app.models.customer import CustomerStatus
 from app.schemas.customer import CustomerCreate, CustomerUpdate
+from app.schemas.order import OrderCreate, OrderItem
 from app.schemas.transaction import TransactionCreate, TransactionUpdate
 
 
@@ -218,6 +219,38 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         return result
 
     @tool
+    def create_order(customer_id: str, items: str, order_date: str = "", delivery_date: str = "", amount: float = -1, currency: str = "") -> dict:
+        """Create an order for a customer - distinct from a transaction, this
+        tracks fulfillment (what was ordered, when it's due, whether it's
+        been paid/delivered) rather than a completed sale. items is a
+        comma-separated list of what was ordered (e.g. "5 bags of rice, 2
+        generators"). order_date defaults to today if blank. delivery_date is
+        the expected future delivery date (YYYY-MM-DD), leave blank if
+        unknown. amount is the order's total value if known (leave as -1 if
+        unknown)."""
+        import datetime as _dt
+
+        order_items = [OrderItem(name=part.strip()) for part in items.split(",") if part.strip()]
+        try:
+            order = order_controller.create_order(
+                db, org_id, UUID(customer_id),
+                OrderCreate(
+                    order_date=order_date.strip() or _dt.date.today(),
+                    delivery_date=_clean(delivery_date),
+                    items=order_items,
+                    amount=amount if amount >= 0 else None,
+                    currency=_clean(currency.upper() if currency else ""),
+                ),
+            )
+        except customer_controller.CustomerNotFoundError:
+            return {"status": "error", "message": "No customer with that id."}
+        from app.schemas.order import OrderOut
+
+        result = {"status": "created", **OrderOut.model_validate(order).model_dump(mode="json")}
+        log("create_order", {"customer_id": customer_id, "items": items, "order_date": order_date, "delivery_date": delivery_date, "amount": amount, "currency": currency}, result)
+        return result
+
+    @tool
     def get_dashboard_summary() -> dict:
         """Get precomputed CRM totals: customer counts by status, sales by
         currency (all-time, this month, last 6 months), top customers, and
@@ -264,6 +297,7 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         find_duplicate_customers,
         add_transaction,
         update_transaction,
+        create_order,
         get_dashboard_summary,
         delete_customer,
         merge_customers,

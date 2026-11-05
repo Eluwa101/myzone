@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Customer, CustomerListResult, CustomerStatus, DuplicateGroup, ImportResult, Transaction } from "./types";
+import type { Customer, CustomerListResult, CustomerStatus, DuplicateGroup, ImportResult, Order, OrderItem, Transaction } from "./types";
 
 export interface CustomerInput {
   name: string;
@@ -69,6 +69,29 @@ export function updateTransaction(customerId: string, txId: string, data: Partia
 
 export function deleteTransaction(customerId: string, txId: string): Promise<void> {
   return api.delete<void>(`/api/customers/${customerId}/transactions/${txId}`);
+}
+
+export interface OrderInput {
+  order_date: string;
+  delivery_date?: string | null;
+  items: OrderItem[];
+  amount?: number | null;
+  currency?: string | null;
+  paid?: boolean;
+  delivered?: boolean;
+  notes?: string | null;
+}
+
+export function addOrder(customerId: string, data: OrderInput): Promise<Order> {
+  return api.post<Order>(`/api/customers/${customerId}/orders`, data);
+}
+
+export function updateOrder(customerId: string, orderId: string, data: Partial<OrderInput>): Promise<Order> {
+  return api.patch<Order>(`/api/customers/${customerId}/orders/${orderId}`, data);
+}
+
+export function deleteOrder(customerId: string, orderId: string): Promise<void> {
+  return api.delete<void>(`/api/customers/${customerId}/orders/${orderId}`);
 }
 
 export function exportCsv(): Promise<string> {

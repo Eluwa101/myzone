@@ -2,6 +2,7 @@ import { Check, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
+  addOrder,
   addTransaction,
   createCustomer,
   deleteCustomer,
@@ -14,6 +15,7 @@ import { errorMessage } from "../api/errorMessage";
 import type { Customer, CustomerStatus } from "../api/types";
 import ErrorText from "../components/ErrorText";
 import InfoFieldRow from "../components/InfoFieldRow";
+import OrderRow from "../components/OrderRow";
 import Spinner from "../components/Spinner";
 import Tabs from "../components/Tabs";
 import TopBar from "../components/TopBar";
@@ -38,7 +40,7 @@ export default function CustomerDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ message: string; existingId: string } | null>(null);
   const [armedDelete, setArmedDelete] = useState(false);
-  const [tab, setTab] = useState<"info" | "transactions">("info");
+  const [tab, setTab] = useState<"info" | "transactions" | "orders">("info");
 
   function loadCustomer() {
     if (!id || isNew) return;
@@ -167,9 +169,10 @@ export default function CustomerDetailPage() {
         tabs={[
           { key: "info", label: "Info" },
           { key: "transactions", label: `Transactions (${customer.transactions.length})` },
+          { key: "orders", label: `Orders (${customer.orders.length})` },
         ]}
         active={tab}
-        onChange={(k) => setTab(k as "info" | "transactions")}
+        onChange={(k) => setTab(k as "info" | "transactions" | "orders")}
       />
 
       <ErrorText message={error} />
@@ -184,8 +187,10 @@ export default function CustomerDetailPage() {
           armedDelete={armedDelete}
           deleting={saving}
         />
-      ) : (
+      ) : tab === "transactions" ? (
         <TransactionsTab customer={customer} onChanged={loadCustomer} />
+      ) : (
+        <OrdersTab customer={customer} onChanged={loadCustomer} />
       )}
     </div>
   );
@@ -385,6 +390,91 @@ function TransactionsTab({ customer, onChanged }: { customer: Customer; onChange
       ) : (
         <button type="button" className="icon-btn btn-ghost" style={{ marginTop: 8 }} onClick={() => setAdding(true)}>
           <Plus size={15} /> Add transaction
+        </button>
+      )}
+    </div>
+  );
+}
+
+function OrdersTab({ customer, onChanged }: { customer: Customer; onChanged: () => void }) {
+  const [adding, setAdding] = useState(false);
+  const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [itemsText, setItemsText] = useState("");
+  const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  async function onAdd(e: FormEvent) {
+    e.preventDefault();
+    if (!itemsText.trim()) return;
+    setError(null);
+    try {
+      await addOrder(customer.id, {
+        order_date: orderDate,
+        delivery_date: deliveryDate || null,
+        items: itemsText
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .map((name) => ({ name, qty: 1 })),
+        amount: amount.trim() ? Number(amount) : null,
+        currency: currency.toUpperCase() || null,
+      });
+      setItemsText("");
+      setDeliveryDate("");
+      setAmount("");
+      setAdding(false);
+      onChanged();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
+  return (
+    <div className="card">
+      {customer.orders.length === 0 && !adding && <p className="muted small">No orders yet.</p>}
+      {customer.orders.map((o) => (
+        <OrderRow key={o.id} customerId={customer.id} order={o} onChanged={onChanged} />
+      ))}
+
+      {adding ? (
+        <form className="info-row-editing" onSubmit={onAdd}>
+          <div className="tx-edit-grid">
+            <div>
+              <label htmlFor="new-order-date">Order date</label>
+              <input id="new-order-date" type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} autoFocus />
+            </div>
+            <div>
+              <label htmlFor="new-order-delivery">Delivery date</label>
+              <input id="new-order-delivery" type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="new-order-items">Items</label>
+              <input id="new-order-items" value={itemsText} onChange={(e) => setItemsText(e.target.value)} placeholder="Rice, Generator (comma-separated)" />
+            </div>
+            <div>
+              <label htmlFor="new-order-amount">Amount</label>
+              <input id="new-order-amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="new-order-currency">Currency</label>
+              <input id="new-order-currency" value={currency} onChange={(e) => setCurrency(e.target.value)} />
+            </div>
+          </div>
+          <ErrorText message={error} />
+          <div className="row" style={{ marginTop: 10 }}>
+            <button type="submit" className="btn-primary">
+              <Check size={15} /> Add
+            </button>
+            <button type="button" onClick={() => setAdding(false)}>
+              <X size={15} /> Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button type="button" className="icon-btn btn-ghost" style={{ marginTop: 8 }} onClick={() => setAdding(true)}>
+          <Plus size={15} /> Add order
         </button>
       )}
     </div>
