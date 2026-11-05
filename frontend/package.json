@@ -10,12 +10,19 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "lucide-react": "^1.68.0",
+    "qrcode": "^1.5.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-router-dom": "^7.18.5"
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.18.5",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@types/dom-speech-recognition": "^0.0.12",
     "@types/node": "^24.19.2",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",

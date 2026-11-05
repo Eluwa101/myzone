@@ -6,6 +6,8 @@ from pydantic import BaseModel
 
 class ChatRequest(BaseModel):
     message: str
+    thread_id: str | None = None
+    image_data_url: str | None = None
 
 
 class PendingActionOut(BaseModel):
@@ -21,6 +23,32 @@ class PendingActionOut(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     pending_actions: list[PendingActionOut] = []
+
+
+class AskRequest(BaseModel):
+    question: str
+
+
+class AskResponse(BaseModel):
+    answer: str
+
+
+class ChatThreadOut(BaseModel):
+    id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ChatMessageOut(BaseModel):
+    role: str
+    content: str
+    has_image: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class AgentActionOut(BaseModel):

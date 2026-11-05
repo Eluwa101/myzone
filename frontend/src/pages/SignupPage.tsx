@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import AuthBrand from "../components/AuthBrand";
 import ErrorText from "../components/ErrorText";
 import { errorMessage } from "../api/errorMessage";
 import { useAuth } from "../context/AuthContext";
@@ -32,7 +33,7 @@ export default function SignupPage() {
   return (
     <div className="auth-screen">
       <div className="card auth-card">
-        <h1>Mini CRM</h1>
+        <AuthBrand />
         <p className="muted">Set up your business account.</p>
         <form onSubmit={onSubmit}>
           <label htmlFor="signup-org">Business name</label>

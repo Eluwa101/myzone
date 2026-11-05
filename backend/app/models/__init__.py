@@ -5,6 +5,8 @@ from app.models.transaction import Transaction
 from app.models.org_settings import OrgSettings
 from app.models.pending_action import PendingAction
 from app.models.agent_action import AgentAction
+from app.models.chat_thread import ChatThread
+from app.models.chat_message import ChatMessage
 
 __all__ = [
     "Organization",
@@ -15,4 +17,6 @@ __all__ = [
     "OrgSettings",
     "PendingAction",
     "AgentAction",
+    "ChatThread",
+    "ChatMessage",
 ]

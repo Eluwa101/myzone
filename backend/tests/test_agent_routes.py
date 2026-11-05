@@ -86,7 +86,7 @@ def test_chat_route_surfaces_pending_actions_from_run_chat(client, auth_headers,
     db_session.commit()
     db_session.refresh(pending)
 
-    def fake_run_chat(db, org_id, user_id, message):
+    def fake_run_chat(db, org_id, user_id, message, thread_id=None, image_data_url=None):
         return "I've prepared that deletion - please confirm it.", [pending]
 
     monkeypatch.setattr(agent_routes, "run_chat", fake_run_chat)
@@ -97,3 +97,19 @@ def test_chat_route_surfaces_pending_actions_from_run_chat(client, auth_headers,
     assert "confirm" in body["reply"].lower()
     assert len(body["pending_actions"]) == 1
     assert body["pending_actions"][0]["tool_name"] == "delete_customer"
+
+
+def test_chat_route_forwards_thread_id(client, auth_headers, monkeypatch):
+    captured = {}
+
+    def fake_run_chat(db, org_id, user_id, message, thread_id=None, image_data_url=None):
+        captured["thread_id"] = thread_id
+        return "ok", []
+
+    monkeypatch.setattr(agent_routes, "run_chat", fake_run_chat)
+
+    client.post("/api/agent/chat", json={"message": "hi", "thread_id": "chat-42"}, headers=auth_headers)
+    assert captured["thread_id"] == "chat-42"
+
+    client.post("/api/agent/chat", json={"message": "hi"}, headers=auth_headers)
+    assert captured["thread_id"] == "default"  # the route normalizes a missing thread_id before persisting history

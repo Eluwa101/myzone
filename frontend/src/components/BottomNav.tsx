@@ -1,20 +1,22 @@
+import { LayoutDashboard, MessageCircle, Settings, Users } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const ITEMS = [
-  { to: "/customers", label: "Customers", icon: "👥" },
-  { to: "/chat", label: "Assistant", icon: "💬" },
-  { to: "/dashboard", label: "Dashboard", icon: "📊" },
+  { to: "/customers", label: "Customers", Icon: Users },
+  { to: "/chat", label: "Assistant", Icon: MessageCircle },
+  { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
+  { to: "/settings", label: "Settings", Icon: Settings },
 ];
 
 export default function BottomNav() {
   return (
     <nav className="bottom-nav">
-      {ITEMS.map((item) => (
-        <NavLink key={item.to} to={item.to} className={({ isActive }) => `bottom-nav-item${isActive ? " active" : ""}`}>
+      {ITEMS.map(({ to, label, Icon }) => (
+        <NavLink key={to} to={to} className={({ isActive }) => `bottom-nav-item${isActive ? " active" : ""}`}>
           <span className="bottom-nav-icon" aria-hidden="true">
-            {item.icon}
+            <Icon size={20} strokeWidth={2} />
           </span>
-          <span>{item.label}</span>
+          <span>{label}</span>
         </NavLink>
       ))}
     </nav>

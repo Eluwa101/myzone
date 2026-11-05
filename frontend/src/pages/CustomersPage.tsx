@@ -1,3 +1,4 @@
+import { Plus, Search, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listCustomers } from "../api/customers";
@@ -45,13 +46,16 @@ export default function CustomersPage() {
     <div>
       <TopBar title="Customers" />
       <div className="toolbar">
-        <input
-          aria-label="Search customers"
-          className="search-input"
-          placeholder="Search name, job, pet, phone…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="search-wrap">
+          <Search size={16} className="search-icon" aria-hidden="true" />
+          <input
+            aria-label="Search customers"
+            className="search-input"
+            placeholder="Search name, job, pet, phone…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
         <select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value as CustomerStatus | "")}>
           <option value="">All statuses</option>
           <option value="lead">Lead</option>
@@ -64,7 +68,10 @@ export default function CustomersPage() {
       {loading ? (
         <Spinner />
       ) : customers.length === 0 ? (
-        <p className="muted empty-state">No customers yet. Tap "+ New customer" to add the first one.</p>
+        <div className="empty-state">
+          <UserRound size={40} className="empty-state-icon" strokeWidth={1.5} />
+          <p>No customers yet. Tap the + button to add the first one.</p>
+        </div>
       ) : (
         <ul className="customer-list">
           {customers.map((c) => (
@@ -88,9 +95,9 @@ export default function CustomersPage() {
         </ul>
       )}
 
-      {!loading && <p className="muted small">{total} total</p>}
+      {!loading && <p className="muted small page-note">{total} total</p>}
       <Link to="/customers/new" className="fab" aria-label="New customer">
-        +
+        <Plus size={24} strokeWidth={2.5} />
       </Link>
     </div>
   );

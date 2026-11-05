@@ -1,4 +1,6 @@
+import { CalendarRange, Heart, MessageCircleQuestion, Trophy, Users, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { getSummary } from "../api/summary";
 import { errorMessage } from "../api/errorMessage";
 import type { Summary } from "../api/types";
@@ -25,44 +27,56 @@ export default function DashboardPage() {
   return (
     <div>
       <TopBar title="Dashboard" />
+      <Link to="/ask" className="card ask-data-link">
+        <MessageCircleQuestion size={18} />
+        <div>
+          <b>Ask your data</b>
+          <div className="muted small">Read-only questions about your customers and sales</div>
+        </div>
+      </Link>
       <ErrorText message={error} />
       {!summary ? (
         <Spinner />
       ) : (
         <>
-          <div className="card">
-            <b>{summary.total_customers} customers</b>
-            {summary.without_consent > 0 && <span className="muted"> ({summary.without_consent} without consent recorded)</span>}
-            <div className="muted small">
-              {Object.entries(summary.status_counts)
-                .map(([k, v]) => `${k}: ${v}`)
-                .join(" · ")}
+          <div className="stat-grid">
+            <div className="card stat-card">
+              <div className="stat-icon">
+                <Users size={18} />
+              </div>
+              <div className="stat-value">{summary.total_customers}</div>
+              <div className="stat-label">
+                customers
+                {summary.without_consent > 0 && ` · ${summary.without_consent} w/o consent`}
+              </div>
+            </div>
+            <div className="card stat-card">
+              <div className="stat-icon">
+                <Wallet size={18} />
+              </div>
+              <div className="stat-value stat-value-money">{fmtCurrencyMap(summary.this_month_by_currency)}</div>
+              <div className="stat-label">this month · all-time {fmtCurrencyMap(summary.all_time_by_currency)}</div>
             </div>
           </div>
 
           <div className="card">
-            <div className="muted small">All-time sales</div>
-            <b>{fmtCurrencyMap(summary.all_time_by_currency)}</b>
-            <div className="muted small" style={{ marginTop: 6 }}>
-              This month
-            </div>
-            <b>{fmtCurrencyMap(summary.this_month_by_currency)}</b>
-          </div>
-
-          <div className="card">
-            <h3>Last 6 months</h3>
+            <h3>
+              <CalendarRange size={15} className="h3-icon" /> Last 6 months
+            </h3>
             {summary.last_6_months.map((m) => (
               <div key={m.month} className="row-between">
-                <span>{m.month}</span>
+                <span className="muted small">{m.month}</span>
                 <span>{fmtCurrencyMap(m.totals)}</span>
               </div>
             ))}
           </div>
 
           <div className="card">
-            <h3>Top customers</h3>
+            <h3>
+              <Trophy size={15} className="h3-icon" /> Top customers
+            </h3>
             {summary.top_customers.length === 0 ? (
-              <p className="muted">No transactions yet.</p>
+              <p className="muted small">No transactions yet.</p>
             ) : (
               summary.top_customers.map((c, i) => (
                 <div key={`${c.customer_id}-${i}`} className="row-between">
@@ -76,13 +90,18 @@ export default function DashboardPage() {
           </div>
 
           <div className="card">
-            <h3>Interested in</h3>
+            <h3>
+              <Heart size={15} className="h3-icon" /> Interested in
+            </h3>
             {summary.interests.length === 0 ? (
-              <p className="muted">No interests recorded.</p>
+              <p className="muted small">No interests recorded.</p>
             ) : (
               summary.interests.map((i) => (
-                <div key={i.interest} style={{ marginTop: 6 }}>
-                  <b>{i.interest}</b> <span className="muted small">({i.customers.length}) {i.customers.join(", ")}</span>
+                <div key={i.interest} className="row-between" style={{ alignItems: "flex-start" }}>
+                  <b>{i.interest}</b>
+                  <span className="muted small" style={{ textAlign: "right" }}>
+                    ({i.customers.length}) {i.customers.join(", ")}
+                  </span>
                 </div>
               ))
             )}

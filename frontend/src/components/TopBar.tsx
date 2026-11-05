@@ -1,15 +1,14 @@
-import { useAuth } from "../context/AuthContext";
+import type { ReactNode } from "react";
+import UserMenu from "./UserMenu";
 
-export default function TopBar({ title }: { title: string }) {
-  const { user, logout } = useAuth();
+export default function TopBar({ title, actions }: { title: string; actions?: ReactNode }) {
   return (
     <header className="top-bar">
       <h1>{title}</h1>
-      {user && (
-        <button className="btn-ghost" onClick={logout}>
-          Log out
-        </button>
-      )}
+      <div className="top-bar-actions">
+        {actions}
+        <UserMenu />
+      </div>
     </header>
   );
 }

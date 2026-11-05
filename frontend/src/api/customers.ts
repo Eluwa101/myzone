@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Customer, CustomerListResult, CustomerStatus, DuplicateGroup, Transaction } from "./types";
+import type { Customer, CustomerListResult, CustomerStatus, DuplicateGroup, ImportResult, Transaction } from "./types";
 
 export interface CustomerInput {
   name: string;
@@ -68,4 +68,12 @@ export function updateTransaction(customerId: string, txId: string, data: Partia
 
 export function deleteTransaction(customerId: string, txId: string): Promise<void> {
   return api.delete<void>(`/api/customers/${customerId}/transactions/${txId}`);
+}
+
+export function exportCsv(): Promise<string> {
+  return api.get<string>("/api/customers/export");
+}
+
+export function importCsv(csvText: string): Promise<ImportResult> {
+  return api.post<ImportResult>("/api/customers/import", { csv_text: csvText });
 }

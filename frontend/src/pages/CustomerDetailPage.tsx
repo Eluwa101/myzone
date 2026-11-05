@@ -1,3 +1,4 @@
+import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -217,6 +218,7 @@ export default function CustomerDetailPage() {
           </button>
           {!isNew && (
             <button type="button" className="btn-danger" onClick={onDelete} disabled={saving} style={{ marginLeft: "auto" }}>
+              <Trash2 size={15} />
               {armedDelete ? "Click again to confirm" : "Delete customer"}
             </button>
           )}
@@ -235,7 +237,9 @@ export default function CustomerDetailPage() {
             <input aria-label="Quantity" type="number" placeholder="Qty" value={txQty} onChange={(e) => setTxQty(e.target.value)} />
             <input aria-label="Amount" type="number" placeholder="Amount" value={txAmount} onChange={(e) => setTxAmount(e.target.value)} />
             <input aria-label="Currency" placeholder="Cur." value={txCurrency} onChange={(e) => setTxCurrency(e.target.value)} />
-            <button type="submit">+ Add</button>
+            <button type="submit" className="icon-btn btn-primary" aria-label="Add transaction">
+              <Plus size={15} />
+            </button>
           </form>
         </div>
       )}

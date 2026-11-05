@@ -1,4 +1,4 @@
-# Mini CRM backend (Phase 1 + 2)
+# Mini CRM backend (Phase 1-4)
 
 FastAPI + SQLAlchemy + Postgres, MVC-style: `models/` (ORM), `schemas/`
 (validation), `controllers/` (business logic — the single source of truth
@@ -83,7 +83,25 @@ The agent/tools layer (`app/agent/`) - add `GROQ_API_KEY` and/or
   in-process (lost on restart - same `InMemorySaver` tradeoff as the
   tutorial's memory section)
 
-Not yet built (later phases): the React frontend, WhatsApp quick-capture
-extraction, and the "ask your data" chat (Phase 2's `/api/agent/chat` is the
-general-purpose agent; the dedicated read-only data-Q&A chat from the
-prototype is still Phase 4).
+## What's here (Phase 4 scope)
+
+- `GET`/`PUT /api/settings` - per-org WhatsApp QR settings (business name,
+  number, message template). The QR image itself is generated client-side
+  (no backend QR rendering needed).
+- `POST /api/customers/import` now takes `{"csv_text": "..."}` as a JSON
+  body instead of a query parameter - a query string can't carry a
+  real-sized CSV file reliably.
+- `app/agent/ask_data.py` - the dedicated **read-only** "ask your data"
+  chat, separate from Phase 2's general-purpose agent. No tools, no writes:
+  it builds a compact text context from precomputed aggregates (same numbers
+  `/api/summary` returns) plus a line per customer, then makes a single
+  grounded LLM call via `POST /api/agent/ask` (`{"question": "..."}` ->
+  `{"answer": "..."}`). Can't change records - if asked to edit something it
+  says so and points back to the app.
+
+Frontend (`frontend/`) now has a Settings page (QR generator + CSV
+import/export) and an Ask Your Data page, alongside the Phase 3 auth/
+customer/dashboard/assistant pages.
+
+Not yet built: WhatsApp quick-capture extraction (paste a WhatsApp message,
+LLM extracts structured fields) from the original prototype.

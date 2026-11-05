@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import agent, auth, customers, summary, transactions
+from app.routes import agent, auth, customers, settings, summary, transactions
 
 app = FastAPI(title="Mini CRM API")
 
@@ -18,6 +18,7 @@ app.include_router(customers.router)
 app.include_router(transactions.router)
 app.include_router(summary.router)
 app.include_router(agent.router)
+app.include_router(settings.router)
 
 
 @app.get("/api/health")

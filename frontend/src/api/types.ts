@@ -79,3 +79,11 @@ export interface DuplicateGroup {
   keep: Customer;
   duplicates: Customer[];
 }
+
+export interface ImportResult {
+  added: number;
+  merged: number;
+  skipped: number;
+  failed: number;
+  errors: string[];
+}

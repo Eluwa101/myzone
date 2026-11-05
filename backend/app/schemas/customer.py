@@ -76,6 +76,10 @@ class MergeRequest(BaseModel):
     merge_id: UUID
 
 
+class ImportRequest(BaseModel):
+    csv_text: str
+
+
 class ImportResult(BaseModel):
     added: int
     merged: int

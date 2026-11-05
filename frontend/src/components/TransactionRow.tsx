@@ -1,3 +1,4 @@
+import { Check, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { deleteTransaction, updateTransaction } from "../api/customers";
 import { errorMessage } from "../api/errorMessage";
@@ -63,11 +64,12 @@ export default function TransactionRow({
       <input aria-label="Amount" type="number" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
       <input aria-label="Currency" placeholder="Cur." value={currency} onChange={(e) => setCurrency(e.target.value)} />
       <div className="tx-row-actions">
-        <button type="button" onClick={save} disabled={busy}>
-          Save
+        <button type="button" className="icon-btn" aria-label="Save transaction" onClick={save} disabled={busy}>
+          <Check size={15} />
         </button>
-        <button type="button" className="btn-danger" onClick={remove} disabled={busy}>
-          {armedDelete ? "Confirm?" : "Delete"}
+        <button type="button" className="icon-btn btn-danger" aria-label={armedDelete ? "Confirm delete" : "Delete transaction"} onClick={remove} disabled={busy}>
+          <Trash2 size={15} />
+          {armedDelete && <span className="small">Confirm?</span>}
         </button>
       </div>
       {error && <p className="error-text small">{error}</p>}

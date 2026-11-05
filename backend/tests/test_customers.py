@@ -115,7 +115,7 @@ def test_csv_export_then_import_round_trips_without_duplicating(client, auth_hea
     csv_text = client.get("/api/customers/export", headers=auth_headers).text
     assert "Ada Obi" in csv_text
 
-    result = client.post("/api/customers/import", params={"csv_text": csv_text}, headers=auth_headers).json()
+    result = client.post("/api/customers/import", json={"csv_text": csv_text}, headers=auth_headers).json()
     assert result["added"] == 0
     assert result["merged"] == 1
 

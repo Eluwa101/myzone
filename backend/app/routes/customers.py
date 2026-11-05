@@ -14,6 +14,7 @@ from app.schemas.customer import (
     CustomerOut,
     CustomerUpdate,
     DuplicateGroup,
+    ImportRequest,
     ImportResult,
     MergeRequest,
 )
@@ -71,11 +72,11 @@ def merge(data: MergeRequest, db: Session = Depends(get_db), current_user: User 
 
 @router.post("/import", response_model=ImportResult)
 def import_customers(
-    csv_text: str,
+    data: ImportRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return customer_controller.import_csv(db, current_user.org_id, csv_text)
+    return customer_controller.import_csv(db, current_user.org_id, data.csv_text)
 
 
 @router.get("/export")
