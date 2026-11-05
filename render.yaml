@@ -16,6 +16,8 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      - key: OPEN_ROUTER_API_KEY
+        sync: false
       - key: GOOGLE_API_KEY
         sync: false
       - key: CORS_ORIGINS
