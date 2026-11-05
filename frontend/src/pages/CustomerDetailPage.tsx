@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Check, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -13,11 +13,18 @@ import { ApiError } from "../api/client";
 import { errorMessage } from "../api/errorMessage";
 import type { Customer, CustomerStatus } from "../api/types";
 import ErrorText from "../components/ErrorText";
+import InfoFieldRow from "../components/InfoFieldRow";
 import Spinner from "../components/Spinner";
+import Tabs from "../components/Tabs";
 import TopBar from "../components/TopBar";
 import TransactionRow from "../components/TransactionRow";
 
 const BLANK: CustomerInput = { name: "" };
+const STATUS_OPTIONS = [
+  { value: "lead", label: "Lead" },
+  { value: "customer", label: "Customer" },
+  { value: "inactive", label: "Inactive" },
+];
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -31,13 +38,7 @@ export default function CustomerDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ message: string; existingId: string } | null>(null);
   const [armedDelete, setArmedDelete] = useState(false);
-
-  // new-transaction draft
-  const [txDate, setTxDate] = useState(new Date().toISOString().slice(0, 10));
-  const [txItem, setTxItem] = useState("");
-  const [txQty, setTxQty] = useState("1");
-  const [txAmount, setTxAmount] = useState("");
-  const [txCurrency, setTxCurrency] = useState("");
+  const [tab, setTab] = useState<"info" | "transactions">("info");
 
   function loadCustomer() {
     if (!id || isNew) return;
@@ -45,20 +46,7 @@ export default function CustomerDetailPage() {
     getCustomer(id)
       .then((c) => {
         setCustomer(c);
-        setForm({
-          name: c.name,
-          phone: c.phone ?? "",
-          email: c.email ?? "",
-          job: c.job ?? "",
-          nationality: c.nationality ?? "",
-          pet: c.pet ?? "",
-          birthday: c.birthday ?? "",
-          address: c.address ?? "",
-          notes: c.notes ?? "",
-          interests: c.interests ?? "",
-          status: c.status,
-          consent_date: c.consent_date ?? "",
-        });
+        setForm({ name: c.name });
       })
       .catch((err) => setError(errorMessage(err)))
       .finally(() => setLoading(false));
@@ -70,19 +58,14 @@ export default function CustomerDetailPage() {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  async function onSave(e: FormEvent, force = false) {
+  async function onCreate(e: FormEvent, force = false) {
     e.preventDefault();
     setSaving(true);
     setError(null);
     setConflict(null);
     try {
-      if (isNew) {
-        const created = await createCustomer(form, force);
-        navigate(`/customers/${created.id}`, { replace: true });
-      } else if (id) {
-        const updated = await updateCustomer(id, form);
-        setCustomer(updated);
-      }
+      const created = await createCustomer(form, force);
+      navigate(`/customers/${created.id}`, { replace: true });
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         const detail = err.detail as { message: string; existing_id: string };
@@ -95,7 +78,28 @@ export default function CustomerDetailPage() {
     }
   }
 
-  async function onDelete() {
+  async function saveField(key: keyof CustomerInput, value: string, isDate = false) {
+    if (!id) return;
+    const payload = { [key]: isDate && !value ? null : value } as Partial<CustomerInput>;
+    await updateCustomer(id, payload);
+    loadCustomer();
+  }
+
+  async function saveExtraField(key: string, value: string) {
+    if (!id || !customer) return;
+    await updateCustomer(id, { extra: { ...customer.extra, [key]: value } });
+    loadCustomer();
+  }
+
+  async function deleteExtraField(key: string) {
+    if (!id || !customer) return;
+    const next = { ...customer.extra };
+    delete next[key];
+    await updateCustomer(id, { extra: next });
+    loadCustomer();
+  }
+
+  async function onDeleteCustomer() {
     if (!id) return;
     if (!armedDelete) {
       setArmedDelete(true);
@@ -111,137 +115,277 @@ export default function CustomerDetailPage() {
     }
   }
 
-  async function onAddTransaction(e: FormEvent) {
+  if (loading) return <Spinner />;
+
+  if (isNew) {
+    return (
+      <div>
+        <TopBar title="New customer" />
+        <form className="card" onSubmit={onCreate}>
+          <label htmlFor="cf-name">Full name *</label>
+          <input id="cf-name" value={form.name} onChange={(e) => set("name", e.target.value)} required autoFocus />
+          <label htmlFor="cf-phone">Phone / WhatsApp</label>
+          <input id="cf-phone" value={form.phone ?? ""} onChange={(e) => set("phone", e.target.value)} />
+          <label htmlFor="cf-interests">Interested in</label>
+          <input
+            id="cf-interests"
+            value={form.interests ?? ""}
+            onChange={(e) => set("interests", e.target.value)}
+            placeholder="Generator, Rice (comma-separated)"
+          />
+          <p className="muted small">You can add more info, transactions, and custom fields once this is saved.</p>
+
+          <ErrorText message={error} />
+          {conflict && (
+            <div className="card conflict-card">
+              <p>{conflict.message}</p>
+              <div className="row">
+                <button type="button" onClick={() => navigate(`/customers/${conflict.existingId}`)}>
+                  View existing
+                </button>
+                <button type="button" className="btn-primary" onClick={(e) => onCreate(e, true)}>
+                  Save as new anyway
+                </button>
+              </div>
+            </div>
+          )}
+
+          <button className="btn-primary" type="submit" disabled={saving} style={{ marginTop: 12 }}>
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  if (!customer) return null;
+
+  return (
+    <div>
+      <TopBar title={customer.name} />
+      <Tabs
+        tabs={[
+          { key: "info", label: "Info" },
+          { key: "transactions", label: `Transactions (${customer.transactions.length})` },
+        ]}
+        active={tab}
+        onChange={(k) => setTab(k as "info" | "transactions")}
+      />
+
+      <ErrorText message={error} />
+
+      {tab === "info" ? (
+        <InfoTab
+          customer={customer}
+          onSaveField={saveField}
+          onSaveExtra={saveExtraField}
+          onDeleteExtra={deleteExtraField}
+          onDeleteCustomer={onDeleteCustomer}
+          armedDelete={armedDelete}
+          deleting={saving}
+        />
+      ) : (
+        <TransactionsTab customer={customer} onChanged={loadCustomer} />
+      )}
+    </div>
+  );
+}
+
+function InfoTab({
+  customer,
+  onSaveField,
+  onSaveExtra,
+  onDeleteExtra,
+  onDeleteCustomer,
+  armedDelete,
+  deleting,
+}: {
+  customer: Customer;
+  onSaveField: (key: keyof CustomerInput, value: string, isDate?: boolean) => Promise<void>;
+  onSaveExtra: (key: string, value: string) => Promise<void>;
+  onDeleteExtra: (key: string) => Promise<void>;
+  onDeleteCustomer: () => void;
+  armedDelete: boolean;
+  deleting: boolean;
+}) {
+  const [addingField, setAddingField] = useState(false);
+  const [newKey, setNewKey] = useState("");
+  const [newValue, setNewValue] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
+
+  async function addField(e: FormEvent) {
     e.preventDefault();
-    if (!id || !txItem.trim()) return;
+    const key = newKey.trim();
+    if (!key) return;
+    setAddError(null);
+    try {
+      await onSaveExtra(key, newValue.trim());
+      setNewKey("");
+      setNewValue("");
+      setAddingField(false);
+    } catch (err) {
+      setAddError(errorMessage(err));
+    }
+  }
+
+  return (
+    <div>
+      <div className="card">
+        <InfoFieldRow label="Full name" value={customer.name} deletable={false} onSave={(v) => onSaveField("name", v)} />
+        <InfoFieldRow label="Phone / WhatsApp" value={customer.phone} onSave={(v) => onSaveField("phone", v)} onDelete={() => onSaveField("phone", "")} />
+        <InfoFieldRow label="Email" value={customer.email} type="text" onSave={(v) => onSaveField("email", v)} onDelete={() => onSaveField("email", "")} />
+        <InfoFieldRow label="Job / occupation" value={customer.job} onSave={(v) => onSaveField("job", v)} onDelete={() => onSaveField("job", "")} />
+        <InfoFieldRow label="Nationality" value={customer.nationality} onSave={(v) => onSaveField("nationality", v)} onDelete={() => onSaveField("nationality", "")} />
+        <InfoFieldRow label="Pet(s)" value={customer.pet} onSave={(v) => onSaveField("pet", v)} onDelete={() => onSaveField("pet", "")} />
+        <InfoFieldRow
+          label="Birthday"
+          value={customer.birthday}
+          type="date"
+          onSave={(v) => onSaveField("birthday", v, true)}
+          onDelete={() => onSaveField("birthday", "", true)}
+        />
+        <InfoFieldRow label="Address / city" value={customer.address} onSave={(v) => onSaveField("address", v)} onDelete={() => onSaveField("address", "")} />
+        <InfoFieldRow
+          label="Interested in"
+          value={customer.interests}
+          placeholder="Generator, Rice (comma-separated)"
+          onSave={(v) => onSaveField("interests", v)}
+          onDelete={() => onSaveField("interests", "")}
+        />
+        <InfoFieldRow
+          label="Status"
+          value={customer.status}
+          type="select"
+          options={STATUS_OPTIONS}
+          allowBlank={false}
+          deletable={false}
+          onSave={(v) => onSaveField("status", v as CustomerStatus)}
+        />
+        <InfoFieldRow
+          label="Consent to be stored (date given)"
+          value={customer.consent_date}
+          type="date"
+          onSave={(v) => onSaveField("consent_date", v, true)}
+          onDelete={() => onSaveField("consent_date", "", true)}
+        />
+        <InfoFieldRow label="Notes" value={customer.notes} type="textarea" onSave={(v) => onSaveField("notes", v)} onDelete={() => onSaveField("notes", "")} />
+      </div>
+
+      <div className="card">
+        <h3>Other info</h3>
+        {Object.entries(customer.extra).length === 0 && !addingField && <p className="muted small">No custom fields yet.</p>}
+        {Object.entries(customer.extra).map(([key, value]) => (
+          <InfoFieldRow key={key} label={key} value={value} onSave={(v) => onSaveExtra(key, v)} onDelete={() => onDeleteExtra(key)} />
+        ))}
+
+        {addingField ? (
+          <form className="info-row-editing" onSubmit={addField}>
+            <label htmlFor="new-field-key">Field name</label>
+            <input id="new-field-key" value={newKey} onChange={(e) => setNewKey(e.target.value)} placeholder="e.g. Car" autoFocus />
+            <label htmlFor="new-field-value">Value</label>
+            <input id="new-field-value" value={newValue} onChange={(e) => setNewValue(e.target.value)} />
+            <ErrorText message={addError} />
+            <div className="row" style={{ marginTop: 10 }}>
+              <button type="submit" className="btn-primary">
+                <Check size={15} /> Add
+              </button>
+              <button type="button" onClick={() => setAddingField(false)}>
+                <X size={15} /> Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button type="button" className="icon-btn btn-ghost" style={{ marginTop: 8 }} onClick={() => setAddingField(true)}>
+            <Plus size={15} /> Add field
+          </button>
+        )}
+      </div>
+
+      <div className="card">
+        <button type="button" className="btn-danger" onClick={onDeleteCustomer} disabled={deleting}>
+          <Trash2 size={15} />
+          {armedDelete ? "Click again to confirm" : "Delete customer"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TransactionsTab({ customer, onChanged }: { customer: Customer; onChanged: () => void }) {
+  const [adding, setAdding] = useState(false);
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [item, setItem] = useState("");
+  const [qty, setQty] = useState("1");
+  const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  async function onAdd(e: FormEvent) {
+    e.preventDefault();
+    if (!item.trim()) return;
     setError(null);
     try {
-      await addTransaction(id, {
-        date: txDate,
-        item: txItem.trim(),
-        qty: Number(txQty) || 1,
-        amount: Number(txAmount) || 0,
-        currency: txCurrency.toUpperCase(),
+      await addTransaction(customer.id, {
+        date,
+        item: item.trim(),
+        qty: Number(qty) || 1,
+        amount: Number(amount) || 0,
+        currency: currency.toUpperCase(),
       });
-      setTxItem("");
-      setTxAmount("");
-      loadCustomer();
+      setItem("");
+      setAmount("");
+      setAdding(false);
+      onChanged();
     } catch (err) {
       setError(errorMessage(err));
     }
   }
 
-  if (loading) return <Spinner />;
-
   return (
-    <div>
-      <TopBar title={isNew ? "New customer" : form.name || "Customer"} />
+    <div className="card">
+      {customer.transactions.length === 0 && !adding && <p className="muted small">No transactions yet.</p>}
+      {customer.transactions.map((t) => (
+        <TransactionRow key={t.id} customerId={customer.id} transaction={t} onChanged={onChanged} />
+      ))}
 
-      <form className="card" onSubmit={onSave}>
-        <div className="form-grid">
-          <div>
-            <label htmlFor="cf-name">Full name *</label>
-            <input id="cf-name" value={form.name} onChange={(e) => set("name", e.target.value)} required />
-          </div>
-          <div>
-            <label htmlFor="cf-phone">Phone / WhatsApp</label>
-            <input id="cf-phone" value={form.phone ?? ""} onChange={(e) => set("phone", e.target.value)} />
-          </div>
-          <div>
-            <label htmlFor="cf-email">Email</label>
-            <input id="cf-email" type="email" value={form.email ?? ""} onChange={(e) => set("email", e.target.value)} />
-          </div>
-          <div>
-            <label htmlFor="cf-job">Job / occupation</label>
-            <input id="cf-job" value={form.job ?? ""} onChange={(e) => set("job", e.target.value)} />
-          </div>
-          <div>
-            <label htmlFor="cf-nationality">Nationality</label>
-            <input id="cf-nationality" value={form.nationality ?? ""} onChange={(e) => set("nationality", e.target.value)} />
-          </div>
-          <div>
-            <label htmlFor="cf-pet">Pet(s)</label>
-            <input id="cf-pet" value={form.pet ?? ""} onChange={(e) => set("pet", e.target.value)} />
-          </div>
-          <div>
-            <label htmlFor="cf-birthday">Birthday</label>
-            <input id="cf-birthday" type="date" value={form.birthday ?? ""} onChange={(e) => set("birthday", e.target.value)} />
-          </div>
-          <div>
-            <label htmlFor="cf-address">Address / city</label>
-            <input id="cf-address" value={form.address ?? ""} onChange={(e) => set("address", e.target.value)} />
-          </div>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label htmlFor="cf-interests">Interested in</label>
-            <input
-              id="cf-interests"
-              value={form.interests ?? ""}
-              onChange={(e) => set("interests", e.target.value)}
-              placeholder="Generator, Rice (comma-separated)"
-            />
-          </div>
-          <div>
-            <label htmlFor="cf-status">Status</label>
-            <select id="cf-status" value={form.status ?? ""} onChange={(e) => set("status", e.target.value as CustomerStatus)}>
-              <option value="">Auto</option>
-              <option value="lead">Lead</option>
-              <option value="customer">Customer</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-          <div>
-            <label htmlFor="cf-consent">Consent to be stored (date given)</label>
-            <input id="cf-consent" type="date" value={form.consent_date ?? ""} onChange={(e) => set("consent_date", e.target.value)} />
-          </div>
-        </div>
-        <label htmlFor="cf-notes">Notes</label>
-        <textarea id="cf-notes" rows={2} value={form.notes ?? ""} onChange={(e) => set("notes", e.target.value)} />
-
-        <ErrorText message={error} />
-        {conflict && (
-          <div className="card conflict-card">
-            <p>{conflict.message}</p>
-            <div className="row">
-              <button type="button" onClick={() => navigate(`/customers/${conflict.existingId}`)}>
-                View existing
-              </button>
-              <button type="button" className="btn-primary" onClick={(e) => onSave(e, true)}>
-                Save as new anyway
-              </button>
+      {adding ? (
+        <form className="info-row-editing" onSubmit={onAdd}>
+          <div className="tx-edit-grid">
+            <div>
+              <label htmlFor="new-tx-date">Date</label>
+              <input id="new-tx-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} autoFocus />
+            </div>
+            <div>
+              <label htmlFor="new-tx-item">Item</label>
+              <input id="new-tx-item" value={item} onChange={(e) => setItem(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="new-tx-qty">Qty</label>
+              <input id="new-tx-qty" type="number" value={qty} onChange={(e) => setQty(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="new-tx-amount">Amount</label>
+              <input id="new-tx-amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="new-tx-currency">Currency</label>
+              <input id="new-tx-currency" value={currency} onChange={(e) => setCurrency(e.target.value)} />
             </div>
           </div>
-        )}
-
-        <div className="row" style={{ marginTop: 12 }}>
-          <button className="btn-primary" type="submit" disabled={saving}>
-            {saving ? "Saving…" : "Save"}
-          </button>
-          {!isNew && (
-            <button type="button" className="btn-danger" onClick={onDelete} disabled={saving} style={{ marginLeft: "auto" }}>
-              <Trash2 size={15} />
-              {armedDelete ? "Click again to confirm" : "Delete customer"}
+          <ErrorText message={error} />
+          <div className="row" style={{ marginTop: 10 }}>
+            <button type="submit" className="btn-primary">
+              <Check size={15} /> Add
             </button>
-          )}
-        </div>
-      </form>
-
-      {!isNew && customer && (
-        <div className="card">
-          <h3>Transactions</h3>
-          {customer.transactions.map((t) => (
-            <TransactionRow key={t.id} customerId={customer.id} transaction={t} onChanged={loadCustomer} />
-          ))}
-          <form className="tx-row" onSubmit={onAddTransaction}>
-            <input aria-label="Date" type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} />
-            <input aria-label="Item" placeholder="Item" value={txItem} onChange={(e) => setTxItem(e.target.value)} />
-            <input aria-label="Quantity" type="number" placeholder="Qty" value={txQty} onChange={(e) => setTxQty(e.target.value)} />
-            <input aria-label="Amount" type="number" placeholder="Amount" value={txAmount} onChange={(e) => setTxAmount(e.target.value)} />
-            <input aria-label="Currency" placeholder="Cur." value={txCurrency} onChange={(e) => setTxCurrency(e.target.value)} />
-            <button type="submit" className="icon-btn btn-primary" aria-label="Add transaction">
-              <Plus size={15} />
+            <button type="button" onClick={() => setAdding(false)}>
+              <X size={15} /> Cancel
             </button>
-          </form>
-        </div>
+          </div>
+        </form>
+      ) : (
+        <button type="button" className="icon-btn btn-ghost" style={{ marginTop: 8 }} onClick={() => setAdding(true)}>
+          <Plus size={15} /> Add transaction
+        </button>
       )}
     </div>
   );

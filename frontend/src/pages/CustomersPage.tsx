@@ -9,16 +9,6 @@ import Spinner from "../components/Spinner";
 import StatusBadge from "../components/StatusBadge";
 import TopBar from "../components/TopBar";
 
-function totalsLabel(c: Customer): string {
-  const totals: Record<string, number> = {};
-  for (const t of c.transactions) {
-    const value = (t.amount || 0) * (t.qty || 1);
-    totals[t.currency || ""] = (totals[t.currency || ""] || 0) + value;
-  }
-  const parts = Object.entries(totals).map(([cur, v]) => `${cur ? cur + " " : ""}${v.toLocaleString(undefined, { minimumFractionDigits: 2 })}`);
-  return parts.length ? parts.join(" + ") : "0.00";
-}
-
 export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<CustomerStatus | "">("");
@@ -82,12 +72,7 @@ export default function CustomersPage() {
                   <StatusBadge status={c.status} />
                 </div>
                 <div className="muted small">
-                  {[c.job, c.nationality, c.pet && `Pet: ${c.pet}`, c.phone, c.interests && `Interested in: ${c.interests}`]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </div>
-                <div className="muted small">
-                  {totalsLabel(c)} · {c.transactions.length} txn
+                  {c.transactions.length} transaction{c.transactions.length === 1 ? "" : "s"}
                 </div>
               </Link>
             </li>

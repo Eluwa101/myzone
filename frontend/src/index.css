@@ -694,18 +694,33 @@ button:disabled {
   margin-bottom: 10px;
 }
 
-/* Customer detail / form */
+/* Customer detail / tabs / info rows */
 
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0 14px;
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin: 10px 16px 4px;
+  background: var(--surface-hover);
+  border-radius: var(--radius-md);
+  padding: 4px;
 }
 
-@media (max-width: 480px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
+.tab-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 8px 6px;
+  font-weight: 600;
+  font-size: 13px;
+  justify-content: center;
+}
+
+.tab-btn.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
 }
 
 .conflict-card {
@@ -714,30 +729,62 @@ button:disabled {
   margin: 14px 0 0;
 }
 
-.tx-row {
-  display: grid;
-  grid-template-columns: 124px 1fr 64px 92px 72px auto;
-  gap: 8px;
-  margin-top: 10px;
-  align-items: start;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-
-.tx-row:first-of-type {
-  border-top: none;
-  padding-top: 0;
-}
-
-@media (max-width: 560px) {
-  .tx-row {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-.tx-row-actions {
+.info-row {
   display: flex;
-  gap: 4px;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 11px 0;
+  text-align: left;
+  border-radius: 0;
+}
+
+.info-row:hover {
+  background: var(--surface-hover);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-row-text {
+  min-width: 0;
+}
+
+.info-row-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.info-row-value {
+  font-size: 14.5px;
+  font-weight: 500;
+  overflow-wrap: break-word;
+}
+
+.info-row-editing {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.info-row-editing label {
+  margin-top: 0;
+}
+
+.tx-edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+
+@media (max-width: 420px) {
+  .tx-edit-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .chip {

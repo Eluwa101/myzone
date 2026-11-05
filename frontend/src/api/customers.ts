@@ -14,6 +14,7 @@ export interface CustomerInput {
   interests?: string;
   status?: CustomerStatus;
   consent_date?: string;
+  extra?: Record<string, string>;
 }
 
 export interface ListParams {
