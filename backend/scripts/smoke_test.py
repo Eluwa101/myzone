@@ -15,16 +15,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.main import app
+from app.models.agent_action import AgentAction
+from app.models.chat_message import ChatMessage
+from app.models.chat_thread import ChatThread
 from app.models.customer import Customer
 from app.models.organization import Organization
+from app.models.pending_action import PendingAction
 from app.models.transaction import Transaction
 from app.models.user import User
 
-client = TestClient(app)
 email = f"smoketest+{uuid.uuid4().hex[:8]}@example.com"
 password = "supersecret1"
 failures: list[str] = []
@@ -42,6 +46,15 @@ def cleanup(org_id: str | None):
         return
     db = SessionLocal()
     try:
+        # LangGraph's own checkpoint tables, keyed by "{org_id}:{user_id}:{thread_id}"
+        for table in ("checkpoint_writes", "checkpoint_blobs", "checkpoints"):
+            db.execute(text(f"DELETE FROM {table} WHERE thread_id LIKE :prefix"), {"prefix": f"{org_id}:%"})
+        db.query(AgentAction).filter(AgentAction.org_id == org_id).delete(synchronize_session=False)
+        db.query(PendingAction).filter(PendingAction.org_id == org_id).delete(synchronize_session=False)
+        thread_ids = [t.id for t in db.query(ChatThread).filter(ChatThread.org_id == org_id).all()]
+        if thread_ids:
+            db.query(ChatMessage).filter(ChatMessage.thread_id.in_(thread_ids)).delete(synchronize_session=False)
+        db.query(ChatThread).filter(ChatThread.org_id == org_id).delete(synchronize_session=False)
         db.query(Transaction).filter(
             Transaction.customer_id.in_(db.query(Customer.id).filter(Customer.org_id == org_id))
         ).delete(synchronize_session=False)
@@ -54,7 +67,7 @@ def cleanup(org_id: str | None):
         db.close()
 
 
-def main() -> int:
+def main(client: TestClient) -> int:
     org_id = None
     start = time.time()
 
@@ -106,4 +119,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # used as a context manager so FastAPI's lifespan shutdown runs,
+    # closing the checkpointer's connection pool cleanly on exit
+    with TestClient(app) as test_client:
+        sys.exit(main(test_client))

@@ -79,9 +79,9 @@ The agent/tools layer (`app/agent/`) - add `GROQ_API_KEY` and/or
 - Every tool call that produces a result is logged to `agent_actions` (an
   audit trail of what the AI has actually changed)
 - `POST /api/agent/chat` - send `{"message": "..."}`, get back `{"reply":
-  ..., "pending_actions": [...]}`; conversation memory is per org+user,
-  in-process (lost on restart - same `InMemorySaver` tradeoff as the
-  tutorial's memory section)
+  ..., "pending_actions": [...]}`; conversation memory is per org+user+thread
+  (see Phase 5), backed by Postgres via `app/agent/checkpointer.py` - it
+  survives process restarts, not just requests
 
 ## What's here (Phase 4 scope)
 
@@ -103,5 +103,36 @@ Frontend (`frontend/`) now has a Settings page (QR generator + CSV
 import/export) and an Ask Your Data page, alongside the Phase 3 auth/
 customer/dashboard/assistant pages.
 
+## What's here (post-Phase-4 additions)
+
+- **Chat history**: `GET /api/agent/threads`, `GET
+  /api/agent/threads/{id}/messages`, `DELETE /api/agent/threads/{id}` -
+  real conversations persisted in `chat_threads`/`chat_messages`, so the
+  frontend's "New chat" button and history panel can list/reopen past
+  conversations, not just reset the visible transcript.
+- **Voice input**: the frontend uses the browser's built-in Speech
+  Recognition API (no backend involved, no cost) on both chat pages.
+- **Vision**: `POST /api/agent/chat` accepts `image_data_url` - Groq's
+  current free model is text-only, so any message with an image is routed
+  to Gemini instead (`app/agent/model.py:get_vision_model`), which also
+  supports tool-calling, so the agent can read a photo and act on it (e.g.
+  create a customer from a photographed note) in one turn.
+- **Markdown formatting**: both the Assistant and Ask Your Data system
+  prompts ask for markdown, and the frontend renders it properly instead of
+  showing raw asterisks.
+- **Postgres-backed agent memory** (`app/agent/checkpointer.py`): replaced
+  `InMemorySaver` with `langgraph-checkpoint-postgres`, using the same
+  Supabase database. This isn't just "nice to have" - a local-disk/SQLite
+  saver would've been just as ephemeral as in-memory on a platform like
+  Render's free tier, where the whole container filesystem resets on every
+  restart/redeploy. Verified by running two completely separate Python
+  processes against the same thread and confirming the second recalled
+  what the first said.
+- **Deployment**: `render.yaml` (backend, Render) and `frontend/vercel.json`
+  (SPA rewrite, Vercel). `CORS_ORIGINS` must include the deployed frontend's
+  URL or its API calls fail silently in the browser (not visible via
+  curl/server-to-server checks - CORS is browser-enforced only).
+
 Not yet built: WhatsApp quick-capture extraction (paste a WhatsApp message,
-LLM extracts structured fields) from the original prototype.
+LLM extracts structured fields) from the original prototype, and multi-user
+role management (everyone is `owner` today, fixed at signup).

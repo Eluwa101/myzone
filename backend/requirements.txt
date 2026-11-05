@@ -15,3 +15,5 @@ langchain
 langchain-groq
 langchain-google-genai
 langgraph
+langgraph-checkpoint-postgres
+psycopg_pool

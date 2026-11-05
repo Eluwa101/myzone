@@ -24,6 +24,7 @@ def test_thread_id_is_namespaced_under_org_and_user(db_session, seeded_org, monk
     org_id, user_id = seeded_org
     captured_configs = []
     monkeypatch.setattr(runner, "get_model", lambda: None)  # avoid a real network call to Groq/Gemini
+    monkeypatch.setattr(runner, "get_checkpointer", lambda: None)  # avoid a real connection to Postgres
     monkeypatch.setattr(runner, "create_agent", lambda **kwargs: _FakeAgent(captured_configs))
 
     runner.run_chat(db_session, org_id, user_id, "hello", thread_id="my-chat")

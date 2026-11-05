@@ -2,18 +2,13 @@ import json
 from uuid import UUID
 
 from langchain.agents import create_agent
-from langgraph.checkpoint.memory import InMemorySaver
 from sqlalchemy.orm import Session
 
+from app.agent.checkpointer import get_checkpointer
 from app.agent.model import extract_text, get_model, get_vision_model
 from app.agent.tools import build_tools
 from app.controllers import agent_controller
 from app.models.pending_action import PendingAction
-
-# One process-lifetime checkpointer shared across requests, keyed per
-# org+user thread below - same idea as src/03_agent_with_memory.py, just
-# scoped so different users/orgs don't share a conversation.
-_checkpointer = InMemorySaver()
 
 SYSTEM_PROMPT = (
     "You are the assistant inside a small business's mini CRM. You can look up, create, "
@@ -55,7 +50,7 @@ def run_chat(
 ) -> tuple[str, list[PendingAction]]:
     tools = build_tools(db, org_id, user_id)
     model = get_vision_model() if image_data_url else get_model()
-    agent = create_agent(model=model, tools=tools, system_prompt=SYSTEM_PROMPT, checkpointer=_checkpointer)
+    agent = create_agent(model=model, tools=tools, system_prompt=SYSTEM_PROMPT, checkpointer=get_checkpointer())
     # thread_id is client-supplied (lets the UI start a genuinely new
     # conversation, not just clear the visible transcript) but always
     # namespaced under org+user server-side, so a client can never read or

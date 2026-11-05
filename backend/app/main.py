@@ -1,10 +1,20 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.agent.checkpointer import close_checkpointer
 from app.core.config import settings as app_settings
 from app.routes import agent, auth, customers, settings, summary, transactions
 
-app = FastAPI(title="Mini CRM API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    close_checkpointer()
+
+
+app = FastAPI(title="Mini CRM API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
