@@ -34,6 +34,20 @@ def reset_model_cache() -> None:
     _cached_model = None
 
 
+def call_with_fallback(get_model_fn, invoke):
+    """get_model()'s cheap "ping" check only catches a provider being down
+    at the moment the model is first resolved - it won't catch something
+    like Groq's daily token quota running out mid-run, which only shows up
+    on a real call. So: try the currently resolved model, and if invoking it
+    raises, drop the cache and retry once - this naturally falls through to
+    Gemini since get_model()'s own ping will hit the same failure."""
+    try:
+        return invoke(get_model_fn())
+    except Exception:
+        reset_model_cache()
+        return invoke(get_model_fn())
+
+
 def extract_text(content) -> str:
     """Most models return a plain string for .content, but Gemini (and other
     multimodal-capable models) can return a list of content blocks instead -

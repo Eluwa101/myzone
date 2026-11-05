@@ -10,7 +10,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session, joinedload
 
-from app.agent.model import extract_text, get_model
+from app.agent.model import call_with_fallback, extract_text, get_model
 from app.controllers import summary_controller
 from app.models.customer import Customer
 
@@ -90,10 +90,9 @@ def build_data_context(db: Session, org_id: UUID) -> str:
 
 def ask_data(db: Session, org_id: UUID, question: str) -> str:
     context = build_data_context(db, org_id)
-    model = get_model()
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT.format(today=date.today().isoformat(), context=context)},
         {"role": "user", "content": question},
     ]
-    result = model.invoke(messages)
+    result = call_with_fallback(get_model, lambda model: model.invoke(messages))
     return extract_text(result.content)

@@ -5,7 +5,7 @@ from langchain.agents import create_agent
 from sqlalchemy.orm import Session
 
 from app.agent.checkpointer import get_checkpointer
-from app.agent.model import extract_text, get_model, get_vision_model
+from app.agent.model import call_with_fallback, extract_text, get_model, get_vision_model
 from app.agent.tools import build_tools
 from app.controllers import agent_controller
 from app.models.pending_action import PendingAction
@@ -69,16 +69,18 @@ def run_chat(
     image_data_url: str | None = None,
 ) -> tuple[str, list[PendingAction]]:
     tools = build_tools(db, org_id, user_id)
-    model = get_vision_model() if image_data_url else get_model()
-    agent = create_agent(model=model, tools=tools, system_prompt=SYSTEM_PROMPT, checkpointer=get_checkpointer())
     # thread_id is client-supplied (lets the UI start a genuinely new
     # conversation, not just clear the visible transcript) but always
     # namespaced under org+user server-side, so a client can never read or
     # continue another org/user's conversation by guessing/reusing an id.
     config = {"configurable": {"thread_id": f"{org_id}:{user_id}:{thread_id or 'default'}"}}
-
     content = _build_user_content(message, image_data_url)
-    result = agent.invoke({"messages": [{"role": "user", "content": content}]}, config)
+
+    def invoke_agent(model):
+        agent = create_agent(model=model, tools=tools, system_prompt=SYSTEM_PROMPT, checkpointer=get_checkpointer())
+        return agent.invoke({"messages": [{"role": "user", "content": content}]}, config)
+
+    result = invoke_agent(get_vision_model()) if image_data_url else call_with_fallback(get_model, invoke_agent)
     messages = result["messages"]
     reply = extract_text(messages[-1].content) if messages else ""
 
