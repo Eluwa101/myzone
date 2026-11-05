@@ -5,7 +5,7 @@ from langchain.agents import create_agent
 from sqlalchemy.orm import Session
 
 from app.agent.checkpointer import get_checkpointer
-from app.agent.model import call_with_fallback, extract_text, get_model, get_vision_model
+from app.agent.model import call_vision_with_fallback, call_with_fallback, extract_text, get_model
 from app.agent.tools import build_tools
 from app.controllers import agent_controller
 from app.models.pending_action import PendingAction
@@ -80,7 +80,7 @@ def run_chat(
         agent = create_agent(model=model, tools=tools, system_prompt=SYSTEM_PROMPT, checkpointer=get_checkpointer())
         return agent.invoke({"messages": [{"role": "user", "content": content}]}, config)
 
-    result = invoke_agent(get_vision_model()) if image_data_url else call_with_fallback(get_model, invoke_agent)
+    result = call_vision_with_fallback(invoke_agent) if image_data_url else call_with_fallback(get_model, invoke_agent)
     messages = result["messages"]
     reply = extract_text(messages[-1].content) if messages else ""
 

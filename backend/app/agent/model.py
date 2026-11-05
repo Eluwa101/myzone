@@ -22,7 +22,8 @@ COOLDOWN_SECONDS = 15 * 60
 
 _cached_model = None
 _cached_provider: str | None = None
-_cooldowns = {"groq": 0.0, "openrouter": 0.0}
+_cooldowns = {"groq": 0.0, "openrouter": 0.0, "gemini_vision": 0.0}
+_vision_provider: str | None = None
 
 
 def _groq():
@@ -107,5 +108,25 @@ def get_vision_model():
     """Groq's model is text-only, so any message that includes an image is
     always routed to Gemini instead, which supports both multimodal input
     and tool-calling - the agent can read a photo and act on it (e.g.
-    create a customer from it) in one turn."""
+    create a customer from it) in one turn. OpenRouter's free router is also
+    multimodal (verified live), so it's the fallback if Gemini fails
+    mid-run - no upfront ping here though, unlike the text chain: Gemini
+    has been reliable enough to trust directly, and pinging would double
+    the cost of every single image message."""
+    global _vision_provider
+    if time.monotonic() < _cooldowns["gemini_vision"]:
+        _vision_provider = "openrouter"
+        return _openrouter()
+    _vision_provider = "gemini"
     return _gemini()
+
+
+def call_vision_with_fallback(invoke):
+    """Same retry-once pattern as call_with_fallback, but for images: Gemini
+    first, OpenRouter if that invoke fails."""
+    try:
+        return invoke(get_vision_model())
+    except Exception:
+        if _vision_provider == "gemini":
+            _cooldowns["gemini_vision"] = time.monotonic() + COOLDOWN_SECONDS
+        return invoke(get_vision_model())
