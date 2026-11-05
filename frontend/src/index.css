@@ -597,6 +597,35 @@ a.row-between:hover {
   margin: 0;
 }
 
+.server-waking-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px calc(8px + env(safe-area-inset-top, 0px));
+  background: var(--warning-50);
+  color: var(--warning-700);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.server-waking-banner .spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .bottom-nav {
   position: fixed;
   bottom: 0;
