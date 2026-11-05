@@ -12,5 +12,13 @@ class Settings(BaseSettings):
     groq_api_key: str | None = None
     google_api_key: str | None = None
 
+    # comma-separated list of allowed frontend origins, e.g.
+    # "http://localhost:5173,https://your-app.vercel.app"
+    cors_origins: str = "http://localhost:5173"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
 
 settings = Settings()
