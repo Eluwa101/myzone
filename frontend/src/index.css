@@ -550,6 +550,23 @@ a.row-between:hover {
   margin-top: 4px;
 }
 
+.public-form-page {
+  min-height: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+}
+
+.public-form-card {
+  width: 100%;
+  max-width: 480px;
+}
+
+.public-form-card label {
+  margin-top: 14px;
+}
+
 .note-customer-checklist label {
   display: flex;
   align-items: center;

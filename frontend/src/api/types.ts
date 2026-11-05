@@ -104,6 +104,38 @@ export interface Summary {
   range_end?: string | null;
 }
 
+export type FormFieldType = "text" | "textarea" | "tel" | "email";
+
+export interface FormFieldDef {
+  key: string;
+  label: string;
+  type: FormFieldType;
+  required: boolean;
+  standard: boolean;
+}
+
+export interface CustomForm {
+  id: string;
+  name: string;
+  public_token: string;
+  fields: FormFieldDef[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PublicForm {
+  name: string;
+  fields: FormFieldDef[];
+}
+
+export interface FormSubmission {
+  id: string;
+  customer_id: string | null;
+  raw_payload: Record<string, string>;
+  created_at: string;
+}
+
 export interface SavedWidget {
   id: string;
   question: string;

@@ -8,8 +8,10 @@ import DashboardPage from "./pages/DashboardPage";
 import DashboardInterestsPage from "./pages/DashboardInterestsPage";
 import DashboardMonthlyPage from "./pages/DashboardMonthlyPage";
 import DashboardTopCustomersPage from "./pages/DashboardTopCustomersPage";
+import FormsPage from "./pages/FormsPage";
 import LoginPage from "./pages/LoginPage";
 import NotesPage from "./pages/NotesPage";
+import PublicFormPage from "./pages/PublicFormPage";
 import SettingsPage from "./pages/SettingsPage";
 import SignupPage from "./pages/SignupPage";
 
@@ -18,6 +20,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route path="/f/:token" element={<PublicFormPage />} />
 
       <Route element={<ProtectedLayout />}>
         <Route path="/customers" element={<CustomersPage />} />
@@ -29,6 +32,7 @@ export default function App() {
         <Route path="/dashboard/interests" element={<DashboardInterestsPage />} />
         <Route path="/ask" element={<AskDataPage />} />
         <Route path="/notes" element={<NotesPage />} />
+        <Route path="/forms" element={<FormsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
 

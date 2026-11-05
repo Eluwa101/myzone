@@ -1,4 +1,4 @@
-import { Copy, Download, QrCode, StickyNote, Upload } from "lucide-react";
+import { ClipboardList, Copy, Download, QrCode, StickyNote, Upload } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -118,6 +118,19 @@ export default function SettingsPage() {
         <h3>Appearance</h3>
         <p className="muted small">Choose how the app looks, or follow your device's setting.</p>
         <ThemeToggle />
+      </div>
+
+      <div className="card">
+        <h3>
+          <ClipboardList size={15} className="h3-icon" /> Forms
+        </h3>
+        <p className="muted small">
+          Build a custom intake form and share its link with customers, or use it as a webhook target for Zapier, Google
+          Forms, or any other integration.
+        </p>
+        <Link to="/forms" className="btn-primary" style={{ display: "inline-flex" }}>
+          Open forms
+        </Link>
       </div>
 
       <div className="card">
