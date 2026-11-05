@@ -54,6 +54,12 @@ def get_checkpointer() -> PostgresSaver:
             min_size=1,
             max_size=5,
             kwargs={"autocommit": True, "row_factory": psycopg.rows.dict_row},
+            # Same reasoning as pool_pre_ping on the main SQLAlchemy engine:
+            # Supabase's pooler closes idle connections server-side, and
+            # without this a pooled connection that went stale between chat
+            # requests fails with "server closed the connection
+            # unexpectedly" instead of being silently replaced.
+            check=ConnectionPool.check_connection,
         )
         saver = PostgresSaver(pool)
         saver.setup()

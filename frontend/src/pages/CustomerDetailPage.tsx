@@ -1,6 +1,6 @@
 import { Check, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   addOrder,
   addTransaction,
@@ -12,7 +12,8 @@ import {
 } from "../api/customers";
 import { ApiError } from "../api/client";
 import { errorMessage } from "../api/errorMessage";
-import type { Customer, CustomerStatus } from "../api/types";
+import { listNotes } from "../api/notes";
+import type { Customer, CustomerStatus, OrgNote } from "../api/types";
 import ErrorText from "../components/ErrorText";
 import InfoFieldRow from "../components/InfoFieldRow";
 import OrderRow from "../components/OrderRow";
@@ -306,6 +307,8 @@ function InfoTab({
         )}
       </div>
 
+      <CustomerNotesSection customerId={customer.id} />
+
       <div className="card">
         <button type="button" className="btn-danger" onClick={onDeleteCustomer} disabled={deleting}>
           <Trash2 size={15} />
@@ -477,6 +480,42 @@ function OrdersTab({ customer, onChanged }: { customer: Customer; onChanged: () 
           <Plus size={15} /> Add order
         </button>
       )}
+    </div>
+  );
+}
+
+function CustomerNotesSection({ customerId }: { customerId: string }) {
+  const [notes, setNotes] = useState<OrgNote[] | null>(null);
+
+  useEffect(() => {
+    listNotes({ customerId })
+      .then(setNotes)
+      .catch(() => setNotes([]));
+  }, [customerId]);
+
+  return (
+    <div className="card">
+      <h3>Notes</h3>
+      {notes === null && <p className="muted small">Loading…</p>}
+      {notes !== null && notes.length === 0 && <p className="muted small">No notes for this customer yet.</p>}
+      {notes?.map((n) => (
+        <div key={n.id} className="info-row" style={{ cursor: "default" }}>
+          <div className="info-row-text">
+            <div className="row" style={{ marginBottom: 2 }}>
+              <span className="info-row-label" style={{ marginBottom: 0, fontWeight: 600, fontSize: 14, color: "var(--text)" }}>
+                {n.title}
+              </span>
+              {n.is_pending_review && <span className="badge badge-lead">Needs review</span>}
+            </div>
+            <div className="info-row-value muted" style={{ fontWeight: 400 }}>
+              {n.content}
+            </div>
+          </div>
+        </div>
+      ))}
+      <Link to={`/notes?customer_id=${customerId}`} className="icon-btn btn-ghost" style={{ marginTop: 8, display: "inline-flex" }}>
+        <Plus size={15} /> Add note
+      </Link>
     </div>
   );
 }

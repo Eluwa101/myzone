@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import NotesBell from "./NotesBell";
 import UserMenu from "./UserMenu";
 
 export default function TopBar({ title, actions }: { title: string; actions?: ReactNode }) {
@@ -7,6 +8,7 @@ export default function TopBar({ title, actions }: { title: string; actions?: Re
       <h1>{title}</h1>
       <div className="top-bar-actions">
         {actions}
+        <NotesBell />
         <UserMenu />
       </div>
     </header>

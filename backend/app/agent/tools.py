@@ -20,9 +20,10 @@ from uuid import UUID
 from langchain.tools import tool
 from sqlalchemy.orm import Session
 
-from app.controllers import agent_controller, customer_controller, order_controller, transaction_controller
+from app.controllers import agent_controller, customer_controller, note_controller, order_controller, transaction_controller
 from app.models.customer import CustomerStatus
 from app.schemas.customer import CustomerCreate, CustomerUpdate
+from app.schemas.note import NoteCreate
 from app.schemas.order import OrderCreate, OrderItem
 from app.schemas.transaction import TransactionCreate, TransactionUpdate
 
@@ -251,6 +252,55 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         return result
 
     @tool
+    def set_customer_custom_field(customer_id: str, field_name: str, value: str) -> dict:
+        """Set a custom field on a customer. Use this when a new piece of
+        information about the customer is a short, clearly-named fact that
+        fits a single field (e.g. field_name "Car", value "Toyota Camry"; or
+        field_name "Preferred delivery day", value "Saturday"). If you are
+        not confident the information cleanly fits as one named field, use
+        add_customer_note instead - don't guess at a field name for
+        something vague or multi-part."""
+        field = field_name.strip()
+        if not field:
+            return {"status": "error", "message": "field_name is required."}
+        try:
+            customer = customer_controller.get_customer(db, org_id, UUID(customer_id))
+        except customer_controller.CustomerNotFoundError:
+            return {"status": "error", "message": "No customer with that id."}
+        updated = customer_controller.update_customer(
+            db, org_id, customer.id, CustomerUpdate(extra={**(customer.extra or {}), field: value.strip()})
+        )
+        result = {"action": "field_set", "field_name": field, "value": value.strip(), **_serialize_customer(updated)}
+        log("set_customer_custom_field", {"customer_id": customer_id, "field_name": field, "value": value}, result)
+        return result
+
+    @tool
+    def add_customer_note(customer_id: str, title: str, content: str) -> dict:
+        """Record free-form, ambiguous, or multi-part information about a
+        customer as a note rather than a structured field - use this whenever
+        the information doesn't cleanly fit a single named field, or you are
+        not confident it should be one (e.g. "customer mentioned they're
+        moving next month and may pause orders", or anything about a
+        customer being a creditor/VIP/special case). The note is flagged for
+        a human to review later and will not appear as a customer field
+        until someone looks at it - this is the safe default when in doubt,
+        prefer it over guessing a field name with set_customer_custom_field."""
+        try:
+            customer = customer_controller.get_customer(db, org_id, UUID(customer_id))
+        except customer_controller.CustomerNotFoundError:
+            return {"status": "error", "message": "No customer with that id."}
+        from app.schemas.note import NoteOut
+
+        note = note_controller.create_note(
+            db, org_id,
+            NoteCreate(title=title.strip() or "Note", content=content.strip(), customer_ids=[customer.id]),
+            created_by_agent=True, is_pending_review=True,
+        )
+        result = {"status": "pending_review", **NoteOut.model_validate(note).model_dump(mode="json")}
+        log("add_customer_note", {"customer_id": customer_id, "title": title, "content": content}, result)
+        return result
+
+    @tool
     def get_dashboard_summary() -> dict:
         """Get precomputed CRM totals: customer counts by status, sales by
         currency (all-time, this month, last 6 months), top customers, and
@@ -298,6 +348,8 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         add_transaction,
         update_transaction,
         create_order,
+        set_customer_custom_field,
+        add_customer_note,
         get_dashboard_summary,
         delete_customer,
         merge_customers,

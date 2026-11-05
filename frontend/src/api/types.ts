@@ -28,6 +28,22 @@ export interface Order {
   notes?: string | null;
 }
 
+export interface NoteCustomerSummary {
+  id: string;
+  name: string;
+}
+
+export interface OrgNote {
+  id: string;
+  title: string;
+  content: string;
+  is_pending_review: boolean;
+  created_by_agent: boolean;
+  created_at: string;
+  updated_at: string;
+  customers: NoteCustomerSummary[];
+}
+
 export interface Customer {
   id: string;
   org_id: string;

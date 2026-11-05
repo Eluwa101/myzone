@@ -1,6 +1,7 @@
-import { Copy, Download, QrCode, Upload } from "lucide-react";
+import { Copy, Download, QrCode, StickyNote, Upload } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { exportCsv, importCsv } from "../api/customers";
 import { errorMessage } from "../api/errorMessage";
 import { getSettings, updateSettings } from "../api/settings";
@@ -111,6 +112,18 @@ export default function SettingsPage() {
   return (
     <div>
       <TopBar title="Settings" />
+
+      <div className="card">
+        <h3>
+          <StickyNote size={15} className="h3-icon" /> Notes
+        </h3>
+        <p className="muted small">
+          Org-wide notes you define - creditors, VIPs, anything you want to flag - attachable to one or many customers.
+        </p>
+        <Link to="/notes" className="btn-primary" style={{ display: "inline-flex" }}>
+          Open notes
+        </Link>
+      </div>
 
       <div className="card">
         <h3>

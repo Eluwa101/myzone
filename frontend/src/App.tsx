@@ -6,6 +6,7 @@ import CustomerDetailPage from "./pages/CustomerDetailPage";
 import CustomersPage from "./pages/CustomersPage";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
+import NotesPage from "./pages/NotesPage";
 import SettingsPage from "./pages/SettingsPage";
 import SignupPage from "./pages/SignupPage";
 
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/ask" element={<AskDataPage />} />
+        <Route path="/notes" element={<NotesPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
 
