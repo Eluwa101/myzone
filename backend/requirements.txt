@@ -13,6 +13,7 @@ pytest
 httpx
 langchain
 langchain-groq
+langchain-openai
 langchain-google-genai
 langgraph
 langgraph-checkpoint-postgres

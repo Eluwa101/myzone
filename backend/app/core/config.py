@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24
 
     groq_api_key: str | None = None
+    open_router_api_key: str | None = None
     google_api_key: str | None = None
 
     # comma-separated list of allowed frontend origins, e.g.
