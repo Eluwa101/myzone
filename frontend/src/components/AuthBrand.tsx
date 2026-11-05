@@ -6,7 +6,7 @@ export default function AuthBrand() {
       <span className="auth-brand-mark" aria-hidden="true">
         <Sparkles size={18} strokeWidth={2.25} />
       </span>
-      <h1>Mini CRM</h1>
+      <h1>MyShop</h1>
     </div>
   );
 }

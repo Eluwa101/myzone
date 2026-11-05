@@ -14,7 +14,7 @@ async def lifespan(app: FastAPI):
     close_checkpointer()
 
 
-app = FastAPI(title="Mini CRM API", lifespan=lifespan)
+app = FastAPI(title="MyShop API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

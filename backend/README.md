@@ -1,4 +1,4 @@
-# Mini CRM backend (Phase 1-4)
+# MyShop backend (Phase 1-4)
 
 FastAPI + SQLAlchemy + Postgres, MVC-style: `models/` (ORM), `schemas/`
 (validation), `controllers/` (business logic — the single source of truth
