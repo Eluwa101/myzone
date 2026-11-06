@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import AuthBrand from "../components/AuthBrand";
 import ErrorText from "../components/ErrorText";
@@ -13,8 +13,13 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Captured once at mount: redirect only if the user was already logged in
+  // when they landed here. signup() sets `user` before navigate("/onboarding")
+  // runs below, and re-checking `user` on every render would send them to
+  // /customers first, racing out the onboarding redirect.
+  const alreadyLoggedIn = useRef(!!user);
 
-  if (user) return <Navigate to="/customers" replace />;
+  if (alreadyLoggedIn.current) return <Navigate to="/customers" replace />;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -22,7 +27,7 @@ export default function SignupPage() {
     setBusy(true);
     try {
       await signup(orgName, email, password);
-      navigate("/customers");
+      navigate("/onboarding");
     } catch (err) {
       setError(errorMessage(err));
     } finally {

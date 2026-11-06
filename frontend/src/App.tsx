@@ -12,6 +12,7 @@ import DashboardTopCustomersPage from "./pages/DashboardTopCustomersPage";
 import FormsPage from "./pages/FormsPage";
 import LoginPage from "./pages/LoginPage";
 import NotesPage from "./pages/NotesPage";
+import OnboardingPage from "./pages/OnboardingPage";
 import PublicFormPage from "./pages/PublicFormPage";
 import SegmentsPage from "./pages/SegmentsPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/f/:token" element={<PublicFormPage />} />
 
         <Route element={<ProtectedLayout />}>
+          <Route path="/onboarding" element={<OnboardingPage />} />
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/customers/:id" element={<CustomerDetailPage />} />
           <Route path="/chat" element={<ChatPage />} />

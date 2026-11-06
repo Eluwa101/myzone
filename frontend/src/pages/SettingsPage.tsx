@@ -1,4 +1,4 @@
-import { ClipboardList, Copy, Download, QrCode, StickyNote, Upload, Users } from "lucide-react";
+import { Building2, ClipboardList, Copy, Download, QrCode, StickyNote, Upload, Users } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -25,6 +25,16 @@ export default function SettingsPage() {
   const [qrStatus, setQrStatus] = useState<string | null>(null);
   const [savingQr, setSavingQr] = useState(false);
 
+  const [industry, setIndustry] = useState("");
+  const [teamSize, setTeamSize] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [brandColor, setBrandColor] = useState("#4f46e5");
+  const [managerName, setManagerName] = useState("");
+  const [staffNames, setStaffNames] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileStatus, setProfileStatus] = useState<string | null>(null);
+
   const [importText, setImportText] = useState("");
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -37,6 +47,13 @@ export default function SettingsPage() {
       setBizName(s.biz_name ?? "");
       setNumber(s.whatsapp_number ?? "");
       setMessage(s.qr_message ?? DEFAULT_MESSAGE);
+      setIndustry(s.industry ?? "");
+      setTeamSize(s.team_size != null ? String(s.team_size) : "");
+      setPhone(s.phone ?? "");
+      setAddress(s.address ?? "");
+      setBrandColor(s.brand_color ?? "#4f46e5");
+      setManagerName(s.manager_name ?? "");
+      setStaffNames((s.staff_names ?? []).join("\n"));
       if (s.whatsapp_number) {
         QRCode.toDataURL(waLink(s.whatsapp_number, s.qr_message ?? DEFAULT_MESSAGE), { width: 220 }).then(setQrDataUrl);
       }
@@ -60,6 +77,30 @@ export default function SettingsPage() {
       setQrStatus(errorMessage(err));
     } finally {
       setSavingQr(false);
+    }
+  }
+
+  async function onSaveProfile() {
+    setSavingProfile(true);
+    setProfileStatus(null);
+    try {
+      await updateSettings({
+        industry: industry || null,
+        team_size: teamSize ? Number(teamSize) : null,
+        phone: phone || null,
+        address: address || null,
+        brand_color: brandColor || null,
+        manager_name: managerName || null,
+        staff_names: staffNames
+          .split("\n")
+          .map((n) => n.trim())
+          .filter(Boolean),
+      });
+      setProfileStatus("Saved.");
+    } catch (err) {
+      setProfileStatus(errorMessage(err));
+    } finally {
+      setSavingProfile(false);
     }
   }
 
@@ -118,6 +159,36 @@ export default function SettingsPage() {
         <h3>Appearance</h3>
         <p className="muted small">Choose how the app looks, or follow your device's setting.</p>
         <ThemeToggle />
+      </div>
+
+      <div className="card">
+        <h3>
+          <Building2 size={15} className="h3-icon" /> Business profile
+        </h3>
+        <p className="muted small">More about your setup - used to tailor the app for your business.</p>
+        <label htmlFor="prof-industry">Industry / business type</label>
+        <input id="prof-industry" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Retail, Salon, Restaurant" />
+        <label htmlFor="prof-team-size">Team size</label>
+        <input id="prof-team-size" type="number" min={1} value={teamSize} onChange={(e) => setTeamSize(e.target.value)} placeholder="e.g. 5" />
+        <label htmlFor="prof-manager">Manager name</label>
+        <input id="prof-manager" value={managerName} onChange={(e) => setManagerName(e.target.value)} />
+        <label htmlFor="prof-staff">Staff / worker names (one per line)</label>
+        <textarea id="prof-staff" rows={4} value={staffNames} onChange={(e) => setStaffNames(e.target.value)} />
+        <label htmlFor="prof-phone">Business phone</label>
+        <input id="prof-phone" value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" />
+        <label htmlFor="prof-address">Business address</label>
+        <input id="prof-address" value={address} onChange={(e) => setAddress(e.target.value)} />
+        <label htmlFor="prof-color">Brand color</label>
+        <div className="row" style={{ alignItems: "center" }}>
+          <input id="prof-color" type="color" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} style={{ width: 48, padding: 2 }} />
+          <span className="muted small">{brandColor}</span>
+        </div>
+        <div className="row" style={{ marginTop: 12 }}>
+          <button className="btn-primary" onClick={onSaveProfile} disabled={savingProfile}>
+            {savingProfile ? "Saving…" : "Save profile"}
+          </button>
+          {profileStatus && <span className="muted small">{profileStatus}</span>}
+        </div>
       </div>
 
       <div className="card">
