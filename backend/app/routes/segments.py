@@ -3,13 +3,25 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
+from app.agent.segment_suggest import SegmentSuggestionError, suggest_segment_filters
 from app.controllers import segment_controller
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
-from app.schemas.segment import SegmentCreate, SegmentFilters, SegmentOut, SegmentResult, SegmentUpdate
+from app.schemas.segment import SegmentCreate, SegmentFilters, SegmentOut, SegmentResult, SegmentSuggestRequest, SegmentUpdate
 
 router = APIRouter(prefix="/api/segments", tags=["segments"])
+
+
+@router.post("/suggest", response_model=SegmentFilters)
+def suggest_filters(data: SegmentSuggestRequest, current_user: User = Depends(get_current_user)):
+    try:
+        return suggest_segment_filters(data.description)
+    except SegmentSuggestionError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Couldn't turn that into filters - try describing it more simply.",
+        )
 
 
 @router.get("", response_model=list[SegmentOut])

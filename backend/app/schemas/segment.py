@@ -21,6 +21,10 @@ class SegmentFilters(BaseModel):
     min_transactions: int | None = Field(default=None, ge=1)
 
 
+class SegmentSuggestRequest(BaseModel):
+    description: str = Field(min_length=1, max_length=500)
+
+
 class SegmentCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     filters: SegmentFilters = Field(default_factory=SegmentFilters)
@@ -44,6 +48,7 @@ class SegmentOut(BaseModel):
 class SegmentMemberOut(BaseModel):
     id: UUID
     name: str
+    first_name: str | None
     email: str | None
     phone: str | None
     status: CustomerStatus

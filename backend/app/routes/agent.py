@@ -28,7 +28,7 @@ def chat(data: ChatRequest, db: Session = Depends(get_db), current_user: User = 
     chat_history_controller.record_user_message(
         db, current_user.org_id, current_user.id, thread_id, data.message, has_image=bool(data.image_data_url)
     )
-    reply, pending = run_chat(db, current_user.org_id, current_user.id, data.message, thread_id, data.image_data_url)
+    reply, pending = run_chat(db, current_user.org_id, current_user.id, data.message, thread_id, data.image_data_url, data.customer_id)
     chat_history_controller.record_assistant_message(db, thread_id, reply)
     return ChatResponse(reply=reply, pending_actions=[PendingActionOut.model_validate(p) for p in pending])
 

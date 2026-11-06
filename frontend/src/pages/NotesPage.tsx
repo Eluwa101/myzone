@@ -1,4 +1,4 @@
-import { Check, ChevronRight, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { listCustomers } from "../api/customers";
@@ -18,6 +18,7 @@ export default function NotesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(!!preselectCustomerId);
+  const [search, setSearch] = useState("");
 
   function load() {
     setLoading(true);
@@ -32,6 +33,13 @@ export default function NotesPage() {
   }
 
   useEffect(load, []);
+
+  const filtered = search.trim()
+    ? notes.filter((n) => {
+        const q = search.trim().toLowerCase();
+        return n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q) || n.customers.some((c) => c.name.toLowerCase().includes(q));
+      })
+    : notes;
 
   return (
     <div>
@@ -60,12 +68,29 @@ export default function NotesPage() {
         )}
       </div>
 
+      {notes.length > 0 && (
+        <div className="toolbar">
+          <div className="search-wrap">
+            <Search size={16} className="search-icon" aria-hidden="true" />
+            <input
+              aria-label="Search notes"
+              className="search-input"
+              placeholder="Search title, content, customer…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <Spinner />
       ) : notes.length === 0 ? (
         <p className="muted small page-note">No notes yet.</p>
+      ) : filtered.length === 0 ? (
+        <p className="muted small page-note">No notes match "{search}".</p>
       ) : (
-        notes.map((n) => <NoteCard key={n.id} note={n} customers={customers} onChanged={load} />)
+        filtered.map((n) => <NoteCard key={n.id} note={n} customers={customers} onChanged={load} />)
       )}
     </div>
   );

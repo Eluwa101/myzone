@@ -20,8 +20,8 @@ export interface ChatHistoryMessage {
   created_at: string;
 }
 
-export function sendChat(message: string, threadId?: string, imageDataUrl?: string): Promise<ChatResponse> {
-  return api.post<ChatResponse>("/api/agent/chat", { message, thread_id: threadId, image_data_url: imageDataUrl });
+export function sendChat(message: string, threadId?: string, imageDataUrl?: string, customerId?: string): Promise<ChatResponse> {
+  return api.post<ChatResponse>("/api/agent/chat", { message, thread_id: threadId, image_data_url: imageDataUrl, customer_id: customerId });
 }
 
 export function listThreads(): Promise<ChatThread[]> {

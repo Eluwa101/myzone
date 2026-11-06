@@ -3,11 +3,12 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session, joinedload
 
-from app.controllers import customer_controller, transaction_controller
+from app.controllers import customer_controller, order_controller, transaction_controller
 from app.models.custom_form import CustomForm, FormSubmission, generate_public_token
 from app.models.customer import Customer
 from app.schemas.customer import CustomerCreate
-from app.schemas.form import CUSTOMER_FIELD_KEYS, TRANSACTION_FIELD_KEYS, FormCreate, FormUpdate
+from app.schemas.form import CUSTOMER_FIELD_KEYS, ORDER_FIELD_KEYS, TRANSACTION_FIELD_KEYS, FormCreate, FormUpdate
+from app.schemas.order import OrderCreate, OrderItem
 from app.schemas.transaction import TransactionCreate
 
 
@@ -88,7 +89,7 @@ def _upsert_customer(db: Session, org_id: UUID, data: CustomerCreate) -> tuple[C
     second record."""
     match = customer_controller.find_match(db, org_id, data.model_dump())
     if match:
-        for field in ["phone", "email", "job", "nationality", "pet", "address", "notes", "interests"]:
+        for field in ["first_name", "last_name", "phone", "email", "job", "nationality", "pet", "address", "notes", "interests"]:
             value = getattr(data, field, None)
             if value and not getattr(match, field, None):
                 setattr(match, field, value)
@@ -127,7 +128,37 @@ def _log_submission_transaction(db: Session, org_id: UUID, customer_id: UUID, tx
     return True
 
 
-def submit_public_form(db: Session, token: str, payload: dict[str, str]) -> tuple[FormSubmission, bool, bool]:
+def _log_submission_order(db: Session, org_id: UUID, customer_id: UUID, order_fields: dict[str, str]) -> bool:
+    """Mirrors _log_submission_transaction: an order only gets logged if the
+    submission actually named an item - everything else is optional."""
+    item = order_fields.get("order_item")
+    if not item:
+        return False
+    qty_raw = order_fields.get("order_qty")
+    try:
+        qty = float(qty_raw) if qty_raw else 1
+    except ValueError:
+        qty = 1
+    price_raw = order_fields.get("order_price")
+    try:
+        price = float(price_raw) if price_raw else None
+    except ValueError:
+        price = None
+    order_date = order_fields.get("order_date") or datetime.date.today().isoformat()
+    order_controller.create_order(
+        db, org_id, customer_id,
+        OrderCreate(
+            order_date=order_date,
+            delivery_date=order_fields.get("order_delivery_date") or None,
+            items=[OrderItem(name=item, qty=qty, price=price)],
+            amount=(qty * price) if price is not None else None,
+            currency=(order_fields.get("order_currency") or "").upper() or None,
+        ),
+    )
+    return True
+
+
+def submit_public_form(db: Session, token: str, payload: dict[str, str]) -> tuple[FormSubmission, bool, bool, bool]:
     form = get_public_form(db, token)
 
     missing = [f["label"] for f in form.fields if f.get("required") and not str(payload.get(f["key"], "")).strip()]
@@ -136,6 +167,7 @@ def submit_public_form(db: Session, token: str, payload: dict[str, str]) -> tupl
 
     customer_fields: dict[str, str] = {}
     transaction_fields: dict[str, str] = {}
+    order_fields: dict[str, str] = {}
     extra: dict[str, str] = {}
     for f in form.fields:
         value = payload.get(f["key"])
@@ -147,16 +179,19 @@ def submit_public_form(db: Session, token: str, payload: dict[str, str]) -> tupl
             customer_fields[f["key"]] = value
         elif category == "transaction" and f["key"] in TRANSACTION_FIELD_KEYS:
             transaction_fields[f["key"]] = value
+        elif category == "order" and f["key"] in ORDER_FIELD_KEYS:
+            order_fields[f["key"]] = value
         elif category == "custom":
             extra[f["label"]] = value
 
-    data = CustomerCreate(name=customer_fields.get("name", ""), **{k: v for k, v in customer_fields.items() if k != "name"}, extra=extra)
+    data = CustomerCreate(**customer_fields, extra=extra)
     customer, created = _upsert_customer(db, form.org_id, data)
 
     transaction_logged = _log_submission_transaction(db, form.org_id, customer.id, transaction_fields)
+    order_logged = _log_submission_order(db, form.org_id, customer.id, order_fields)
 
     submission = FormSubmission(form_id=form.id, org_id=form.org_id, customer_id=customer.id, raw_payload=payload)
     db.add(submission)
     db.commit()
     db.refresh(submission)
-    return submission, created, transaction_logged
+    return submission, created, transaction_logged, order_logged

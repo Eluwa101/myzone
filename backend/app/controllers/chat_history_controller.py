@@ -38,9 +38,12 @@ def record_assistant_message(db: Session, thread_id: str, content: str) -> None:
 
 
 def list_threads(db: Session, org_id: UUID, user_id: UUID) -> list[ChatThread]:
+    # Per-customer threads (id prefixed "customer:") are embedded in that
+    # customer's own record, not the general Assistant tab's history list.
     return (
         db.query(ChatThread)
         .filter(ChatThread.org_id == org_id, ChatThread.user_id == user_id)
+        .filter(~ChatThread.id.like("customer:%"))
         .order_by(ChatThread.updated_at.desc())
         .all()
     )

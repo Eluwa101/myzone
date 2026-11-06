@@ -2,7 +2,9 @@ import { api } from "./client";
 import type { Customer, CustomerListResult, CustomerStatus, DuplicateGroup, ImportResult, Order, OrderItem, Transaction } from "./types";
 
 export interface CustomerInput {
-  name: string;
+  name?: string;
+  first_name?: string;
+  last_name?: string;
   phone?: string;
   email?: string;
   job?: string;

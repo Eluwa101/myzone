@@ -8,7 +8,7 @@ from app.controllers import chat_history_controller
 
 
 def _mock_run_chat(monkeypatch, reply="Hi there!"):
-    def fake_run_chat(db, org_id, user_id, message, thread_id=None, image_data_url=None):
+    def fake_run_chat(db, org_id, user_id, message, thread_id=None, image_data_url=None, customer_id=None):
         return reply, []
 
     monkeypatch.setattr(agent_routes, "run_chat", fake_run_chat)
@@ -60,6 +60,24 @@ def test_different_thread_ids_stay_separate(client, auth_headers, monkeypatch):
 
     t1_messages = client.get("/api/agent/threads/t1/messages", headers=auth_headers).json()
     assert [m["content"] for m in t1_messages] == ["in thread one", "a"]
+
+
+def test_customer_scoped_threads_are_excluded_from_the_general_list(client, auth_headers, monkeypatch):
+    _mock_run_chat(monkeypatch, reply="a")
+    client.post("/api/agent/chat", json={"message": "general chat", "thread_id": "t1"}, headers=auth_headers)
+    _mock_run_chat(monkeypatch, reply="b")
+    client.post(
+        "/api/agent/chat",
+        json={"message": "about this customer", "thread_id": "customer:123", "customer_id": None},
+        headers=auth_headers,
+    )
+
+    threads = client.get("/api/agent/threads", headers=auth_headers).json()
+    assert {t["id"] for t in threads} == {"t1"}
+
+    # the customer-scoped thread's own messages are still reachable directly
+    messages = client.get("/api/agent/threads/customer:123/messages", headers=auth_headers).json()
+    assert [m["content"] for m in messages] == ["about this customer", "b"]
 
 
 def test_deleting_a_thread_removes_it_and_its_messages(client, auth_headers, monkeypatch):

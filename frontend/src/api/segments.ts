@@ -29,3 +29,7 @@ export function previewSegment(filters: SegmentFilters): Promise<SegmentResult> 
 export function getSegmentMembers(id: string): Promise<SegmentResult> {
   return api.get<SegmentResult>(`/api/segments/${id}/members`);
 }
+
+export function suggestSegmentFilters(description: string): Promise<SegmentFilters> {
+  return api.post<SegmentFilters>("/api/segments/suggest", { description });
+}

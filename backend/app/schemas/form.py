@@ -5,13 +5,22 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 # Only simple, string-valued fields are offered as "customer"/"transaction"
-# form fields - birthday/consent_date/status/qty-as-number etc. need type
-# coercion or enum validation that isn't worth the complexity for a public
-# intake form; they stay editable in the app afterward like any record.
-CUSTOMER_FIELD_KEYS = {"name", "phone", "email", "job", "nationality", "pet", "address", "notes", "interests"}
+# /"order" form fields - birthday/consent_date/status/qty-as-number etc. need
+# type coercion or enum validation that isn't worth the complexity for a
+# public intake form; they stay editable in the app afterward like any
+# record. "name" stays recognized for forms created before the
+# first_name/last_name convention below - new forms use the split fields.
+CUSTOMER_FIELD_KEYS = {"name", "first_name", "last_name", "phone", "email", "job", "nationality", "pet", "address", "notes", "interests"}
 TRANSACTION_FIELD_KEYS = {"tx_date", "tx_item", "tx_qty", "tx_amount", "tx_currency"}
+ORDER_FIELD_KEYS = {"order_date", "order_delivery_date", "order_item", "order_qty", "order_price", "order_currency"}
 
-FieldCategory = Literal["customer", "transaction", "custom"]
+# Every form - whether it's meant for orders, transactions, or general
+# customer data - always collects these four so a record can be identified
+# and reached; only first_name is required, mirroring how "name" alone used
+# to be the sole required field.
+REQUIRED_CONTACT_KEYS = {"first_name", "last_name", "phone", "email"}
+
+FieldCategory = Literal["customer", "transaction", "order", "custom"]
 
 
 class FormFieldDef(BaseModel):
@@ -23,16 +32,19 @@ class FormFieldDef(BaseModel):
 
 
 def _validate_fields(fields: list[FormFieldDef]) -> list[FormFieldDef]:
-    name_fields = [f for f in fields if f.category == "customer" and f.key == "name"]
-    if not name_fields:
-        raise ValueError("Every form must include the 'name' customer field.")
-    if not name_fields[0].required:
-        raise ValueError("The 'name' field must be required.")
+    customer_fields = {f.key: f for f in fields if f.category == "customer"}
+    missing = REQUIRED_CONTACT_KEYS - customer_fields.keys()
+    if missing:
+        raise ValueError(f"Every form must include: {', '.join(sorted(missing))}.")
+    if not customer_fields["first_name"].required:
+        raise ValueError("The 'first_name' field must be required.")
     for f in fields:
         if f.category == "customer" and f.key not in CUSTOMER_FIELD_KEYS:
             raise ValueError(f"'{f.key}' is not a recognized customer field.")
         if f.category == "transaction" and f.key not in TRANSACTION_FIELD_KEYS:
             raise ValueError(f"'{f.key}' is not a recognized transaction field.")
+        if f.category == "order" and f.key not in ORDER_FIELD_KEYS:
+            raise ValueError(f"'{f.key}' is not a recognized order field.")
     return fields
 
 
@@ -84,6 +96,7 @@ class FormSubmitResult(BaseModel):
     status: str
     customer_created: bool
     transaction_logged: bool
+    order_logged: bool
 
 
 class FormSubmissionOut(BaseModel):

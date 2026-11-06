@@ -8,6 +8,7 @@ class ChatRequest(BaseModel):
     message: str
     thread_id: str | None = None
     image_data_url: str | None = None
+    customer_id: UUID | None = None
 
 
 class PendingActionOut(BaseModel):

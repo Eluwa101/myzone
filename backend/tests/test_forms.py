@@ -1,20 +1,36 @@
-NAME_FIELD = {"key": "name", "label": "Full name", "type": "text", "required": True, "category": "customer"}
+FIRST_NAME_FIELD = {"key": "first_name", "label": "First name", "type": "text", "required": True, "category": "customer"}
+LAST_NAME_FIELD = {"key": "last_name", "label": "Last name", "type": "text", "required": False, "category": "customer"}
 PHONE_FIELD = {"key": "phone", "label": "Phone", "type": "tel", "required": False, "category": "customer"}
+EMAIL_FIELD = {"key": "email", "label": "Email", "type": "email", "required": False, "category": "customer"}
+CORE_CONTACT_FIELDS = [FIRST_NAME_FIELD, LAST_NAME_FIELD, PHONE_FIELD, EMAIL_FIELD]
 CUSTOM_FIELD = {"key": "fav_color", "label": "Favorite color", "type": "text", "required": False, "category": "custom"}
 TX_ITEM_FIELD = {"key": "tx_item", "label": "Item", "type": "text", "required": False, "category": "transaction"}
 TX_AMOUNT_FIELD = {"key": "tx_amount", "label": "Amount", "type": "number", "required": False, "category": "transaction"}
+ORDER_ITEM_FIELD = {"key": "order_item", "label": "Item ordered", "type": "text", "required": False, "category": "order"}
+ORDER_PRICE_FIELD = {"key": "order_price", "label": "Price", "type": "number", "required": False, "category": "order"}
+ORDER_QTY_FIELD = {"key": "order_qty", "label": "Quantity", "type": "number", "required": False, "category": "order"}
 
 
 def _create_form(client, auth_headers, fields=None):
     return client.post(
         "/api/forms",
-        json={"name": "Lead intake", "fields": fields or [NAME_FIELD, PHONE_FIELD, CUSTOM_FIELD]},
+        json={"name": "Lead intake", "fields": fields or [*CORE_CONTACT_FIELDS, CUSTOM_FIELD]},
         headers=auth_headers,
     ).json()
 
 
-def test_create_form_requires_a_required_name_field(client, auth_headers):
+def test_create_form_requires_core_contact_fields(client, auth_headers):
     resp = client.post("/api/forms", json={"name": "Bad form", "fields": [PHONE_FIELD]}, headers=auth_headers)
+    assert resp.status_code == 422
+
+
+def test_create_form_requires_first_name_to_be_required(client, auth_headers):
+    not_required = {**FIRST_NAME_FIELD, "required": False}
+    resp = client.post(
+        "/api/forms",
+        json={"name": "Bad form", "fields": [not_required, LAST_NAME_FIELD, PHONE_FIELD, EMAIL_FIELD]},
+        headers=auth_headers,
+    )
     assert resp.status_code == 422
 
 
@@ -42,7 +58,7 @@ def test_public_submission_creates_customer_with_extra_field(client, auth_header
     form = _create_form(client, auth_headers)
     resp = client.post(
         f"/api/public/forms/{form['public_token']}/submit",
-        json={"name": "Ada Obi", "phone": "08012345678", "fav_color": "Blue"},
+        json={"first_name": "Ada", "last_name": "Obi", "phone": "08012345678", "fav_color": "Blue"},
     )
     assert resp.status_code == 200
     assert resp.json()["customer_created"] is True
@@ -50,6 +66,8 @@ def test_public_submission_creates_customer_with_extra_field(client, auth_header
     customers = client.get("/api/customers", headers=auth_headers).json()["items"]
     assert len(customers) == 1
     assert customers[0]["name"] == "Ada Obi"
+    assert customers[0]["first_name"] == "Ada"
+    assert customers[0]["last_name"] == "Obi"
     assert customers[0]["extra"]["Favorite color"] == "Blue"
 
 
@@ -59,7 +77,7 @@ def test_public_submission_merges_into_existing_customer_by_phone(client, auth_h
 
     resp = client.post(
         f"/api/public/forms/{form['public_token']}/submit",
-        json={"name": "Ada O.", "phone": "08012345678", "fav_color": "Green"},
+        json={"first_name": "Ada", "last_name": "O.", "phone": "08012345678", "fav_color": "Green"},
     )
     assert resp.status_code == 200
     assert resp.json()["customer_created"] is False
@@ -73,7 +91,7 @@ def test_public_submission_missing_required_field_is_rejected(client, auth_heade
     form = _create_form(client, auth_headers)
     resp = client.post(f"/api/public/forms/{form['public_token']}/submit", json={"phone": "08012345678"})
     assert resp.status_code == 400
-    assert "name" in resp.json()["detail"].lower() or "full name" in resp.json()["detail"].lower()
+    assert "first name" in resp.json()["detail"].lower()
 
 
 def test_inactive_form_is_not_publicly_reachable(client, auth_headers):
@@ -94,10 +112,10 @@ def test_regenerate_token_invalidates_old_link(client, auth_headers):
 
 def test_submissions_are_listed_for_the_owning_org(client, auth_headers):
     form = _create_form(client, auth_headers)
-    client.post(f"/api/public/forms/{form['public_token']}/submit", json={"name": "Ada Obi"})
+    client.post(f"/api/public/forms/{form['public_token']}/submit", json={"first_name": "Ada", "last_name": "Obi"})
     submissions = client.get(f"/api/forms/{form['id']}/submissions", headers=auth_headers).json()
     assert len(submissions) == 1
-    assert submissions[0]["raw_payload"]["name"] == "Ada Obi"
+    assert submissions[0]["raw_payload"]["first_name"] == "Ada"
 
 
 def test_delete_form(client, auth_headers):
@@ -108,10 +126,10 @@ def test_delete_form(client, auth_headers):
 
 
 def test_submission_with_transaction_fields_logs_a_transaction(client, auth_headers):
-    form = _create_form(client, auth_headers, fields=[NAME_FIELD, TX_ITEM_FIELD, TX_AMOUNT_FIELD])
+    form = _create_form(client, auth_headers, fields=[*CORE_CONTACT_FIELDS, TX_ITEM_FIELD, TX_AMOUNT_FIELD])
     resp = client.post(
         f"/api/public/forms/{form['public_token']}/submit",
-        json={"name": "Ada Obi", "tx_item": "Rice", "tx_amount": "15000"},
+        json={"first_name": "Ada", "last_name": "Obi", "tx_item": "Rice", "tx_amount": "15000"},
     )
     assert resp.status_code == 200
     assert resp.json()["transaction_logged"] is True
@@ -123,8 +141,10 @@ def test_submission_with_transaction_fields_logs_a_transaction(client, auth_head
 
 
 def test_submission_without_amount_does_not_log_a_transaction(client, auth_headers):
-    form = _create_form(client, auth_headers, fields=[NAME_FIELD, TX_ITEM_FIELD, TX_AMOUNT_FIELD])
-    resp = client.post(f"/api/public/forms/{form['public_token']}/submit", json={"name": "Ada Obi", "tx_item": "Rice"})
+    form = _create_form(client, auth_headers, fields=[*CORE_CONTACT_FIELDS, TX_ITEM_FIELD, TX_AMOUNT_FIELD])
+    resp = client.post(
+        f"/api/public/forms/{form['public_token']}/submit", json={"first_name": "Ada", "last_name": "Obi", "tx_item": "Rice"}
+    )
     assert resp.status_code == 200
     assert resp.json()["transaction_logged"] is False
 
@@ -132,8 +152,33 @@ def test_submission_without_amount_does_not_log_a_transaction(client, auth_heade
     assert customers[0]["transactions"] == []
 
 
+def test_submission_with_order_fields_logs_an_order(client, auth_headers):
+    form = _create_form(client, auth_headers, fields=[*CORE_CONTACT_FIELDS, ORDER_ITEM_FIELD, ORDER_QTY_FIELD, ORDER_PRICE_FIELD])
+    resp = client.post(
+        f"/api/public/forms/{form['public_token']}/submit",
+        json={"first_name": "Ada", "last_name": "Obi", "order_item": "Generator", "order_qty": "2", "order_price": "45000"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["order_logged"] is True
+
+    customers = client.get("/api/customers", headers=auth_headers).json()["items"]
+    assert len(customers[0]["orders"]) == 1
+    order = customers[0]["orders"][0]
+    assert order["items"] == [{"name": "Generator", "qty": 2, "price": 45000}]
+    assert order["amount"] == 90000
+
+
+def test_submission_without_order_item_does_not_log_an_order(client, auth_headers):
+    form = _create_form(client, auth_headers, fields=[*CORE_CONTACT_FIELDS, ORDER_ITEM_FIELD])
+    resp = client.post(
+        f"/api/public/forms/{form['public_token']}/submit", json={"first_name": "Ada", "last_name": "Obi"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["order_logged"] is False
+
+
 def test_submission_customer_name_shown_in_submissions_list(client, auth_headers):
     form = _create_form(client, auth_headers)
-    client.post(f"/api/public/forms/{form['public_token']}/submit", json={"name": "Ada Obi"})
+    client.post(f"/api/public/forms/{form['public_token']}/submit", json={"first_name": "Ada", "last_name": "Obi"})
     submissions = client.get(f"/api/forms/{form['id']}/submissions", headers=auth_headers).json()
     assert submissions[0]["customer_name"] == "Ada Obi"

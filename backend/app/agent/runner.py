@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.agent.checkpointer import get_checkpointer
 from app.agent.model import call_vision_with_fallback, call_with_fallback, extract_text, get_model
 from app.agent.tools import build_tools
-from app.controllers import agent_controller
+from app.controllers import agent_controller, customer_controller
 from app.models.pending_action import PendingAction
 
 SYSTEM_PROMPT = (
@@ -67,6 +67,7 @@ def run_chat(
     message: str,
     thread_id: str | None = None,
     image_data_url: str | None = None,
+    customer_id: UUID | None = None,
 ) -> tuple[str, list[PendingAction]]:
     tools = build_tools(db, org_id, user_id)
     # thread_id is client-supplied (lets the UI start a genuinely new
@@ -76,8 +77,22 @@ def run_chat(
     config = {"configurable": {"thread_id": f"{org_id}:{user_id}:{thread_id or 'default'}"}}
     content = _build_user_content(message, image_data_url)
 
+    system_prompt = SYSTEM_PROMPT
+    if customer_id:
+        try:
+            customer = customer_controller.get_customer(db, org_id, customer_id)
+            system_prompt += (
+                f"\n\nContext: this conversation is embedded in the record for customer "
+                f"'{customer.name}' (id={customer_id}). Unless the user clearly names someone "
+                f"else, assume any order, transaction, note, or field update they describe is "
+                f"for this customer and use this id directly - no need to call search_customers "
+                f"first."
+            )
+        except customer_controller.CustomerNotFoundError:
+            pass
+
     def invoke_agent(model):
-        agent = create_agent(model=model, tools=tools, system_prompt=SYSTEM_PROMPT, checkpointer=get_checkpointer())
+        agent = create_agent(model=model, tools=tools, system_prompt=system_prompt, checkpointer=get_checkpointer())
         return agent.invoke({"messages": [{"role": "user", "content": content}]}, config)
 
     result = call_vision_with_fallback(invoke_agent) if image_data_url else call_with_fallback(get_model, invoke_agent)

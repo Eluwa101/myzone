@@ -1,5 +1,5 @@
-import { Check, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { Bot, Check, Plus, Send, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   addOrder,
@@ -10,21 +10,24 @@ import {
   type CustomerInput,
   updateCustomer,
 } from "../api/customers";
+import { getThreadMessages, listPending, sendChat } from "../api/agent";
 import { ApiError } from "../api/client";
 import { errorMessage } from "../api/errorMessage";
 import { listNotes } from "../api/notes";
-import type { Customer, CustomerStatus, Order, OrgNote } from "../api/types";
+import type { Customer, CustomerStatus, Order, OrgNote, PendingAction } from "../api/types";
 import CurrencySelect from "../components/CurrencySelect";
 import ErrorText from "../components/ErrorText";
 import InfoFieldRow from "../components/InfoFieldRow";
+import MarkdownMessage from "../components/MarkdownMessage";
 import OrderItemsEditor, { hasPricedItems, itemsTotal } from "../components/OrderItemsEditor";
 import OrderRow from "../components/OrderRow";
+import PendingActionCard from "../components/PendingActionCard";
 import Spinner from "../components/Spinner";
 import Tabs from "../components/Tabs";
 import TopBar from "../components/TopBar";
 import TransactionRow from "../components/TransactionRow";
 
-const BLANK: CustomerInput = { name: "" };
+const BLANK: CustomerInput = { first_name: "", last_name: "", phone: "", email: "" };
 const STATUS_OPTIONS = [
   { value: "lead", label: "Lead" },
   { value: "customer", label: "Customer" },
@@ -45,8 +48,8 @@ export default function CustomerDetailPage() {
   const [conflict, setConflict] = useState<{ message: string; existingId: string } | null>(null);
   const [armedDelete, setArmedDelete] = useState(false);
   const initialTab = searchParams.get("tab");
-  const [tab, setTab] = useState<"info" | "transactions" | "orders">(
-    initialTab === "transactions" || initialTab === "orders" ? initialTab : "info"
+  const [tab, setTab] = useState<"info" | "transactions" | "orders" | "assistant">(
+    initialTab === "transactions" || initialTab === "orders" || initialTab === "assistant" ? initialTab : "info"
   );
 
   function loadCustomer() {
@@ -131,10 +134,14 @@ export default function CustomerDetailPage() {
       <div>
         <TopBar title="New customer" backTo="/customers" />
         <form className="card" onSubmit={onCreate}>
-          <label htmlFor="cf-name">Full name *</label>
-          <input id="cf-name" value={form.name} onChange={(e) => set("name", e.target.value)} required autoFocus />
+          <label htmlFor="cf-first-name">First name *</label>
+          <input id="cf-first-name" value={form.first_name ?? ""} onChange={(e) => set("first_name", e.target.value)} required autoFocus />
+          <label htmlFor="cf-last-name">Last name</label>
+          <input id="cf-last-name" value={form.last_name ?? ""} onChange={(e) => set("last_name", e.target.value)} />
           <label htmlFor="cf-phone">Phone / WhatsApp</label>
           <input id="cf-phone" value={form.phone ?? ""} onChange={(e) => set("phone", e.target.value)} />
+          <label htmlFor="cf-email">Email</label>
+          <input id="cf-email" type="email" value={form.email ?? ""} onChange={(e) => set("email", e.target.value)} />
           <label htmlFor="cf-interests">Interested in</label>
           <input
             id="cf-interests"
@@ -177,9 +184,10 @@ export default function CustomerDetailPage() {
           { key: "info", label: "Info" },
           { key: "transactions", label: `Transactions (${customer.transactions.length})` },
           { key: "orders", label: `Orders (${customer.orders.length})` },
+          { key: "assistant", label: "Assistant" },
         ]}
         active={tab}
-        onChange={(k) => setTab(k as "info" | "transactions" | "orders")}
+        onChange={(k) => setTab(k as "info" | "transactions" | "orders" | "assistant")}
       />
 
       <ErrorText message={error} />
@@ -196,8 +204,10 @@ export default function CustomerDetailPage() {
         />
       ) : tab === "transactions" ? (
         <TransactionsTab customer={customer} onChanged={loadCustomer} />
-      ) : (
+      ) : tab === "orders" ? (
         <OrdersTab customer={customer} onChanged={loadCustomer} />
+      ) : (
+        <AssistantTab customer={customer} onChanged={loadCustomer} />
       )}
     </div>
   );
@@ -243,7 +253,13 @@ function InfoTab({
   return (
     <div>
       <div className="card">
-        <InfoFieldRow label="Full name" value={customer.name} deletable={false} onSave={(v) => onSaveField("name", v)} />
+        <InfoFieldRow
+          label="First name"
+          value={customer.first_name || customer.name}
+          deletable={false}
+          onSave={(v) => onSaveField("first_name", v)}
+        />
+        <InfoFieldRow label="Last name" value={customer.last_name} onSave={(v) => onSaveField("last_name", v)} onDelete={() => onSaveField("last_name", "")} />
         <InfoFieldRow label="Phone / WhatsApp" value={customer.phone} onSave={(v) => onSaveField("phone", v)} onDelete={() => onSaveField("phone", "")} />
         <InfoFieldRow label="Email" value={customer.email} type="text" onSave={(v) => onSaveField("email", v)} onDelete={() => onSaveField("email", "")} />
         <InfoFieldRow label="Job / occupation" value={customer.job} onSave={(v) => onSaveField("job", v)} onDelete={() => onSaveField("job", "")} />
@@ -528,6 +544,121 @@ function OrdersTab({ customer, onChanged }: { customer: Customer; onChanged: () 
           <Plus size={15} /> Add order
         </button>
       )}
+    </div>
+  );
+}
+
+interface AssistantMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+function AssistantTab({ customer, onChanged }: { customer: Customer; onChanged: () => void }) {
+  const threadId = `customer:${customer.id}`;
+  const [messages, setMessages] = useState<AssistantMessage[]>([]);
+  const [pending, setPending] = useState<PendingAction[]>([]);
+  const [input, setInput] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  function refreshPending() {
+    listPending()
+      .then((all) =>
+        setPending(
+          all.filter((p) => {
+            const payload = p.payload as Record<string, unknown>;
+            return payload.customer_id === customer.id || payload.keep_id === customer.id || payload.merge_id === customer.id;
+          })
+        )
+      )
+      .catch(() => {
+        /* non-fatal - chat still works without this */
+      });
+  }
+
+  useEffect(() => {
+    setLoaded(false);
+    getThreadMessages(threadId)
+      .then((history) => setMessages(history.map((m) => ({ role: m.role, content: m.content }))))
+      .catch(() => setMessages([]))
+      .finally(() => setLoaded(true));
+    refreshPending();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadId]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, pending]);
+
+  async function onSend(e: FormEvent) {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || busy) return;
+    setInput("");
+    setError(null);
+    setMessages((m) => [...m, { role: "user", content: text }]);
+    setBusy(true);
+    try {
+      const res = await sendChat(text, threadId, undefined, customer.id);
+      setMessages((m) => [...m, { role: "assistant", content: res.reply }]);
+      if (res.pending_actions.length) refreshPending();
+      onChanged();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card assistant-tab">
+      <p className="muted small">
+        <Bot size={13} className="h3-icon" /> Ask it to log an order, add a transaction or note, or update info for{" "}
+        <b>{customer.name}</b> - it already knows which customer you mean.
+      </p>
+
+      {pending.map((p) => (
+        <PendingActionCard
+          key={p.id}
+          action={p}
+          onResolved={() => {
+            refreshPending();
+            onChanged();
+          }}
+        />
+      ))}
+
+      <div className="chat-transcript assistant-tab-transcript">
+        {!loaded ? (
+          <Spinner />
+        ) : messages.length === 0 ? (
+          <p className="muted small">No conversation yet about {customer.name}.</p>
+        ) : (
+          messages.map((m, i) => (
+            <div key={i} className={`chat-bubble ${m.role}`}>
+              {m.role === "assistant" ? <MarkdownMessage content={m.content} /> : m.content}
+            </div>
+          ))
+        )}
+        {busy && <div className="chat-bubble assistant muted">Thinking…</div>}
+        <div ref={bottomRef} />
+      </div>
+
+      <ErrorText message={error} />
+      <form className="chat-input-row" onSubmit={onSend}>
+        <input
+          aria-label="Message"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={`Ask about ${customer.name}…`}
+          disabled={busy}
+        />
+        <button className="btn-primary" type="submit" disabled={busy || !input.trim()} aria-label="Send message">
+          <Send size={16} />
+        </button>
+      </form>
     </div>
   );
 }

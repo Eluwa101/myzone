@@ -1,14 +1,24 @@
-import { Check, Copy, Mail, MessageCircle, Trash2, X } from "lucide-react";
+import { Bot, Check, Copy, ExternalLink, Mail, MessageCircle, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { createSegment, deleteSegment, getSegmentMembers, listSegments, previewSegment, updateSegment } from "../api/segments";
+import { createSegment, deleteSegment, getSegmentMembers, listSegments, previewSegment, suggestSegmentFilters, updateSegment } from "../api/segments";
 import { errorMessage } from "../api/errorMessage";
-import type { CustomerStatus, Segment, SegmentFilters, SegmentResult } from "../api/types";
+import type { CustomerStatus, Segment, SegmentFilters, SegmentMember, SegmentResult } from "../api/types";
 import ErrorText from "../components/ErrorText";
 import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
 
 const EMAIL_BATCH_SIZE = 40;
+
+function personalize(message: string, member: SegmentMember): string {
+  const firstName = member.first_name || member.name.split(" ")[0] || "";
+  return message.replaceAll("{first_name}", firstName);
+}
+
+function waLink(phone: string, message: string): string {
+  const digits = phone.replace(/\D/g, "");
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}
 
 function describeFilters(f: SegmentFilters): string {
   const parts: string[] = [];
@@ -152,6 +162,26 @@ function SegmentBuilder({
   const [preview, setPreview] = useState<SegmentResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [description, setDescription] = useState("");
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [appliedSummary, setAppliedSummary] = useState<string | null>(null);
+
+  async function onSuggest() {
+    if (!description.trim()) return;
+    setSuggesting(true);
+    setSuggestError(null);
+    setAppliedSummary(null);
+    try {
+      const suggested = await suggestSegmentFilters(description.trim());
+      setFilters(suggested);
+      setAppliedSummary(describeFilters(suggested));
+    } catch (err) {
+      setSuggestError(errorMessage(err));
+    } finally {
+      setSuggesting(false);
+    }
+  }
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -183,6 +213,26 @@ function SegmentBuilder({
     <form className="info-row-editing" onSubmit={onSubmit}>
       <label htmlFor="seg-name">Segment name</label>
       <input id="seg-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Generator leads" autoFocus />
+
+      <div className="card assistant-suggest-card">
+        <label htmlFor="seg-describe">
+          <Bot size={13} className="h3-icon" /> Describe who you want, and let the assistant set the filters
+        </label>
+        <div className="row">
+          <input
+            id="seg-describe"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="e.g. leads interested in generators who haven't bought in 60 days"
+            style={{ flex: 1 }}
+          />
+          <button type="button" onClick={onSuggest} disabled={suggesting || !description.trim()}>
+            <Sparkles size={14} /> {suggesting ? "Thinking…" : "Suggest filters"}
+          </button>
+        </div>
+        {appliedSummary && <p className="muted small">Applied: {appliedSummary} - adjust below if needed.</p>}
+        <ErrorText message={suggestError} />
+      </div>
 
       <FilterForm filters={filters} onChange={setFilters} />
 
@@ -316,6 +366,9 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
           <input id={`seg-subject-${segment.id}`} value={subject} onChange={(e) => setSubject(e.target.value)} />
           <label htmlFor={`seg-message-${segment.id}`}>Message</label>
           <textarea id={`seg-message-${segment.id}`} rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />
+          <p className="muted small" style={{ marginTop: -6 }}>
+            Use <code>{"{first_name}"}</code> to personalize each message.
+          </p>
 
           <div style={{ marginTop: 10 }}>
             <p className="small" style={{ margin: "0 0 6px" }}>
@@ -351,6 +404,28 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
                   <Copy size={14} /> Copy {phones.length} phone number{phones.length === 1 ? "" : "s"}
                 </button>
                 {copyStatus && <p className="muted small">{copyStatus}</p>}
+
+                <p className="muted small" style={{ marginTop: 10 }}>
+                  Or open a personalized chat one at a time:
+                </p>
+                <div className="submissions-list">
+                  {(members?.members ?? [])
+                    .filter((m) => m.phone)
+                    .map((m) => (
+                      <a
+                        key={m.id}
+                        href={waLink(m.phone!, personalize(message, m))}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="row-between"
+                      >
+                        <span>{m.name}</span>
+                        <span className="muted small">
+                          <ExternalLink size={12} className="h3-icon" /> {m.phone}
+                        </span>
+                      </a>
+                    ))}
+                </div>
               </>
             )}
           </div>

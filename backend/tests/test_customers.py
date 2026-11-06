@@ -6,6 +6,36 @@ def test_create_customer_defaults_to_customer_status(client, auth_headers):
     assert body["status_auto"] is True
 
 
+def test_create_customer_from_first_last_name_derives_name(client, auth_headers):
+    resp = client.post(
+        "/api/customers",
+        json={"first_name": "Ada", "last_name": "Obi"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["name"] == "Ada Obi"
+    assert body["first_name"] == "Ada"
+    assert body["last_name"] == "Obi"
+
+
+def test_create_customer_without_name_or_first_last_is_rejected(client, auth_headers):
+    resp = client.post("/api/customers", json={"phone": "08012345678"}, headers=auth_headers)
+    assert resp.status_code == 422
+
+
+def test_update_first_name_resyncs_name(client, auth_headers):
+    created = client.post("/api/customers", json={"name": "Ada Obi"}, headers=auth_headers).json()
+
+    resp = client.patch(
+        f"/api/customers/{created['id']}",
+        json={"first_name": "Chioma", "last_name": "Obi"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "Chioma Obi"
+
+
 def test_create_customer_with_interests_is_a_lead(client, auth_headers):
     resp = client.post(
         "/api/customers",

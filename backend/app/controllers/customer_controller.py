@@ -174,6 +174,8 @@ def create_customer(db: Session, org_id: UUID, data: CustomerCreate, force: bool
     customer = Customer(
         org_id=org_id,
         name=data.name,
+        first_name=data.first_name,
+        last_name=data.last_name,
         phone=data.phone,
         email=data.email,
         job=data.job,
@@ -200,6 +202,10 @@ def update_customer(db: Session, org_id: UUID, customer_id: UUID, data: Customer
     status = updates.pop("status", "__unset__")
     for field, value in updates.items():
         setattr(customer, field, value)
+    if "first_name" in updates or "last_name" in updates:
+        combined = f"{customer.first_name or ''} {customer.last_name or ''}".strip()
+        if combined:
+            customer.name = combined
     if status != "__unset__":
         _apply_status(customer, status)
     recompute_derived_fields(customer)

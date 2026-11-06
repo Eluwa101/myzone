@@ -1,4 +1,4 @@
-import { Check, Copy, ExternalLink, QrCode, ShoppingBag, Trash2, User, X } from "lucide-react";
+import { Check, Copy, ExternalLink, Package, QrCode, ShoppingBag, Trash2, User, X } from "lucide-react";
 import QRCodeLib from "qrcode";
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link } from "react-router-dom";
@@ -10,7 +10,8 @@ import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
 
 const CUSTOMER_FIELD_OPTIONS: { key: string; label: string; type: FormFieldType }[] = [
-  { key: "name", label: "Full name", type: "text" },
+  { key: "first_name", label: "First name", type: "text" },
+  { key: "last_name", label: "Last name", type: "text" },
   { key: "phone", label: "Phone / WhatsApp", type: "tel" },
   { key: "email", label: "Email", type: "email" },
   { key: "job", label: "Job / occupation", type: "text" },
@@ -29,9 +30,48 @@ const TRANSACTION_FIELD_OPTIONS: { key: string; label: string; type: FormFieldTy
   { key: "tx_date", label: "Purchase date", type: "date" },
 ];
 
+const ORDER_FIELD_OPTIONS: { key: string; label: string; type: FormFieldType }[] = [
+  { key: "order_item", label: "Item ordered", type: "text" },
+  { key: "order_qty", label: "Quantity", type: "number" },
+  { key: "order_price", label: "Price per item", type: "number" },
+  { key: "order_currency", label: "Currency", type: "text" },
+  { key: "order_date", label: "Order date", type: "date" },
+  { key: "order_delivery_date", label: "Delivery date", type: "date" },
+];
+
 const CUSTOM_FIELD_TYPES: FormFieldType[] = ["text", "textarea", "tel", "email", "number", "date"];
 
-const DEFAULT_FIELDS: FormFieldDef[] = [{ key: "name", label: "Full name", type: "text", required: true, category: "customer" }];
+// Every form - whatever it's for - collects these four so a record can be
+// identified and reached; only first_name is locked required, matching the
+// backend's REQUIRED_CONTACT_KEYS rule.
+const CORE_CONTACT_FIELDS: FormFieldDef[] = [
+  { key: "first_name", label: "First name", type: "text", required: true, category: "customer" },
+  { key: "last_name", label: "Last name", type: "text", required: false, category: "customer" },
+  { key: "phone", label: "Phone / WhatsApp", type: "tel", required: false, category: "customer" },
+  { key: "email", label: "Email", type: "email", required: false, category: "customer" },
+];
+const LOCKED_KEYS = new Set(CORE_CONTACT_FIELDS.map((f) => f.key));
+
+type FormTemplate = "order" | "transaction" | "customer" | "blank";
+
+function templateFields(template: FormTemplate): FormFieldDef[] {
+  if (template === "order") {
+    return [
+      ...CORE_CONTACT_FIELDS,
+      { key: "order_item", label: "Item ordered", type: "text", required: true, category: "order" },
+      { key: "order_qty", label: "Quantity", type: "number", required: false, category: "order" },
+      { key: "order_price", label: "Price per item", type: "number", required: false, category: "order" },
+    ];
+  }
+  if (template === "transaction") {
+    return [
+      ...CORE_CONTACT_FIELDS,
+      { key: "tx_item", label: "Item purchased", type: "text", required: true, category: "transaction" },
+      { key: "tx_amount", label: "Amount", type: "number", required: false, category: "transaction" },
+    ];
+  }
+  return [...CORE_CONTACT_FIELDS];
+}
 
 function publicFormUrl(token: string): string {
   return `${window.location.origin}/f/${token}`;
@@ -51,6 +91,7 @@ export default function FormsPage() {
   const [forms, setForms] = useState<CustomForm[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [template, setTemplate] = useState<FormTemplate | null>(null);
 
   function load() {
     listForms()
@@ -60,22 +101,46 @@ export default function FormsPage() {
 
   useEffect(load, []);
 
+  function cancelCreate() {
+    setCreating(false);
+    setTemplate(null);
+  }
+
   return (
     <div>
       <TopBar title="Forms" backTo="/settings" />
       <p className="muted small page-note">
         Build a custom intake form, share its link with customers, or use the link's API directly from Zapier, a Google
-        Form's Apps Script, or any other tool that can POST JSON.
+        Form's Apps Script, or any other tool that can POST JSON. Every form always collects first name, last name, phone,
+        and email.
       </p>
       <ErrorText message={error} />
 
       <div className="card">
-        {creating ? (
-          <FormBuilder onCancel={() => setCreating(false)} onSaved={() => { setCreating(false); load(); }} />
-        ) : (
+        {!creating ? (
           <button type="button" className="icon-btn btn-ghost" onClick={() => setCreating(true)}>
             + New form
           </button>
+        ) : template === null ? (
+          <div>
+            <label>What's this form for?</label>
+            <div className="row" style={{ flexWrap: "wrap" }}>
+              <button type="button" className="chip" onClick={() => setTemplate("order")}>
+                <Package size={13} className="h3-icon" /> Order
+              </button>
+              <button type="button" className="chip" onClick={() => setTemplate("transaction")}>
+                <ShoppingBag size={13} className="h3-icon" /> Transaction
+              </button>
+              <button type="button" className="chip" onClick={() => setTemplate("customer")}>
+                <User size={13} className="h3-icon" /> Customer data
+              </button>
+            </div>
+            <button type="button" onClick={cancelCreate} style={{ marginTop: 10 }}>
+              <X size={14} /> Cancel
+            </button>
+          </div>
+        ) : (
+          <FormBuilder initialFields={templateFields(template)} onCancel={cancelCreate} onSaved={() => { cancelCreate(); load(); }} />
         )}
       </div>
 
@@ -232,6 +297,7 @@ function SubmissionsList({ formId, fields }: { formId: string; fields: FormField
               <div key={k} className="row-between" style={{ padding: "3px 0" }}>
                 <span className="muted small">
                   {categoryByKey.get(k) === "transaction" && <ShoppingBag size={11} className="h3-icon" />}
+                  {categoryByKey.get(k) === "order" && <Package size={11} className="h3-icon" />}
                   {labelByKey.get(k) ?? k}
                 </span>
                 <span className="small">{v}</span>
@@ -254,7 +320,7 @@ function AddFieldPicker({ usedKeys, onAdd }: { usedKeys: Set<string>; onAdd: (f:
       return;
     }
     const [category, key] = value.split(":") as [FormFieldCategory, string];
-    const options = category === "customer" ? CUSTOMER_FIELD_OPTIONS : TRANSACTION_FIELD_OPTIONS;
+    const options = category === "customer" ? CUSTOMER_FIELD_OPTIONS : category === "transaction" ? TRANSACTION_FIELD_OPTIONS : ORDER_FIELD_OPTIONS;
     const opt = options.find((o) => o.key === key);
     if (opt) onAdd({ key: opt.key, label: opt.label, type: opt.type, required: false, category });
   }
@@ -278,22 +344,35 @@ function AddFieldPicker({ usedKeys, onAdd }: { usedKeys: Set<string>; onAdd: (f:
           </option>
         ))}
       </optgroup>
+      <optgroup label="Order fields">
+        {ORDER_FIELD_OPTIONS.filter((o) => !usedKeys.has(`order:${o.key}`)).map((o) => (
+          <option key={o.key} value={`order:${o.key}`}>
+            {o.label}
+          </option>
+        ))}
+      </optgroup>
       <option value="__custom__">+ Custom field…</option>
     </select>
   );
 }
 
+function isLocked(f: FormFieldDef): boolean {
+  return f.category === "customer" && LOCKED_KEYS.has(f.key);
+}
+
 function FormBuilder({
   initialForm,
+  initialFields,
   onCancel,
   onSaved,
 }: {
   initialForm?: CustomForm;
+  initialFields?: FormFieldDef[];
   onCancel: () => void;
   onSaved: () => void;
 }) {
   const [name, setName] = useState(initialForm?.name ?? "");
-  const [fields, setFields] = useState<FormFieldDef[]>(initialForm?.fields ?? DEFAULT_FIELDS);
+  const [fields, setFields] = useState<FormFieldDef[]>(initialForm?.fields ?? initialFields ?? CORE_CONTACT_FIELDS);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -348,11 +427,16 @@ function FormBuilder({
                   <ShoppingBag size={11} className="h3-icon" /> Transaction field
                 </>
               )}
+              {f.category === "order" && (
+                <>
+                  <Package size={11} className="h3-icon" /> Order field
+                </>
+              )}
               {f.category === "custom" && "Custom field"}
             </span>
           </div>
           <label htmlFor={`field-label-${i}`}>Label shown on the form</label>
-          <input id={`field-label-${i}`} value={f.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="e.g. Preferred delivery day" disabled={f.key === "name"} />
+          <input id={`field-label-${i}`} value={f.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="e.g. Preferred delivery day" disabled={isLocked(f)} />
           {f.category === "custom" && (
             <>
               <label htmlFor={`field-type-${i}`}>Input type</label>
@@ -367,10 +451,10 @@ function FormBuilder({
           )}
           <div className="row" style={{ marginTop: 8 }}>
             <label className="row" style={{ gap: 6 }}>
-              <input type="checkbox" checked={f.required} onChange={(e) => update(i, { required: e.target.checked })} disabled={f.key === "name"} />
+              <input type="checkbox" checked={f.required} onChange={(e) => update(i, { required: e.target.checked })} disabled={f.key === "first_name" && f.category === "customer"} />
               Required
             </label>
-            {f.key !== "name" && (
+            {!isLocked(f) && (
               <button type="button" className="btn-danger" onClick={() => remove(i)} style={{ marginLeft: "auto" }}>
                 <Trash2 size={14} />
               </button>

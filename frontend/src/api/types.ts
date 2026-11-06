@@ -49,6 +49,8 @@ export interface Customer {
   id: string;
   org_id: string;
   name: string;
+  first_name?: string | null;
+  last_name?: string | null;
   phone?: string | null;
   email?: string | null;
   job?: string | null;
@@ -111,7 +113,7 @@ export interface Summary {
 }
 
 export type FormFieldType = "text" | "textarea" | "tel" | "email" | "number" | "date";
-export type FormFieldCategory = "customer" | "transaction" | "custom";
+export type FormFieldCategory = "customer" | "transaction" | "order" | "custom";
 
 export interface FormFieldDef {
   key: string;
@@ -165,6 +167,7 @@ export interface Segment {
 export interface SegmentMember {
   id: string;
   name: string;
+  first_name: string | null;
   email: string | null;
   phone: string | null;
   status: CustomerStatus;
