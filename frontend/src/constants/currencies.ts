@@ -1,0 +1,18 @@
+export const CURRENCIES: { code: string; name: string }[] = [
+  { code: "NGN", name: "Nigerian Naira" },
+  { code: "USD", name: "US Dollar" },
+  { code: "EUR", name: "Euro" },
+  { code: "GBP", name: "British Pound" },
+  { code: "GHS", name: "Ghanaian Cedi" },
+  { code: "KES", name: "Kenyan Shilling" },
+  { code: "ZAR", name: "South African Rand" },
+  { code: "XOF", name: "West African CFA Franc" },
+  { code: "XAF", name: "Central African CFA Franc" },
+  { code: "EGP", name: "Egyptian Pound" },
+  { code: "CAD", name: "Canadian Dollar" },
+  { code: "AUD", name: "Australian Dollar" },
+  { code: "AED", name: "UAE Dirham" },
+  { code: "INR", name: "Indian Rupee" },
+  { code: "CNY", name: "Chinese Yuan" },
+  { code: "JPY", name: "Japanese Yen" },
+];

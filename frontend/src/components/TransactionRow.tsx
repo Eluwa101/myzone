@@ -3,6 +3,7 @@ import { useState } from "react";
 import { deleteTransaction, updateTransaction } from "../api/customers";
 import { errorMessage } from "../api/errorMessage";
 import type { Transaction } from "../api/types";
+import CurrencySelect from "./CurrencySelect";
 import ErrorText from "./ErrorText";
 
 function money(n: number): string {
@@ -48,7 +49,7 @@ export default function TransactionRow({
         item,
         qty: Number(qty) || 0,
         amount: Number(amount) || 0,
-        currency: currency.toUpperCase(),
+        currency,
       });
       setOpen(false);
       onChanged();
@@ -109,7 +110,7 @@ export default function TransactionRow({
         </div>
         <div>
           <label htmlFor={`tx-currency-${transaction.id}`}>Currency</label>
-          <input id={`tx-currency-${transaction.id}`} value={currency} onChange={(e) => setCurrency(e.target.value)} />
+          <CurrencySelect id={`tx-currency-${transaction.id}`} value={currency} onChange={setCurrency} />
         </div>
       </div>
       <ErrorText message={error} />

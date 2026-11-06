@@ -17,6 +17,8 @@ interface Message {
   imagePreview?: string;
 }
 
+const AUTO_SEND_SECONDS = 3;
+
 export default function ChatPage() {
   const [threadId, setThreadId] = useState<string>(() => crypto.randomUUID());
   const [messages, setMessages] = useState<Message[]>([]);
@@ -26,13 +28,55 @@ export default function ChatPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [autoSendCountdown, setAutoSendCountdown] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const baseTextRef = useRef("");
+  const inputRef = useRef(input);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const autoSendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const doSendRef = useRef<() => void>(() => {});
 
-  const voice = useVoiceInput((transcript) => {
-    setInput((baseTextRef.current ? baseTextRef.current + " " : "") + transcript);
-  });
+  useEffect(() => {
+    inputRef.current = input;
+  }, [input]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSendIntervalRef.current) clearInterval(autoSendIntervalRef.current);
+    };
+  }, []);
+
+  function cancelAutoSend() {
+    if (autoSendIntervalRef.current) {
+      clearInterval(autoSendIntervalRef.current);
+      autoSendIntervalRef.current = null;
+    }
+    setAutoSendCountdown(null);
+  }
+
+  function scheduleAutoSend() {
+    setAutoSendCountdown(AUTO_SEND_SECONDS);
+    autoSendIntervalRef.current = setInterval(() => {
+      setAutoSendCountdown((n) => {
+        if (n === null || n <= 1) {
+          if (autoSendIntervalRef.current) clearInterval(autoSendIntervalRef.current);
+          autoSendIntervalRef.current = null;
+          doSendRef.current();
+          return null;
+        }
+        return n - 1;
+      });
+    }, 1000);
+  }
+
+  const voice = useVoiceInput(
+    (transcript) => {
+      setInput((baseTextRef.current ? baseTextRef.current + " " : "") + transcript);
+    },
+    () => {
+      if (inputRef.current.trim()) scheduleAutoSend();
+    }
+  );
 
   function refreshPending() {
     listPending()
@@ -67,6 +111,7 @@ export default function ChatPage() {
   }
 
   function onMicClick() {
+    cancelAutoSend();
     baseTextRef.current = input;
     voice.toggle();
   }
@@ -82,9 +127,8 @@ export default function ChatPage() {
     }
   }
 
-  async function onSend(e: FormEvent) {
-    e.preventDefault();
-    const text = input.trim();
+  async function doSend() {
+    const text = inputRef.current.trim();
     if ((!text && !image) || busy) return;
     setInput("");
     const imageToSend = image;
@@ -101,6 +145,15 @@ export default function ChatPage() {
     } finally {
       setBusy(false);
     }
+  }
+  useEffect(() => {
+    doSendRef.current = doSend;
+  });
+
+  function onSend(e: FormEvent) {
+    e.preventDefault();
+    cancelAutoSend();
+    doSend();
   }
 
   return (
@@ -151,6 +204,26 @@ export default function ChatPage() {
           </button>
         </div>
       )}
+      {autoSendCountdown !== null && (
+        <div className="auto-send-banner row-between">
+          <span>Sending in {autoSendCountdown}s…</span>
+          <div className="row" style={{ gap: 8 }}>
+            <button type="button" className="btn-ghost small" onClick={cancelAutoSend}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary small"
+              onClick={() => {
+                cancelAutoSend();
+                doSend();
+              }}
+            >
+              Send now
+            </button>
+          </div>
+        </div>
+      )}
       <form className="chat-input-row" onSubmit={onSend}>
         <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={onImageChosen} />
         <button
@@ -178,7 +251,10 @@ export default function ChatPage() {
         <input
           aria-label="Message"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+            cancelAutoSend();
+          }}
           placeholder={voice.listening ? "Listening…" : "Ask your assistant…"}
           disabled={busy}
           autoFocus

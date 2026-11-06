@@ -13,9 +13,11 @@ import {
 import { ApiError } from "../api/client";
 import { errorMessage } from "../api/errorMessage";
 import { listNotes } from "../api/notes";
-import type { Customer, CustomerStatus, OrgNote } from "../api/types";
+import type { Customer, CustomerStatus, Order, OrgNote } from "../api/types";
+import CurrencySelect from "../components/CurrencySelect";
 import ErrorText from "../components/ErrorText";
 import InfoFieldRow from "../components/InfoFieldRow";
+import OrderItemsEditor, { hasPricedItems, itemsTotal } from "../components/OrderItemsEditor";
 import OrderRow from "../components/OrderRow";
 import Spinner from "../components/Spinner";
 import Tabs from "../components/Tabs";
@@ -342,7 +344,7 @@ function TransactionsTab({ customer, onChanged }: { customer: Customer; onChange
         item: item.trim(),
         qty: Number(qty) || 1,
         amount: Number(amount) || 0,
-        currency: currency.toUpperCase(),
+        currency,
       });
       setItem("");
       setAmount("");
@@ -383,7 +385,7 @@ function TransactionsTab({ customer, onChanged }: { customer: Customer; onChange
             </div>
             <div>
               <label htmlFor="new-tx-currency">Currency</label>
-              <input id="new-tx-currency" value={currency} onChange={(e) => setCurrency(e.target.value)} />
+              <CurrencySelect id="new-tx-currency" value={currency} onChange={setCurrency} />
             </div>
           </div>
           <ErrorText message={error} />
@@ -447,28 +449,30 @@ function OrdersTab({ customer, onChanged }: { customer: Customer; onChanged: () 
   const [adding, setAdding] = useState(false);
   const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
   const [deliveryDate, setDeliveryDate] = useState("");
-  const [itemsText, setItemsText] = useState("");
+  const [items, setItems] = useState<Order["items"]>([]);
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  function updateItems(next: Order["items"]) {
+    setItems(next);
+    if (hasPricedItems(next)) setAmount(String(itemsTotal(next)));
+  }
+
   async function onAdd(e: FormEvent) {
     e.preventDefault();
-    if (!itemsText.trim()) return;
+    const cleanItems = items.filter((it) => it.name.trim());
+    if (cleanItems.length === 0) return;
     setError(null);
     try {
       await addOrder(customer.id, {
         order_date: orderDate,
         delivery_date: deliveryDate || null,
-        items: itemsText
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .map((name) => ({ name, qty: 1 })),
+        items: cleanItems,
         amount: amount.trim() ? Number(amount) : null,
-        currency: currency.toUpperCase() || null,
+        currency: currency || null,
       });
-      setItemsText("");
+      setItems([]);
       setDeliveryDate("");
       setAmount("");
       setAdding(false);
@@ -496,17 +500,17 @@ function OrdersTab({ customer, onChanged }: { customer: Customer; onChanged: () 
               <label htmlFor="new-order-delivery">Delivery date</label>
               <input id="new-order-delivery" type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
             </div>
-            <div>
-              <label htmlFor="new-order-items">Items</label>
-              <input id="new-order-items" value={itemsText} onChange={(e) => setItemsText(e.target.value)} placeholder="Rice, Generator (comma-separated)" />
-            </div>
+          </div>
+          <label>Items</label>
+          <OrderItemsEditor items={items} onChange={updateItems} />
+          <div className="tx-edit-grid">
             <div>
               <label htmlFor="new-order-amount">Amount</label>
               <input id="new-order-amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
             <div>
               <label htmlFor="new-order-currency">Currency</label>
-              <input id="new-order-currency" value={currency} onChange={(e) => setCurrency(e.target.value)} />
+              <CurrencySelect id="new-order-currency" value={currency} onChange={setCurrency} />
             </div>
           </div>
           <ErrorText message={error} />

@@ -1015,6 +1015,35 @@ a.row-between:hover {
   }
 }
 
+.order-items-editor {
+  margin: 6px 0 12px;
+}
+
+.order-item-row {
+  display: grid;
+  grid-template-columns: 2fr 0.7fr 0.9fr 0.9fr auto;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.order-item-row input {
+  margin: 0;
+}
+
+.order-item-subtotal {
+  text-align: right;
+}
+
+@media (max-width: 420px) {
+  .order-item-row {
+    grid-template-columns: 1fr 0.6fr 0.8fr auto;
+  }
+  .order-item-subtotal {
+    display: none;
+  }
+}
+
 .chip {
   font-size: 13px;
   padding: 7px 13px;
@@ -1241,4 +1270,18 @@ a.row-between:hover {
   object-fit: cover;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
+}
+
+.auto-send-banner {
+  margin: 0 16px 6px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft-bg);
+  color: var(--accent-soft-text);
+}
+
+.auto-send-banner .btn-ghost.small,
+.auto-send-banner .btn-primary.small {
+  padding: 4px 10px;
+  font-size: 13px;
 }

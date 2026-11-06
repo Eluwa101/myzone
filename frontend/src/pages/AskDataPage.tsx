@@ -23,17 +23,60 @@ const CHIPS = [
   "Who has no consent recorded?",
 ];
 
+const AUTO_SEND_SECONDS = 3;
+
 export default function AskDataPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [autoSendCountdown, setAutoSendCountdown] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const baseTextRef = useRef("");
+  const inputRef = useRef(input);
+  const autoSendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const voice = useVoiceInput((transcript) => {
-    setInput((baseTextRef.current ? baseTextRef.current + " " : "") + transcript);
-  });
+  useEffect(() => {
+    inputRef.current = input;
+  }, [input]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSendIntervalRef.current) clearInterval(autoSendIntervalRef.current);
+    };
+  }, []);
+
+  function cancelAutoSend() {
+    if (autoSendIntervalRef.current) {
+      clearInterval(autoSendIntervalRef.current);
+      autoSendIntervalRef.current = null;
+    }
+    setAutoSendCountdown(null);
+  }
+
+  function scheduleAutoSend() {
+    setAutoSendCountdown(AUTO_SEND_SECONDS);
+    autoSendIntervalRef.current = setInterval(() => {
+      setAutoSendCountdown((n) => {
+        if (n === null || n <= 1) {
+          if (autoSendIntervalRef.current) clearInterval(autoSendIntervalRef.current);
+          autoSendIntervalRef.current = null;
+          ask(inputRef.current);
+          return null;
+        }
+        return n - 1;
+      });
+    }, 1000);
+  }
+
+  const voice = useVoiceInput(
+    (transcript) => {
+      setInput((baseTextRef.current ? baseTextRef.current + " " : "") + transcript);
+    },
+    () => {
+      if (inputRef.current.trim()) scheduleAutoSend();
+    }
+  );
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -57,10 +100,12 @@ export default function AskDataPage() {
 
   function onSend(e: FormEvent) {
     e.preventDefault();
+    cancelAutoSend();
     ask(input);
   }
 
   function onMicClick() {
+    cancelAutoSend();
     baseTextRef.current = input;
     voice.toggle();
   }
@@ -133,6 +178,26 @@ export default function AskDataPage() {
       </div>
 
       <ErrorText message={error} />
+      {autoSendCountdown !== null && (
+        <div className="auto-send-banner row-between">
+          <span>Sending in {autoSendCountdown}s…</span>
+          <div className="row" style={{ gap: 8 }}>
+            <button type="button" className="btn-ghost small" onClick={cancelAutoSend}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary small"
+              onClick={() => {
+                cancelAutoSend();
+                ask(input);
+              }}
+            >
+              Send now
+            </button>
+          </div>
+        </div>
+      )}
       <form className="chat-input-row" onSubmit={onSend}>
         {voice.supported && (
           <button
@@ -149,7 +214,10 @@ export default function AskDataPage() {
         <input
           aria-label="Question"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+            cancelAutoSend();
+          }}
           placeholder={voice.listening ? "Listening…" : "Ask anything about your customers…"}
           disabled={busy}
           autoFocus

@@ -14,11 +14,30 @@ def test_create_order_defaults_and_appears_on_customer(client, auth_headers):
     body = resp.json()
     assert body["paid"] is False
     assert body["delivered"] is False
-    assert body["items"] == [{"name": "Rice", "qty": 2}]
+    assert body["items"] == [{"name": "Rice", "qty": 2, "price": None}]
 
     updated_customer = client.get(f"/api/customers/{customer['id']}", headers=auth_headers).json()
     assert len(updated_customer["orders"]) == 1
     assert updated_customer["orders"][0]["id"] == body["id"]
+
+
+def test_order_items_support_price_per_line(client, auth_headers):
+    customer = _create_customer(client, auth_headers)
+
+    resp = client.post(
+        f"/api/customers/{customer['id']}/orders",
+        json={
+            "order_date": "2026-11-05",
+            "items": [{"name": "Rice", "qty": 2, "price": 2500}, {"name": "Generator", "qty": 1, "price": 45000}],
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["items"] == [
+        {"name": "Rice", "qty": 2, "price": 2500},
+        {"name": "Generator", "qty": 1, "price": 45000},
+    ]
 
 
 def test_update_order_toggles_paid_and_delivered(client, auth_headers):

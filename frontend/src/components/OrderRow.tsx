@@ -3,18 +3,12 @@ import { useState } from "react";
 import { deleteOrder, updateOrder } from "../api/customers";
 import { errorMessage } from "../api/errorMessage";
 import type { Order } from "../api/types";
+import CurrencySelect from "./CurrencySelect";
 import ErrorText from "./ErrorText";
+import OrderItemsEditor, { hasPricedItems, itemsTotal } from "./OrderItemsEditor";
 
 function itemsToText(items: Order["items"]): string {
   return items.map((i) => (i.qty && i.qty !== 1 ? `${i.name} x${i.qty}` : i.name)).join(", ");
-}
-
-function parseItems(text: string): Order["items"] {
-  return text
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((name) => ({ name, qty: 1 }));
 }
 
 export default function OrderRow({
@@ -29,7 +23,7 @@ export default function OrderRow({
   const [open, setOpen] = useState(false);
   const [orderDate, setOrderDate] = useState(order.order_date);
   const [deliveryDate, setDeliveryDate] = useState(order.delivery_date ?? "");
-  const [itemsText, setItemsText] = useState(itemsToText(order.items));
+  const [items, setItems] = useState<Order["items"]>(order.items);
   const [amount, setAmount] = useState(order.amount != null ? String(order.amount) : "");
   const [currency, setCurrency] = useState(order.currency ?? "");
   const [paid, setPaid] = useState(order.paid);
@@ -41,7 +35,7 @@ export default function OrderRow({
   function startEdit() {
     setOrderDate(order.order_date);
     setDeliveryDate(order.delivery_date ?? "");
-    setItemsText(itemsToText(order.items));
+    setItems(order.items);
     setAmount(order.amount != null ? String(order.amount) : "");
     setCurrency(order.currency ?? "");
     setPaid(order.paid);
@@ -51,6 +45,11 @@ export default function OrderRow({
     setOpen(true);
   }
 
+  function updateItems(next: Order["items"]) {
+    setItems(next);
+    if (hasPricedItems(next)) setAmount(String(itemsTotal(next)));
+  }
+
   async function save() {
     setBusy(true);
     setError(null);
@@ -58,9 +57,9 @@ export default function OrderRow({
       await updateOrder(customerId, order.id, {
         order_date: orderDate,
         delivery_date: deliveryDate || null,
-        items: parseItems(itemsText),
+        items: items.filter((it) => it.name.trim()),
         amount: amount.trim() ? Number(amount) : null,
-        currency: currency.toUpperCase() || null,
+        currency: currency || null,
         paid,
         delivered,
       });
@@ -116,17 +115,17 @@ export default function OrderRow({
           <label htmlFor={`order-delivery-${order.id}`}>Delivery date</label>
           <input id={`order-delivery-${order.id}`} type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
         </div>
-        <div>
-          <label htmlFor={`order-items-${order.id}`}>Items</label>
-          <input id={`order-items-${order.id}`} value={itemsText} onChange={(e) => setItemsText(e.target.value)} placeholder="Rice, Generator (comma-separated)" />
-        </div>
+      </div>
+      <label>Items</label>
+      <OrderItemsEditor items={items} onChange={updateItems} />
+      <div className="tx-edit-grid">
         <div>
           <label htmlFor={`order-amount-${order.id}`}>Amount</label>
           <input id={`order-amount-${order.id}`} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </div>
         <div>
           <label htmlFor={`order-currency-${order.id}`}>Currency</label>
-          <input id={`order-currency-${order.id}`} value={currency} onChange={(e) => setCurrency(e.target.value)} />
+          <CurrencySelect id={`order-currency-${order.id}`} value={currency} onChange={setCurrency} />
         </div>
       </div>
       <div className="row" style={{ marginTop: 10, gap: 16 }}>

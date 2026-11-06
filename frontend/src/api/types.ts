@@ -13,6 +13,7 @@ export interface Transaction {
 export interface OrderItem {
   name: string;
   qty: number;
+  price?: number | null;
 }
 
 export interface Order {
