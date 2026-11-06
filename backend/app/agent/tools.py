@@ -23,8 +23,8 @@ from sqlalchemy.orm import Session
 from app.controllers import agent_controller, customer_controller, note_controller, order_controller, transaction_controller
 from app.models.customer import CustomerStatus
 from app.schemas.customer import CustomerCreate, CustomerUpdate
-from app.schemas.note import NoteCreate
-from app.schemas.order import OrderCreate, OrderItem
+from app.schemas.note import NoteCreate, NoteUpdate
+from app.schemas.order import OrderCreate, OrderItem, OrderUpdate
 from app.schemas.transaction import TransactionCreate, TransactionUpdate
 
 
@@ -252,6 +252,75 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         return result
 
     @tool
+    def update_order(
+        customer_id: str,
+        order_id: str,
+        order_date: str = "",
+        delivery_date: str = "",
+        items: str = "",
+        amount: float = -1,
+        currency: str = "",
+        paid: str = "",
+        delivered: str = "",
+    ) -> dict:
+        """Update an existing order - e.g. set or change its delivery date,
+        mark it paid or delivered, or correct its items/amount. Only pass
+        the fields that should change; leave the rest blank/-1. items, if
+        given, replaces the whole item list as a comma-separated list (e.g.
+        "5 bags of rice, 2 generators"). paid/delivered must be "true" or
+        "false" if given."""
+        updates: dict = {}
+        if order_date.strip():
+            updates["order_date"] = order_date.strip()
+        if delivery_date.strip():
+            updates["delivery_date"] = delivery_date.strip()
+        if items.strip():
+            updates["items"] = [OrderItem(name=part.strip()) for part in items.split(",") if part.strip()]
+        if amount >= 0:
+            updates["amount"] = amount
+        if currency.strip():
+            updates["currency"] = currency.upper().strip()
+        if paid.strip():
+            updates["paid"] = paid.strip().lower() == "true"
+        if delivered.strip():
+            updates["delivered"] = delivered.strip().lower() == "true"
+        try:
+            order = order_controller.update_order(db, org_id, UUID(customer_id), UUID(order_id), OrderUpdate(**updates))
+        except (customer_controller.CustomerNotFoundError, order_controller.OrderNotFoundError):
+            return {"status": "error", "message": "No such customer/order."}
+        from app.schemas.order import OrderOut
+
+        result = {"status": "updated", **OrderOut.model_validate(order).model_dump(mode="json")}
+        log("update_order", {"customer_id": customer_id, "order_id": order_id, **{k: v for k, v in updates.items() if k != "items"}}, result)
+        return result
+
+    @tool
+    def delete_order(customer_id: str, order_id: str) -> dict:
+        """Delete an order record entirely - use when an order was entered
+        in error or was cancelled and should be removed, not just marked
+        undelivered/unpaid (use update_order for status changes)."""
+        try:
+            order_controller.delete_order(db, org_id, UUID(customer_id), UUID(order_id))
+        except (customer_controller.CustomerNotFoundError, order_controller.OrderNotFoundError):
+            return {"status": "error", "message": "No such customer/order."}
+        result = {"status": "deleted", "order_id": order_id}
+        log("delete_order", {"customer_id": customer_id, "order_id": order_id}, result)
+        return result
+
+    @tool
+    def delete_transaction(customer_id: str, transaction_id: str) -> dict:
+        """Delete a transaction record entirely - use when the user says a
+        transaction was entered in error and should be removed, not just
+        corrected (use update_transaction for corrections)."""
+        try:
+            transaction_controller.delete_transaction(db, org_id, UUID(customer_id), UUID(transaction_id))
+        except (customer_controller.CustomerNotFoundError, transaction_controller.TransactionNotFoundError):
+            return {"status": "error", "message": "No such customer/transaction."}
+        result = {"status": "deleted", "transaction_id": transaction_id}
+        log("delete_transaction", {"customer_id": customer_id, "transaction_id": transaction_id}, result)
+        return result
+
+    @tool
     def set_customer_custom_field(customer_id: str, field_name: str, value: str) -> dict:
         """Set a custom field on a customer. Use this when a new piece of
         information about the customer is a short, clearly-named fact that
@@ -329,6 +398,67 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         return result
 
     @tool
+    def list_notes(customer_id: str = "") -> dict:
+        """List notes, optionally filtered to one customer's notes. Use this
+        to find a note's id before calling update_note or delete_note, or to
+        answer a question about what's been noted on a customer."""
+        cid = UUID(customer_id) if customer_id.strip() else None
+        if cid:
+            try:
+                customer_controller.get_customer(db, org_id, cid)
+            except customer_controller.CustomerNotFoundError:
+                return {"status": "error", "message": "No customer with that id."}
+        notes = note_controller.list_notes(db, org_id, customer_id=cid)
+        return {
+            "notes": [
+                {
+                    "id": str(n.id), "title": n.title, "content": n.content,
+                    "pending_review": n.is_pending_review,
+                    "customers": [c.name for c in n.customers],
+                }
+                for n in notes
+            ]
+        }
+
+    @tool
+    def update_note(note_id: str, title: str = "", content: str = "", mark_reviewed: str = "") -> dict:
+        """Correct an existing note's title or content, or mark it reviewed.
+        Only pass the fields that should change. mark_reviewed must be
+        "true" or "false" if given - set it to "true" once a pending note
+        has been looked at (the same effect as a human tapping "Mark
+        reviewed"). Look up note_id with list_notes first if you don't
+        already have it."""
+        updates: dict = {}
+        if title.strip():
+            updates["title"] = title.strip()
+        if content.strip():
+            updates["content"] = content.strip()
+        if mark_reviewed.strip():
+            updates["is_pending_review"] = mark_reviewed.strip().lower() != "true"
+        try:
+            note = note_controller.update_note(db, org_id, UUID(note_id), NoteUpdate(**updates))
+        except note_controller.NoteNotFoundError:
+            return {"status": "error", "message": "No note with that id."}
+        from app.schemas.note import NoteOut
+
+        result = {"status": "updated", **NoteOut.model_validate(note).model_dump(mode="json")}
+        log("update_note", {"note_id": note_id, **updates}, result)
+        return result
+
+    @tool
+    def delete_note(note_id: str) -> dict:
+        """Delete a note entirely - use when the user says a note was added
+        in error or is no longer relevant. Look up note_id with list_notes
+        first if you don't already have it."""
+        try:
+            note_controller.delete_note(db, org_id, UUID(note_id))
+        except note_controller.NoteNotFoundError:
+            return {"status": "error", "message": "No note with that id."}
+        result = {"status": "deleted", "note_id": note_id}
+        log("delete_note", {"note_id": note_id}, result)
+        return result
+
+    @tool
     def get_dashboard_summary() -> dict:
         """Get precomputed CRM totals: customer counts by status, sales by
         currency (all-time, this month, last 6 months), top customers, and
@@ -375,10 +505,16 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         find_duplicate_customers,
         add_transaction,
         update_transaction,
+        delete_transaction,
         create_order,
+        update_order,
+        delete_order,
         set_customer_custom_field,
         add_customer_note,
         create_shared_note,
+        list_notes,
+        update_note,
+        delete_note,
         get_dashboard_summary,
         delete_customer,
         merge_customers,

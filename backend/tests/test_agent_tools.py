@@ -124,3 +124,60 @@ def test_search_customers_tool(db_session, seeded_org, tools):
     result = tools["search_customers"].invoke({"query": "generator"})
     assert result["total"] == 1
     assert result["customers"][0]["name"] == "Ada Obi"
+
+
+def test_update_transaction_tool_then_delete_tool(db_session, seeded_org, tools):
+    created = tools["create_customer"].invoke({"name": "Ada Obi"})
+    tx = tools["add_transaction"].invoke({"customer_id": created["id"], "date": "2026-11-01", "item": "Rice", "amount": 15000})
+
+    updated = tools["update_transaction"].invoke({"customer_id": created["id"], "transaction_id": tx["id"], "amount": 20000})
+    assert updated["status"] == "updated"
+    assert updated["amount"] == 20000
+
+    deleted = tools["delete_transaction"].invoke({"customer_id": created["id"], "transaction_id": tx["id"]})
+    assert deleted["status"] == "deleted"
+
+    summary = tools["get_dashboard_summary"].invoke({})
+    assert summary["all_time_by_currency"] == {}
+
+
+def test_update_order_tool_sets_delivery_date_and_marks_delivered(db_session, seeded_org, tools):
+    created = tools["create_customer"].invoke({"name": "Ada Obi"})
+    order = tools["create_order"].invoke({"customer_id": created["id"], "items": "2 generators"})
+    assert order["delivery_date"] is None
+
+    updated = tools["update_order"].invoke({"customer_id": created["id"], "order_id": order["id"], "delivery_date": "2026-12-01", "delivered": "true"})
+    assert updated["status"] == "updated"
+    assert updated["delivery_date"] == "2026-12-01"
+    assert updated["delivered"] is True
+
+
+def test_delete_order_tool(db_session, seeded_org, tools):
+    created = tools["create_customer"].invoke({"name": "Ada Obi"})
+    order = tools["create_order"].invoke({"customer_id": created["id"], "items": "Generator"})
+
+    result = tools["delete_order"].invoke({"customer_id": created["id"], "order_id": order["id"]})
+    assert result["status"] == "deleted"
+
+    listing = tools["search_customers"].invoke({"query": "Ada"})
+    assert listing["total"] == 1  # the customer itself is untouched
+
+
+def test_list_notes_update_note_delete_note_tools(db_session, seeded_org, tools):
+    created = tools["create_customer"].invoke({"name": "Ada Obi"})
+    note = tools["add_customer_note"].invoke({"customer_id": created["id"], "title": "Flag", "content": "Owes for last month"})
+    assert note["status"] == "pending_review"
+
+    listed = tools["list_notes"].invoke({"customer_id": created["id"]})
+    assert len(listed["notes"]) == 1
+    assert listed["notes"][0]["id"] == note["id"]
+    assert listed["notes"][0]["pending_review"] is True
+
+    reviewed = tools["update_note"].invoke({"note_id": note["id"], "content": "Paid up now", "mark_reviewed": "true"})
+    assert reviewed["status"] == "updated"
+    assert reviewed["content"] == "Paid up now"
+    assert reviewed["is_pending_review"] is False
+
+    deleted = tools["delete_note"].invoke({"note_id": note["id"]})
+    assert deleted["status"] == "deleted"
+    assert tools["list_notes"].invoke({})["notes"] == []
