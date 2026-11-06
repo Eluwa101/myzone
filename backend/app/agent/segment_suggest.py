@@ -1,30 +1,80 @@
 """
-Turns a plain-English description of a customer group into SegmentFilters -
-a single grounded LLM call, no tools, no writes, same lightweight pattern as
-ask_data.py. Kept separate from the general-purpose agent in runner.py,
-which can take actions and isn't meant to also do structured extraction.
+Turns a plain-English description of a customer group into a SegmentFilters
+condition tree - a single grounded LLM call, no tools, no writes, same
+lightweight pattern as ask_data.py. Kept separate from the general-purpose
+agent in runner.py, which can take actions and isn't meant to also do
+structured extraction.
 """
 import json
 from datetime import date
 
 from app.agent.model import call_with_fallback, extract_text, get_model
+from app.controllers.segment_fields import FIELD_REGISTRY, OPERATORS_BY_TYPE
 from app.schemas.segment import SegmentFilters
 
-SYSTEM_PROMPT = """You turn a plain-English description of a group of customers into a JSON filter \
-object for a CRM's segment builder. Reply with ONLY a single JSON object - no prose, no markdown \
-code fences - matching this shape exactly (every key optional; omit any you don't need):
-{{"status": "lead" | "customer" | "inactive", "interest_contains": string, "has_consent": true | \
-false, "search": string, "last_purchase_within_days": integer, "last_purchase_over_days": integer, \
-"min_transactions": integer}}
+SCHEMA_EXAMPLE = {
+    "type": "group",
+    "combinator": "or",
+    "conditions": [
+        {"type": "condition", "field": "status", "operator": "equals", "value": "lead"},
+        {
+            "type": "group",
+            "combinator": "and",
+            "conditions": [
+                {"type": "condition", "field": "interests", "operator": "contains", "value": "generator"},
+                {"type": "condition", "field": "last_purchase_date", "operator": "over_days_ago", "value": 60},
+            ],
+        },
+    ],
+}
 
-Guidance: "search" matches a name/phone/email substring - use it only for a specific name or \
-contact fragment the user gave, never for a general description. "interest_contains" matches the \
-free-text "interested in" field. Use last_purchase_within_days for "bought recently / in the last \
-N days", and last_purchase_over_days for "haven't bought in N days / churned / win-back targeting" \
-- these are mutually exclusive, never set both. If the user gives no clear number of days, leave \
-both out rather than guessing one. min_transactions must be 1 or more - there is no filter for \
-exactly zero purchases, so for "never bought / no purchases yet" leave min_transactions out \
-entirely (status "lead" is usually the better fit for that intent). Today is {today}."""
+
+def _field_catalog() -> str:
+    lines = [f'- "{f.key}" ({f.type}){" - choices: " + ", ".join(f.choices) if f.choices else ""}' for f in FIELD_REGISTRY.values()]
+    lines.append('- "extra.<key>" (text) - one of the org\'s own custom fields, e.g. "extra.Car"')
+    return "\n".join(lines)
+
+
+def _operator_catalog() -> str:
+    return "\n".join(f"- {ftype}: {', '.join(ops)}" for ftype, ops in OPERATORS_BY_TYPE.items())
+
+
+def _build_system_prompt() -> str:
+    # Built fresh per call (not a module-level constant) so "today" stays
+    # accurate for a long-running server process, not frozen at import time.
+    return f"""You turn a plain-English description of a group of customers into a JSON \
+condition tree for a CRM's segment builder. Reply with ONLY a single JSON object - no prose, no \
+markdown code fences.
+
+Shape: a node is either a condition or a group.
+Condition: {{"type": "condition", "field": <field key>, "operator": <operator>, "value": <...>, \
+"value2": <...>, "values": [...]}} - only include value/value2/values as the operator needs them:
+most operators use "value", "between" also uses "value2" as the upper bound, "in_list"/"not_in_list" \
+use "values" (a list of strings).
+Group: {{"type": "group", "combinator": "and" | "or" | "nor", "conditions": [<node>, ...]}} - "nor" \
+means none of the conditions may match. Groups can nest inside a group's "conditions" list to express \
+"(A and B) or (C and not D)"-style logic. The top-level response is always a group.
+
+Available fields:
+{_field_catalog()}
+
+Available operators by field type:
+{_operator_catalog()}
+
+Dates (birthday, consent_date, created_at, last_purchase_date, first_purchase_date, last_order_date) \
+use YYYY-MM-DD strings for "equals"/"greater_than"/"less_than"/"between", or a plain integer number \
+of days for "within_last_days"/"over_days_ago" - e.g. "hasn't bought in 60 days" is field \
+"last_purchase_date", operator "over_days_ago", value 60. A customer who has never purchased or \
+never ordered automatically counts as matching "over_days_ago" on last_purchase_date/last_order_date \
+(win-back targeting should catch people who've never bought, not just people who stopped). Boolean \
+fields (has_unpaid_order, has_undelivered_order) use operator "equals" with value true or false. For \
+"never bought anything", use field "transaction_count", operator "equals", value 0 (or status \
+"equals" "lead" if that fits the intent better).
+
+Example - "leads, or people interested in generators who haven't bought in 60 days":
+{json.dumps(SCHEMA_EXAMPLE)}
+
+Today is {date.today().isoformat()}."""
 
 
 class SegmentSuggestionError(Exception):
@@ -33,7 +83,7 @@ class SegmentSuggestionError(Exception):
 
 def suggest_segment_filters(description: str) -> SegmentFilters:
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT.format(today=date.today().isoformat())},
+        {"role": "system", "content": _build_system_prompt()},
         {"role": "user", "content": description},
     ]
     result = call_with_fallback(get_model, lambda model: model.invoke(messages))
@@ -47,6 +97,7 @@ def suggest_segment_filters(description: str) -> SegmentFilters:
         data = json.loads(text)
         if not isinstance(data, dict):
             raise ValueError("Expected a JSON object.")
-        return SegmentFilters(**{k: v for k, v in data.items() if v is not None})
+        data.setdefault("type", "group")
+        return SegmentFilters.model_validate(data)
     except (ValueError, TypeError) as e:
         raise SegmentSuggestionError(str(e)) from e

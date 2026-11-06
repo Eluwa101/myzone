@@ -1,4 +1,4 @@
-import { Bot, Check, Plus, Send, Trash2, X } from "lucide-react";
+import { Bot, Check, Mic, Plus, Send, Square, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -26,6 +26,7 @@ import Spinner from "../components/Spinner";
 import Tabs from "../components/Tabs";
 import TopBar from "../components/TopBar";
 import TransactionRow from "../components/TransactionRow";
+import { useVoiceAutoSend } from "../hooks/useVoiceAutoSend";
 
 const BLANK: CustomerInput = { first_name: "", last_name: "", phone: "", email: "" };
 const STATUS_OPTIONS = [
@@ -592,8 +593,7 @@ function AssistantTab({ customer, onChanged }: { customer: Customer; onChanged: 
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pending]);
 
-  async function onSend(e: FormEvent) {
-    e.preventDefault();
+  async function doSend() {
     const text = input.trim();
     if (!text || busy) return;
     setInput("");
@@ -610,6 +610,14 @@ function AssistantTab({ customer, onChanged }: { customer: Customer; onChanged: 
     } finally {
       setBusy(false);
     }
+  }
+
+  const { voice, autoSendCountdown, cancelAutoSend, onMicClick } = useVoiceAutoSend(input, setInput, doSend);
+
+  function onSend(e: FormEvent) {
+    e.preventDefault();
+    cancelAutoSend();
+    doSend();
   }
 
   return (
@@ -647,12 +655,47 @@ function AssistantTab({ customer, onChanged }: { customer: Customer; onChanged: 
       </div>
 
       <ErrorText message={error} />
+      {autoSendCountdown !== null && (
+        <div className="auto-send-banner row-between">
+          <span>Sending in {autoSendCountdown}s…</span>
+          <div className="row" style={{ gap: 8 }}>
+            <button type="button" className="btn-ghost small" onClick={cancelAutoSend}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary small"
+              onClick={() => {
+                cancelAutoSend();
+                doSend();
+              }}
+            >
+              Send now
+            </button>
+          </div>
+        </div>
+      )}
       <form className="chat-input-row" onSubmit={onSend}>
+        {voice.supported && (
+          <button
+            type="button"
+            className={`icon-btn${voice.listening ? " btn-danger" : ""}`}
+            onClick={onMicClick}
+            disabled={busy}
+            aria-label={voice.listening ? "Stop dictation" : "Dictate message"}
+            title={voice.listening ? "Stop dictation" : "Dictate message"}
+          >
+            {voice.listening ? <Square size={16} /> : <Mic size={16} />}
+          </button>
+        )}
         <input
           aria-label="Message"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={`Ask about ${customer.name}…`}
+          onChange={(e) => {
+            setInput(e.target.value);
+            cancelAutoSend();
+          }}
+          placeholder={voice.listening ? "Listening…" : `Ask about ${customer.name}…`}
           disabled={busy}
         />
         <button className="btn-primary" type="submit" disabled={busy || !input.trim()} aria-label="Send message">

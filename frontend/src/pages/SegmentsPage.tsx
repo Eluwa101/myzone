@@ -1,10 +1,11 @@
 import { Bot, Check, Copy, ExternalLink, Mail, MessageCircle, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { createSegment, deleteSegment, getSegmentMembers, listSegments, previewSegment, suggestSegmentFilters, updateSegment } from "../api/segments";
+import { createSegment, deleteSegment, getSegmentFields, getSegmentMembers, listSegments, previewSegment, suggestSegmentFilters, updateSegment } from "../api/segments";
 import { errorMessage } from "../api/errorMessage";
-import type { CustomerStatus, Segment, SegmentFilters, SegmentMember, SegmentResult } from "../api/types";
+import type { Segment, SegmentFieldsCatalog, SegmentFilters, SegmentMember, SegmentNode, SegmentResult } from "../api/types";
 import ErrorText from "../components/ErrorText";
+import SegmentQueryBuilder, { emptyGroup, OPERATOR_LABELS } from "../components/SegmentQueryBuilder";
 import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
 
@@ -20,17 +21,22 @@ function waLink(phone: string, message: string): string {
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 
+function describeNode(node: SegmentNode): string {
+  if (node.type === "condition") {
+    const fieldLabel = node.field.startsWith("extra.") ? node.field.slice(6) : node.field.replace(/_/g, " ");
+    const opLabel = OPERATOR_LABELS[node.operator] ?? node.operator;
+    if (node.operator === "is_set" || node.operator === "is_not_set") return `${fieldLabel} ${opLabel}`;
+    if (node.operator === "between") return `${fieldLabel} ${opLabel} ${node.value} and ${node.value2}`;
+    if (node.operator === "in_list" || node.operator === "not_in_list") return `${fieldLabel} ${opLabel} [${(node.values ?? []).join(", ")}]`;
+    return `${fieldLabel} ${opLabel} "${node.value}"`;
+  }
+  if (node.conditions.length === 0) return "everyone";
+  const joiner = node.combinator === "and" ? " and " : node.combinator === "or" ? " or " : " nor ";
+  return node.conditions.map((c) => (c.type === "group" ? `(${describeNode(c)})` : describeNode(c))).join(joiner);
+}
+
 function describeFilters(f: SegmentFilters): string {
-  const parts: string[] = [];
-  if (f.status) parts.push(`Status: ${f.status}`);
-  if (f.interest_contains) parts.push(`Interested in "${f.interest_contains}"`);
-  if (f.has_consent === true) parts.push("Has consent");
-  if (f.has_consent === false) parts.push("No consent recorded");
-  if (f.search) parts.push(`Matches "${f.search}"`);
-  if (f.last_purchase_within_days) parts.push(`Bought in last ${f.last_purchase_within_days}d`);
-  if (f.last_purchase_over_days) parts.push(`No purchase in ${f.last_purchase_over_days}d`);
-  if (f.min_transactions) parts.push(`≥${f.min_transactions} purchases`);
-  return parts.length ? parts.join(" · ") : "Everyone";
+  return f.conditions.length === 0 ? "Everyone" : describeNode(f);
 }
 
 export default function SegmentsPage() {
@@ -76,78 +82,6 @@ export default function SegmentsPage() {
   );
 }
 
-function FilterForm({ filters, onChange }: { filters: SegmentFilters; onChange: (f: SegmentFilters) => void }) {
-  function set<K extends keyof SegmentFilters>(key: K, value: SegmentFilters[K]) {
-    onChange({ ...filters, [key]: value });
-  }
-
-  return (
-    <>
-      <label htmlFor="seg-status">Status</label>
-      <select id="seg-status" value={filters.status ?? ""} onChange={(e) => set("status", (e.target.value || null) as CustomerStatus | null)}>
-        <option value="">Any</option>
-        <option value="lead">Lead</option>
-        <option value="customer">Customer</option>
-        <option value="inactive">Inactive</option>
-      </select>
-
-      <label htmlFor="seg-interest">Interested in contains</label>
-      <input
-        id="seg-interest"
-        value={filters.interest_contains ?? ""}
-        onChange={(e) => set("interest_contains", e.target.value || null)}
-        placeholder="e.g. Generator"
-      />
-
-      <label htmlFor="seg-search">Name / phone / email contains</label>
-      <input id="seg-search" value={filters.search ?? ""} onChange={(e) => set("search", e.target.value || null)} />
-
-      <label htmlFor="seg-consent">Consent</label>
-      <select
-        id="seg-consent"
-        value={filters.has_consent === true ? "yes" : filters.has_consent === false ? "no" : ""}
-        onChange={(e) => set("has_consent", e.target.value === "" ? null : e.target.value === "yes")}
-      >
-        <option value="">Any</option>
-        <option value="yes">Has consent</option>
-        <option value="no">No consent recorded</option>
-      </select>
-
-      <div className="tx-edit-grid">
-        <div>
-          <label htmlFor="seg-within">Bought within (days)</label>
-          <input
-            id="seg-within"
-            type="number"
-            min={1}
-            value={filters.last_purchase_within_days ?? ""}
-            onChange={(e) => set("last_purchase_within_days", e.target.value ? Number(e.target.value) : null)}
-          />
-        </div>
-        <div>
-          <label htmlFor="seg-over">No purchase in (days)</label>
-          <input
-            id="seg-over"
-            type="number"
-            min={1}
-            value={filters.last_purchase_over_days ?? ""}
-            onChange={(e) => set("last_purchase_over_days", e.target.value ? Number(e.target.value) : null)}
-          />
-        </div>
-      </div>
-
-      <label htmlFor="seg-min-tx">Minimum number of purchases</label>
-      <input
-        id="seg-min-tx"
-        type="number"
-        min={1}
-        value={filters.min_transactions ?? ""}
-        onChange={(e) => set("min_transactions", e.target.value ? Number(e.target.value) : null)}
-      />
-    </>
-  );
-}
-
 function SegmentBuilder({
   initial,
   onCancel,
@@ -158,7 +92,8 @@ function SegmentBuilder({
   onSaved: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [filters, setFilters] = useState<SegmentFilters>(initial?.filters ?? {});
+  const [filters, setFilters] = useState<SegmentFilters>(initial?.filters ?? emptyGroup());
+  const [catalog, setCatalog] = useState<SegmentFieldsCatalog | null>(null);
   const [preview, setPreview] = useState<SegmentResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -166,6 +101,12 @@ function SegmentBuilder({
   const [suggesting, setSuggesting] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
   const [appliedSummary, setAppliedSummary] = useState<string | null>(null);
+
+  useEffect(() => {
+    getSegmentFields()
+      .then(setCatalog)
+      .catch((err) => setError(errorMessage(err)));
+  }, []);
 
   async function onSuggest() {
     if (!description.trim()) return;
@@ -234,7 +175,7 @@ function SegmentBuilder({
         <ErrorText message={suggestError} />
       </div>
 
-      <FilterForm filters={filters} onChange={setFilters} />
+      {catalog ? <SegmentQueryBuilder group={filters} catalog={catalog} onChange={setFilters} /> : <Spinner />}
 
       <div className="card" style={{ marginTop: 10 }}>
         <p className="small" style={{ margin: 0 }}>

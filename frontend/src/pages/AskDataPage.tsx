@@ -6,7 +6,7 @@ import { createWidget } from "../api/widgets";
 import ErrorText from "../components/ErrorText";
 import MarkdownMessage from "../components/MarkdownMessage";
 import TopBar from "../components/TopBar";
-import { useVoiceInput } from "../hooks/useVoiceInput";
+import { useVoiceAutoSend } from "../hooks/useVoiceAutoSend";
 
 interface Message {
   role: "user" | "assistant";
@@ -23,60 +23,14 @@ const CHIPS = [
   "Who has no consent recorded?",
 ];
 
-const AUTO_SEND_SECONDS = 3;
-
 export default function AskDataPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [autoSendCountdown, setAutoSendCountdown] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const baseTextRef = useRef("");
-  const inputRef = useRef(input);
-  const autoSendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    inputRef.current = input;
-  }, [input]);
-
-  useEffect(() => {
-    return () => {
-      if (autoSendIntervalRef.current) clearInterval(autoSendIntervalRef.current);
-    };
-  }, []);
-
-  function cancelAutoSend() {
-    if (autoSendIntervalRef.current) {
-      clearInterval(autoSendIntervalRef.current);
-      autoSendIntervalRef.current = null;
-    }
-    setAutoSendCountdown(null);
-  }
-
-  function scheduleAutoSend() {
-    setAutoSendCountdown(AUTO_SEND_SECONDS);
-    autoSendIntervalRef.current = setInterval(() => {
-      setAutoSendCountdown((n) => {
-        if (n === null || n <= 1) {
-          if (autoSendIntervalRef.current) clearInterval(autoSendIntervalRef.current);
-          autoSendIntervalRef.current = null;
-          ask(inputRef.current);
-          return null;
-        }
-        return n - 1;
-      });
-    }, 1000);
-  }
-
-  const voice = useVoiceInput(
-    (transcript) => {
-      setInput((baseTextRef.current ? baseTextRef.current + " " : "") + transcript);
-    },
-    () => {
-      if (inputRef.current.trim()) scheduleAutoSend();
-    }
-  );
+  const { voice, autoSendCountdown, cancelAutoSend, onMicClick } = useVoiceAutoSend(input, setInput, () => ask(input));
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -102,12 +56,6 @@ export default function AskDataPage() {
     e.preventDefault();
     cancelAutoSend();
     ask(input);
-  }
-
-  function onMicClick() {
-    cancelAutoSend();
-    baseTextRef.current = input;
-    voice.toggle();
   }
 
   async function saveToDashboard(index: number) {

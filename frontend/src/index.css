@@ -975,6 +975,41 @@ a.row-between:hover {
   gap: 4px;
 }
 
+.segment-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  margin: 8px 0;
+  background: var(--surface);
+}
+
+.segment-group-nested {
+  margin-left: 14px;
+  border-left: 2px solid var(--accent-soft-bg);
+}
+
+.segment-group-header {
+  border-bottom: none;
+  padding: 0 0 8px;
+  margin-bottom: 4px;
+}
+
+.segment-condition-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+}
+
+.segment-condition-row select,
+.segment-condition-row input {
+  margin: 0;
+  width: auto;
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
 .info-row {
   display: flex;
   justify-content: space-between;

@@ -5,12 +5,31 @@ from sqlalchemy.orm import Session
 
 from app.agent.segment_suggest import SegmentSuggestionError, suggest_segment_filters
 from app.controllers import segment_controller
+from app.controllers.segment_fields import FIELD_REGISTRY, OPERATORS_BY_TYPE, list_custom_field_keys
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
-from app.schemas.segment import SegmentCreate, SegmentFilters, SegmentOut, SegmentResult, SegmentSuggestRequest, SegmentUpdate
+from app.schemas.segment import (
+    SegmentCreate,
+    SegmentFieldOut,
+    SegmentFieldsOut,
+    SegmentFilters,
+    SegmentOut,
+    SegmentResult,
+    SegmentSuggestRequest,
+    SegmentUpdate,
+)
 
 router = APIRouter(prefix="/api/segments", tags=["segments"])
+
+
+@router.get("/fields", response_model=SegmentFieldsOut)
+def get_fields(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return SegmentFieldsOut(
+        fields=[SegmentFieldOut(key=f.key, label=f.label, type=f.type, choices=f.choices) for f in FIELD_REGISTRY.values()],
+        operators_by_type=OPERATORS_BY_TYPE,
+        custom_fields=list_custom_field_keys(db, current_user.org_id),
+    )
 
 
 @router.post("/suggest", response_model=SegmentFilters)

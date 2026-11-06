@@ -8,7 +8,7 @@ import ErrorText from "../components/ErrorText";
 import MarkdownMessage from "../components/MarkdownMessage";
 import PendingActionCard from "../components/PendingActionCard";
 import TopBar from "../components/TopBar";
-import { useVoiceInput } from "../hooks/useVoiceInput";
+import { useVoiceAutoSend } from "../hooks/useVoiceAutoSend";
 import { fileToCompressedDataUrl } from "../utils/image";
 
 interface Message {
@@ -16,8 +16,6 @@ interface Message {
   content: string;
   imagePreview?: string;
 }
-
-const AUTO_SEND_SECONDS = 3;
 
 export default function ChatPage() {
   const [threadId, setThreadId] = useState<string>(() => crypto.randomUUID());
@@ -28,55 +26,15 @@ export default function ChatPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [autoSendCountdown, setAutoSendCountdown] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const baseTextRef = useRef("");
   const inputRef = useRef(input);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const autoSendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const doSendRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     inputRef.current = input;
   }, [input]);
 
-  useEffect(() => {
-    return () => {
-      if (autoSendIntervalRef.current) clearInterval(autoSendIntervalRef.current);
-    };
-  }, []);
-
-  function cancelAutoSend() {
-    if (autoSendIntervalRef.current) {
-      clearInterval(autoSendIntervalRef.current);
-      autoSendIntervalRef.current = null;
-    }
-    setAutoSendCountdown(null);
-  }
-
-  function scheduleAutoSend() {
-    setAutoSendCountdown(AUTO_SEND_SECONDS);
-    autoSendIntervalRef.current = setInterval(() => {
-      setAutoSendCountdown((n) => {
-        if (n === null || n <= 1) {
-          if (autoSendIntervalRef.current) clearInterval(autoSendIntervalRef.current);
-          autoSendIntervalRef.current = null;
-          doSendRef.current();
-          return null;
-        }
-        return n - 1;
-      });
-    }, 1000);
-  }
-
-  const voice = useVoiceInput(
-    (transcript) => {
-      setInput((baseTextRef.current ? baseTextRef.current + " " : "") + transcript);
-    },
-    () => {
-      if (inputRef.current.trim()) scheduleAutoSend();
-    }
-  );
+  const { voice, autoSendCountdown, cancelAutoSend, onMicClick } = useVoiceAutoSend(input, setInput, doSend);
 
   function refreshPending() {
     listPending()
@@ -110,12 +68,6 @@ export default function ChatPage() {
     }
   }
 
-  function onMicClick() {
-    cancelAutoSend();
-    baseTextRef.current = input;
-    voice.toggle();
-  }
-
   async function onImageChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -146,9 +98,6 @@ export default function ChatPage() {
       setBusy(false);
     }
   }
-  useEffect(() => {
-    doSendRef.current = doSend;
-  });
 
   function onSend(e: FormEvent) {
     e.preventDefault();

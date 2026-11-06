@@ -1,24 +1,61 @@
 import datetime
+from typing import Annotated, Literal, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from app.models.customer import CustomerStatus
 
+Combinator = Literal["and", "or", "nor"]
 
-class SegmentFilters(BaseModel):
-    """All set filters are AND-ed together. A segment is always resolved
-    live against current data - nothing here is a snapshot."""
+Operator = Literal[
+    "equals",
+    "not_equals",
+    "contains",
+    "not_contains",
+    "in_list",
+    "not_in_list",
+    "is_set",
+    "is_not_set",
+    "greater_than",
+    "less_than",
+    "between",
+    "within_last_days",
+    "over_days_ago",
+]
 
-    status: CustomerStatus | None = None
-    interest_contains: str | None = Field(default=None, max_length=200)
-    has_consent: bool | None = None
-    search: str | None = Field(default=None, max_length=200)
-    # has at least one transaction dated within the last N days
-    last_purchase_within_days: int | None = Field(default=None, ge=1)
-    # no transaction within the last N days (or never purchased) - churn/win-back targeting
-    last_purchase_over_days: int | None = Field(default=None, ge=1)
-    min_transactions: int | None = Field(default=None, ge=1)
+
+class SegmentCondition(BaseModel):
+    """One leaf test, e.g. {field: "status", operator: "equals", value: "lead"}.
+    `field` is one of FIELD_REGISTRY's keys (see segment_fields.py), or
+    "extra.<key>" for one of the org's own custom fields. value/value2/values
+    are used depending on operator: most use `value`, "between" also uses
+    `value2` as the upper bound, "in_list"/"not_in_list" use `values`."""
+
+    type: Literal["condition"] = "condition"
+    field: str = Field(min_length=1, max_length=120)
+    operator: Operator
+    value: str | float | bool | None = None
+    value2: str | float | None = None
+    values: list[str] | None = None
+
+
+class SegmentGroup(BaseModel):
+    """A combinator applied to a list of conditions and/or nested groups -
+    the recursion is what lets the builder express arbitrary
+    (A AND B) OR (C AND NOT D)-style queries. An empty group matches
+    everyone (vacuously true), so a brand-new segment with no conditions
+    yet previews as "everyone", matching the old default-filters behavior."""
+
+    type: Literal["group"] = "group"
+    combinator: Combinator = "and"
+    conditions: list[Annotated[Union[SegmentCondition, "SegmentGroup"], Field(discriminator="type")]] = Field(default_factory=list)
+
+
+SegmentGroup.model_rebuild()
+
+# Public name kept stable - a segment's filters ARE a (possibly nested) group.
+SegmentFilters = SegmentGroup
 
 
 class SegmentSuggestRequest(BaseModel):
@@ -59,3 +96,16 @@ class SegmentMemberOut(BaseModel):
 class SegmentResult(BaseModel):
     total: int
     members: list[SegmentMemberOut]
+
+
+class SegmentFieldOut(BaseModel):
+    key: str
+    label: str
+    type: Literal["text", "enum", "date", "number", "boolean"]
+    choices: list[str] | None = None
+
+
+class SegmentFieldsOut(BaseModel):
+    fields: list[SegmentFieldOut]
+    operators_by_type: dict[str, list[Operator]]
+    custom_fields: list[str]

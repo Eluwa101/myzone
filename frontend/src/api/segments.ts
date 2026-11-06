@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Segment, SegmentFilters, SegmentResult } from "./types";
+import type { Segment, SegmentFieldsCatalog, SegmentFilters, SegmentResult } from "./types";
 
 export interface SegmentInput {
   name: string;
@@ -32,4 +32,8 @@ export function getSegmentMembers(id: string): Promise<SegmentResult> {
 
 export function suggestSegmentFilters(description: string): Promise<SegmentFilters> {
   return api.post<SegmentFilters>("/api/segments/suggest", { description });
+}
+
+export function getSegmentFields(): Promise<SegmentFieldsCatalog> {
+  return api.get<SegmentFieldsCatalog>("/api/segments/fields");
 }

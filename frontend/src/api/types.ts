@@ -146,14 +146,56 @@ export interface FormSubmission {
   created_at: string;
 }
 
-export interface SegmentFilters {
-  status?: CustomerStatus | null;
-  interest_contains?: string | null;
-  has_consent?: boolean | null;
-  search?: string | null;
-  last_purchase_within_days?: number | null;
-  last_purchase_over_days?: number | null;
-  min_transactions?: number | null;
+export type SegmentOperator =
+  | "equals"
+  | "not_equals"
+  | "contains"
+  | "not_contains"
+  | "in_list"
+  | "not_in_list"
+  | "is_set"
+  | "is_not_set"
+  | "greater_than"
+  | "less_than"
+  | "between"
+  | "within_last_days"
+  | "over_days_ago";
+
+export type SegmentCombinator = "and" | "or" | "nor";
+
+export interface SegmentCondition {
+  type: "condition";
+  field: string;
+  operator: SegmentOperator;
+  value?: string | number | boolean | null;
+  value2?: string | number | null;
+  values?: string[] | null;
+}
+
+export interface SegmentGroup {
+  type: "group";
+  combinator: SegmentCombinator;
+  conditions: (SegmentCondition | SegmentGroup)[];
+}
+
+export type SegmentNode = SegmentCondition | SegmentGroup;
+
+// A segment's filters ARE a (possibly nested) group.
+export type SegmentFilters = SegmentGroup;
+
+export type SegmentFieldType = "text" | "enum" | "date" | "number" | "boolean";
+
+export interface SegmentFieldDef {
+  key: string;
+  label: string;
+  type: SegmentFieldType;
+  choices?: string[] | null;
+}
+
+export interface SegmentFieldsCatalog {
+  fields: SegmentFieldDef[];
+  operators_by_type: Record<SegmentFieldType, SegmentOperator[]>;
+  custom_fields: string[];
 }
 
 export interface Segment {
