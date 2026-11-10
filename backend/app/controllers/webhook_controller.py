@@ -8,6 +8,7 @@ from uuid import UUID
 import httpx
 from sqlalchemy.orm import Session
 
+from app.controllers import notification_controller
 from app.core.database import SessionLocal
 from app.models.webhook import WebhookDelivery, WebhookSubscription, generate_webhook_secret
 from app.schemas.webhook import WebhookSubscriptionCreate, WebhookSubscriptionUpdate
@@ -30,6 +31,9 @@ def create_subscription(db: Session, org_id: UUID, data: WebhookSubscriptionCrea
     db.add(sub)
     db.commit()
     db.refresh(sub)
+    notification_controller.create_notification(
+        db, org_id, "webhook.created", f"New webhook configured for {data.target_url}", link="/webhooks"
+    )
     return sub
 
 
@@ -120,6 +124,19 @@ def _deliver(org_id: UUID, subscription_id: UUID, target_url: str, secret: str, 
             )
         )
         db.commit()
+        if result_status == "success":
+            notification_controller.create_notification(
+                db, org_id, "webhook.delivery.success", f"Webhook delivered: {event_type}", link="/webhooks"
+            )
+        else:
+            notification_controller.create_notification(
+                db,
+                org_id,
+                "webhook.delivery.failed",
+                f"Webhook delivery failed: {event_type}",
+                body=f"{target_url} did not accept the delivery after {attempts} attempt(s).",
+                link="/webhooks",
+            )
     except Exception:  # noqa: BLE001 - logging-only path, must never raise
         logger.exception("Failed to record webhook delivery for subscription %s", subscription_id)
     finally:

@@ -1,8 +1,8 @@
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from app.controllers import webhook_controller
+from app.controllers import notification_controller, webhook_controller
 from app.controllers.customer_controller import get_customer
 from app.models.order import Order
 from app.schemas.order import OrderCreate, OrderUpdate
@@ -30,6 +30,9 @@ def create_order(db: Session, org_id: UUID, customer_id: UUID, data: OrderCreate
     db.commit()
     db.refresh(order)
     webhook_controller.dispatch_event(db, org_id, "order.created", webhook_controller.order_payload(order))
+    notification_controller.create_notification(
+        db, org_id, "order.created", f"New order for {customer.name}", link=f"/customers/{customer.id}?tab=orders"
+    )
     return order
 
 
@@ -41,6 +44,13 @@ def list_orders(db: Session, org_id: UUID, customer_id: UUID) -> list[Order]:
         .order_by(Order.order_date.desc())
         .all()
     )
+
+
+def list_all_orders(db: Session, org_id: UUID, pending_only: bool = False) -> list[Order]:
+    q = db.query(Order).options(joinedload(Order.customer)).filter(Order.org_id == org_id)
+    if pending_only:
+        q = q.filter(Order.delivered.is_(False))
+    return q.order_by(Order.order_date.desc()).all()
 
 
 def _get_order(db: Session, org_id: UUID, customer_id: UUID, order_id: UUID) -> Order:

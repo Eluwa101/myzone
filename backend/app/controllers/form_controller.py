@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session, joinedload
 
-from app.controllers import customer_controller, order_controller, transaction_controller
+from app.controllers import customer_controller, notification_controller, order_controller, transaction_controller
 from app.models.custom_form import CustomForm, FormSubmission, generate_public_token, generate_webhook_secret
 from app.models.customer import Customer
 from app.models.organization import Organization
@@ -224,4 +224,11 @@ def submit_public_form(
     db.add(submission)
     db.commit()
     db.refresh(submission)
+    notification_controller.create_notification(
+        db,
+        form.org_id,
+        "form.submission",
+        f"New submission via {form.name}: {customer.name}",
+        link=f"/customers/{customer.id}",
+    )
     return submission, created, transaction_logged, order_logged

@@ -95,7 +95,7 @@ def test_agent_create_shared_note_tool_attaches_multiple_customers_without_revie
 
 
 def test_agent_add_customer_note_tool_creates_pending_note(db_session, seeded_org, tools):
-    from app.controllers import customer_controller, note_controller
+    from app.controllers import customer_controller, note_controller, notification_controller
     from app.schemas.customer import CustomerCreate
 
     org_id, _ = seeded_org
@@ -107,3 +107,5 @@ def test_agent_add_customer_note_tool_creates_pending_note(db_session, seeded_or
     assert result["created_by_agent"] is True
 
     assert note_controller.count_pending(db_session, org_id) == 1
+    notifications = notification_controller.list_notifications(db_session, org_id)
+    assert any(n.type == "note.pending_review" for n in notifications)

@@ -45,3 +45,7 @@ class OrderOut(BaseModel):
     notes: str | None
 
     model_config = {"from_attributes": True}
+
+
+class OrderWithCustomerOut(OrderOut):
+    customer_name: str

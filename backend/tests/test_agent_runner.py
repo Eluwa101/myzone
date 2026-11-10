@@ -2,8 +2,10 @@
 run_chat's thread-id namespacing, tested directly without a real model:
 create_agent is stubbed to capture the config it's invoked with.
 """
+import pytest
+
 import app.agent.runner as runner
-from app.controllers import customer_controller, settings_controller
+from app.controllers import customer_controller, notification_controller, settings_controller
 from app.schemas.customer import CustomerCreate
 from app.schemas.settings import SettingsUpdate
 
@@ -82,3 +84,24 @@ def test_business_profile_is_added_to_the_system_prompt(db_session, seeded_org, 
     assert "Ada's Fabrics" in prompt
     assert "Tailoring" in prompt
     assert "manager: Ada" in prompt
+
+
+def test_total_provider_failure_notifies_and_reraises(db_session, seeded_org, monkeypatch):
+    org_id, user_id = seeded_org
+    monkeypatch.setattr(runner, "get_model", lambda: None)
+    monkeypatch.setattr(runner, "get_checkpointer", lambda: None)
+
+    def fake_create_agent(**kwargs):
+        class _AlwaysFails:
+            def invoke(self, payload, config):
+                raise RuntimeError("provider down")
+
+        return _AlwaysFails()
+
+    monkeypatch.setattr(runner, "create_agent", fake_create_agent)
+
+    with pytest.raises(RuntimeError):
+        runner.run_chat(db_session, org_id, user_id, "hello")
+
+    notifications = notification_controller.list_notifications(db_session, org_id)
+    assert any(n.type == "agent.unavailable" for n in notifications)

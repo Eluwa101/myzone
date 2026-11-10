@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.agent.checkpointer import get_checkpointer
 from app.agent.model import call_vision_with_fallback, call_with_fallback, extract_text, get_model
 from app.agent.tools import build_tools
-from app.controllers import agent_controller, customer_controller, settings_controller
+from app.controllers import agent_controller, customer_controller, notification_controller, settings_controller
 from app.models.pending_action import PendingAction
 
 SYSTEM_PROMPT = (
@@ -119,7 +119,13 @@ def run_chat(
         agent = create_agent(model=model, tools=tools, system_prompt=system_prompt, checkpointer=get_checkpointer())
         return agent.invoke({"messages": [{"role": "user", "content": content}]}, config)
 
-    result = call_vision_with_fallback(invoke_agent) if image_data_url else call_with_fallback(get_model, invoke_agent)
+    try:
+        result = call_vision_with_fallback(invoke_agent) if image_data_url else call_with_fallback(get_model, invoke_agent)
+    except Exception:
+        notification_controller.create_notification(
+            db, org_id, "agent.unavailable", "Assistant is temporarily unavailable", body="Every configured model provider failed to respond."
+        )
+        raise
     messages = result["messages"]
     reply = extract_text(messages[-1].content) if messages else ""
 

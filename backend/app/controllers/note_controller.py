@@ -2,7 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session, joinedload
 
-from app.controllers import webhook_controller
+from app.controllers import notification_controller, webhook_controller
 from app.models.customer import Customer
 from app.models.org_note import OrgNote
 from app.schemas.note import NoteCreate, NoteUpdate
@@ -37,6 +37,8 @@ def create_note(
     db.commit()
     db.refresh(note)
     webhook_controller.dispatch_event(db, org_id, "note.created", webhook_controller.note_payload(note))
+    if is_pending_review:
+        notification_controller.create_notification(db, org_id, "note.pending_review", f"Note needs review: {note.title}", link="/notes")
     return note
 
 

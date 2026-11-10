@@ -94,3 +94,54 @@ def test_order_scoped_to_customer_and_org(client, auth_headers):
 def test_orders_require_auth(client):
     resp = client.get("/api/customers/00000000-0000-0000-0000-000000000000/orders")
     assert resp.status_code == 401
+
+
+def test_list_all_orders_includes_customer_name(client, auth_headers):
+    ada = _create_customer(client, auth_headers, name="Ada Obi")
+    bola = _create_customer(client, auth_headers, name="Bola Ade")
+    client.post(f"/api/customers/{ada['id']}/orders", json={"order_date": "2026-11-01", "items": [{"name": "Rice"}]}, headers=auth_headers)
+    client.post(
+        f"/api/customers/{bola['id']}/orders",
+        json={"order_date": "2026-11-02", "items": [{"name": "Beans"}], "delivered": True},
+        headers=auth_headers,
+    )
+
+    resp = client.get("/api/orders", headers=auth_headers)
+    assert resp.status_code == 200
+    names = {o["customer_name"] for o in resp.json()}
+    assert names == {"Ada Obi", "Bola Ade"}
+
+
+def test_list_all_orders_pending_filter(client, auth_headers):
+    ada = _create_customer(client, auth_headers, name="Ada Obi")
+    bola = _create_customer(client, auth_headers, name="Bola Ade")
+    client.post(f"/api/customers/{ada['id']}/orders", json={"order_date": "2026-11-01", "items": [{"name": "Rice"}]}, headers=auth_headers)
+    client.post(
+        f"/api/customers/{bola['id']}/orders",
+        json={"order_date": "2026-11-02", "items": [{"name": "Beans"}], "delivered": True},
+        headers=auth_headers,
+    )
+
+    resp = client.get("/api/orders?pending=true", headers=auth_headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 1
+    assert body[0]["customer_name"] == "Ada Obi"
+    assert body[0]["delivered"] is False
+
+
+def test_all_orders_requires_auth(client):
+    assert client.get("/api/orders").status_code == 401
+
+
+def test_all_orders_scoped_to_org(client, auth_headers):
+    ada = _create_customer(client, auth_headers, name="Ada Obi")
+    client.post(f"/api/customers/{ada['id']}/orders", json={"order_date": "2026-11-01", "items": [{"name": "Rice"}]}, headers=auth_headers)
+
+    client.post("/api/auth/signup", json={"org_name": "Other Co", "email": "o@example.com", "password": "secret123"})
+    login = client.post("/api/auth/login", json={"email": "o@example.com", "password": "secret123"}).json()
+    other_headers = {"Authorization": f"Bearer {login['access_token']}"}
+
+    resp = client.get("/api/orders", headers=other_headers)
+    assert resp.status_code == 200
+    assert resp.json() == []

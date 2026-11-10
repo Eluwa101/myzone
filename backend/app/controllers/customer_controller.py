@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.controllers import webhook_controller
+from app.controllers import notification_controller, webhook_controller
 from app.models.customer import Customer, CustomerStatus
 from app.models.transaction import Transaction
 from app.schemas.customer import CustomerCreate, CustomerUpdate, ImportResult
@@ -418,6 +418,15 @@ def import_csv(db: Session, org_id: UUID, csv_text: str) -> ImportResult:
             errors.append(str(e))
             db.rollback()
 
+    notification_type = "import.failed" if failed and not (added or merged) else "import.completed"
+    notification_controller.create_notification(
+        db,
+        org_id,
+        notification_type,
+        f"CSV import finished: {added} added, {merged} updated" + (f", {failed} failed" if failed else ""),
+        body=("; ".join(errors[:5]) + ("…" if len(errors) > 5 else "")) if errors else None,
+        link="/data",
+    )
     return ImportResult(added=added, merged=merged, skipped=skipped, failed=failed, errors=errors)
 
 
