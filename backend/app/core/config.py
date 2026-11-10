@@ -17,6 +17,22 @@ class Settings(BaseSettings):
     # "http://localhost:5173,https://your-app.vercel.app"
     cors_origins: str = "http://localhost:5173"
 
+    # the frontend origin used to build links in emails (verify/reset) - the
+    # first entry of cors_origins by default, but settable independently in
+    # case the CORS list ever has more than one real frontend
+    frontend_url: str = "http://localhost:5173"
+
+    resend_api_key: str | None = None
+    # Resend's shared test sender - works without verifying a domain, but
+    # only delivers to the email address that owns the Resend account. Swap
+    # for "YourBrand <noreply@yourdomain.com>" once a domain is verified.
+    email_from: str = "MyShop <onboarding@resend.dev>"
+
+    # the OAuth client ID from Google Cloud Console (Authorized JavaScript
+    # origins must include every frontend origin in cors_origins) - used to
+    # verify the audience of ID tokens from the "Continue with Google" button
+    google_oauth_client_id: str | None = None
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

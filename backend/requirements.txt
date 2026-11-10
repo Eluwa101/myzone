@@ -18,3 +18,5 @@ langchain-google-genai
 langgraph
 langgraph-checkpoint-postgres
 psycopg_pool
+resend
+google-auth

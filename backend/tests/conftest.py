@@ -36,6 +36,22 @@ def _fresh_schema():
     Base.metadata.drop_all(engine)
 
 
+def verify_user_email(email: str) -> None:
+    """Test helper: marks a signed-up user's email verified directly,
+    bypassing the real email-link flow - used wherever a test needs a
+    second/other account to log in without caring about verification
+    itself (that flow has its own tests in test_auth.py)."""
+    from app.models.user import User
+
+    db = TestingSessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        user.email_verified = True
+        db.commit()
+    finally:
+        db.close()
+
+
 def _override_get_db():
     db = TestingSessionLocal()
     try:
@@ -70,7 +86,7 @@ def seeded_org(db_session):
     org = Organization(name="Ada's Store")
     db_session.add(org)
     db_session.flush()
-    user = User(org_id=org.id, email="ada@example.com", hashed_password=hash_password("supersecret"))
+    user = User(org_id=org.id, email="ada@example.com", hashed_password=hash_password("supersecret"), email_verified=True)
     db_session.add(user)
     db_session.commit()
     return org.id, user.id
@@ -82,6 +98,12 @@ def auth_headers(client):
         "/api/auth/signup",
         json={"org_name": "Ada's Store", "email": "ada@example.com", "password": "supersecret"},
     )
+    # signup requires email verification before login - tests care about
+    # what happens after login, not the verification flow itself, so mark
+    # it verified directly rather than threading a captured token through
+    # every test that needs auth_headers.
+    verify_user_email("ada@example.com")
+
     resp = client.post("/api/auth/login", json={"email": "ada@example.com", "password": "supersecret"})
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}

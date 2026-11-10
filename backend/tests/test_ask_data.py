@@ -16,13 +16,13 @@ def test_build_data_context_includes_precomputed_totals_and_customer(client, aut
     created = client.post("/api/customers", json={"name": "Ada Obi", "interests": "Rice"}, headers=auth_headers).json()
     client.post(
         f"/api/customers/{created['id']}/transactions",
-        json={"date": "2026-11-01", "item": "Rice", "qty": 2, "amount": 15000, "currency": "NGN"},
+        json={"date": "2026-11-01", "items": [{"item": "Rice", "qty": 2, "amount": 15000}], "currency": "NGN"},
         headers=auth_headers,
     )
 
     context = build_data_context(db_session, user.org_id)
     assert "TOTALS (precomputed, exact): 1 customers" in context
-    assert "All-time sales: NGN 30,000.00" in context
+    assert "All-time sales: NGN 15,000.00" in context
     assert "Ada Obi" in context
     assert "Rice" in context
 

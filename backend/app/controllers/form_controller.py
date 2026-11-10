@@ -12,7 +12,7 @@ from app.models.organization import Organization
 from app.schemas.customer import CustomerCreate
 from app.schemas.form import CUSTOMER_FIELD_KEYS, ORDER_FIELD_KEYS, TRANSACTION_FIELD_KEYS, FormCreate, FormUpdate
 from app.schemas.order import OrderCreate, OrderItem
-from app.schemas.transaction import TransactionCreate
+from app.schemas.transaction import TransactionCreate, TransactionItem
 
 
 class FormNotFoundError(Exception):
@@ -146,7 +146,11 @@ def _log_submission_transaction(db: Session, org_id: UUID, customer_id: UUID, tx
     tx_date = tx_fields.get("tx_date") or datetime.date.today().isoformat()
     transaction_controller.add_transaction(
         db, org_id, customer_id,
-        TransactionCreate(date=tx_date, item=item, qty=qty, amount=amount, currency=(tx_fields.get("tx_currency") or "").upper()),
+        TransactionCreate(
+            date=tx_date,
+            items=[TransactionItem(item=item, qty=qty, amount=amount)],
+            currency=(tx_fields.get("tx_currency") or "").upper(),
+        ),
     )
     return True
 

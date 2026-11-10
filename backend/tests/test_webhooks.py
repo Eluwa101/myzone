@@ -207,7 +207,7 @@ def test_order_and_transaction_events_fire(client, auth_headers, monkeypatch):
     )
     client.post(
         f"/api/customers/{customer['id']}/transactions",
-        json={"date": "2026-01-01", "item": "Widget", "qty": 1, "amount": 10, "currency": "USD"},
+        json={"date": "2026-01-01", "items": [{"item": "Widget", "qty": 1, "amount": 10}], "currency": "USD"},
         headers=auth_headers,
     )
     client.delete(f"/api/customers/{customer['id']}", headers=auth_headers)

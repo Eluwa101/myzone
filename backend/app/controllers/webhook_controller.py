@@ -193,8 +193,7 @@ def transaction_payload(tx) -> dict:
         "id": str(tx.id),
         "customer_id": str(tx.customer_id),
         "date": tx.date.isoformat() if tx.date else None,
-        "item": tx.item,
-        "qty": tx.qty,
+        "items": tx.items,
         "amount": float(tx.amount) if tx.amount is not None else None,
         "currency": tx.currency,
     }

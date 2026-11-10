@@ -71,7 +71,7 @@ def test_add_transaction_flips_status_and_clears_bought_interest(client, auth_he
 
     tx_resp = client.post(
         f"/api/customers/{created['id']}/transactions",
-        json={"date": "2026-11-01", "item": "Rice", "qty": 2, "amount": 15000, "currency": "NGN"},
+        json={"date": "2026-11-01", "items": [{"item": "Rice", "qty": 2, "amount": 15000}], "currency": "NGN"},
         headers=auth_headers,
     )
     assert tx_resp.status_code == 201
@@ -92,7 +92,7 @@ def test_manual_status_is_pinned(client, auth_headers):
 
     client.post(
         f"/api/customers/{created['id']}/transactions",
-        json={"date": "2026-11-01", "item": "Rice", "amount": 1000, "currency": "NGN"},
+        json={"date": "2026-11-01", "items": [{"item": "Rice", "amount": 1000}], "currency": "NGN"},
         headers=auth_headers,
     )
     unchanged = client.get(f"/api/customers/{created['id']}", headers=auth_headers).json()
@@ -138,7 +138,7 @@ def test_csv_export_then_import_round_trips_without_duplicating(client, auth_hea
     ).json()
     client.post(
         f"/api/customers/{created['id']}/transactions",
-        json={"date": "2026-11-01", "item": "Rice", "qty": 1, "amount": 15000, "currency": "NGN"},
+        json={"date": "2026-11-01", "items": [{"item": "Rice", "qty": 1, "amount": 15000}], "currency": "NGN"},
         headers=auth_headers,
     )
 

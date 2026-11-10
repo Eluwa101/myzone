@@ -15,6 +15,7 @@ from app.models.chat_message import ChatMessage
 from app.models.webhook import WebhookSubscription, WebhookDelivery
 from app.models.idempotency import IdempotencyKey
 from app.models.notification import Notification
+from app.models.auth_token import AuthToken, AuthTokenPurpose
 
 __all__ = [
     "Organization",
@@ -37,4 +38,6 @@ __all__ = [
     "WebhookDelivery",
     "IdempotencyKey",
     "Notification",
+    "AuthToken",
+    "AuthTokenPurpose",
 ]

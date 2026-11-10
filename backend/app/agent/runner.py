@@ -70,6 +70,12 @@ def _business_context(db: Session, org_id: UUID) -> str:
         facts.append(f"business phone: {settings.phone}")
     if settings.address:
         facts.append(f"business address: {settings.address}")
+    if settings.default_currency:
+        facts.append(
+            f"default currency: {settings.default_currency} - use this for amounts the user mentions without "
+            "naming a currency, and when calling add_transaction/create_order without an explicit currency "
+            "(those tools already fall back to it themselves, but mention it in ISO form when you quote a price)"
+        )
     if not facts:
         return ""
     return "\n\nBusiness you're assisting (from Settings -> Business profile): " + "; ".join(facts) + "."

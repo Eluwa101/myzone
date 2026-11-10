@@ -138,7 +138,10 @@ def test_all_orders_scoped_to_org(client, auth_headers):
     ada = _create_customer(client, auth_headers, name="Ada Obi")
     client.post(f"/api/customers/{ada['id']}/orders", json={"order_date": "2026-11-01", "items": [{"name": "Rice"}]}, headers=auth_headers)
 
+    from tests.conftest import verify_user_email
+
     client.post("/api/auth/signup", json={"org_name": "Other Co", "email": "o@example.com", "password": "secret123"})
+    verify_user_email("o@example.com")
     login = client.post("/api/auth/login", json={"email": "o@example.com", "password": "secret123"}).json()
     other_headers = {"Authorization": f"Bearer {login['access_token']}"}
 

@@ -149,7 +149,7 @@ def test_submission_with_transaction_fields_logs_a_transaction(client, auth_head
 
     customers = client.get("/api/customers", headers=auth_headers).json()["items"]
     assert len(customers[0]["transactions"]) == 1
-    assert customers[0]["transactions"][0]["item"] == "Rice"
+    assert customers[0]["transactions"][0]["items"] == [{"item": "Rice", "qty": 1, "amount": 15000}]
     assert customers[0]["transactions"][0]["amount"] == 15000
 
 

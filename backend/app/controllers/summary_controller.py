@@ -44,7 +44,7 @@ def _transaction_aggregates(
         for tx in c.transactions:
             if not _in_range(tx.date, start_date, end_date):
                 continue
-            value = float(tx.amount or 0) * float(tx.qty or 1)
+            value = float(tx.amount or 0)
             if not value:
                 continue
             currency = (tx.currency or "").upper()

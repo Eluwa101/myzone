@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import ProtectedLayout from "./components/ProtectedLayout";
 import ServerWakingBanner from "./components/ServerWakingBanner";
 import AskDataPage from "./pages/AskDataPage";
+import CheckEmailPage from "./pages/CheckEmailPage";
 import ChatPage from "./pages/ChatPage";
 import CustomerDetailPage from "./pages/CustomerDetailPage";
 import CustomersPage from "./pages/CustomersPage";
@@ -10,15 +11,18 @@ import DashboardInterestsPage from "./pages/DashboardInterestsPage";
 import DashboardMonthlyPage from "./pages/DashboardMonthlyPage";
 import DashboardTopCustomersPage from "./pages/DashboardTopCustomersPage";
 import DataPage from "./pages/DataPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import FormsPage from "./pages/FormsPage";
 import LoginPage from "./pages/LoginPage";
 import NotesPage from "./pages/NotesPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import OrdersPage from "./pages/OrdersPage";
 import PublicFormPage from "./pages/PublicFormPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import SegmentsPage from "./pages/SegmentsPage";
 import SettingsPage from "./pages/SettingsPage";
 import SignupPage from "./pages/SignupPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
 import WebhooksPage from "./pages/WebhooksPage";
 
 export default function App() {
@@ -28,6 +32,10 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/check-email" element={<CheckEmailPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/f/:token" element={<PublicFormPage />} />
 
         <Route element={<ProtectedLayout />}>

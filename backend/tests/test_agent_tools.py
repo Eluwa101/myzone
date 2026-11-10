@@ -114,7 +114,38 @@ def test_add_transaction_then_dashboard_summary_reflects_it(db_session, seeded_o
     tools["add_transaction"].invoke({"customer_id": created["id"], "date": "2026-11-01", "item": "Rice", "amount": 15000, "qty": 2, "currency": "ngn"})
 
     summary = tools["get_dashboard_summary"].invoke({})
-    assert summary["all_time_by_currency"]["NGN"] == 30000
+    assert summary["all_time_by_currency"]["NGN"] == 15000
+
+
+def test_add_transaction_with_items_json_creates_one_multi_item_transaction(db_session, seeded_org, tools):
+    created = tools["create_customer"].invoke({"name": "Ada Obi"})
+    tx = tools["add_transaction"].invoke(
+        {
+            "customer_id": created["id"],
+            "date": "2026-11-01",
+            "items_json": '[{"item": "Rice", "qty": 2, "amount": 5000}, {"item": "Sugar", "qty": 1, "amount": 1200}]',
+        }
+    )
+    assert tx["status"] == "created"
+    assert tx["amount"] == 6200
+    assert len(tx["items"]) == 2
+
+    summary = tools["get_dashboard_summary"].invoke({})
+    # currency fell back to the org's configured default (empty in this
+    # fixture org, so the all_time bucket key is "")
+    assert sum(summary["all_time_by_currency"].values()) == 6200
+
+
+def test_add_transaction_falls_back_to_org_default_currency(db_session, seeded_org, tools):
+    from app.controllers import settings_controller
+    from app.schemas.settings import SettingsUpdate
+
+    org_id, _user_id = seeded_org
+    settings_controller.update_settings(db_session, org_id, SettingsUpdate(default_currency="NGN"))
+
+    created = tools["create_customer"].invoke({"name": "Ada Obi"})
+    tx = tools["add_transaction"].invoke({"customer_id": created["id"], "date": "2026-11-01", "item": "Rice", "amount": 5000})
+    assert tx["currency"] == "NGN"
 
 
 def test_search_customers_tool(db_session, seeded_org, tools):

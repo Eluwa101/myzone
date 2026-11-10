@@ -89,7 +89,12 @@ def find_duplicate_groups(db: Session, org_id: UUID) -> list[list[Customer]]:
 def _clear_bought_interests(customer: Customer) -> None:
     if not customer.interests:
         return
-    items = [t.item.lower().strip() for t in customer.transactions if t.item and len(t.item.strip()) > 2]
+    items = [
+        li["item"].lower().strip()
+        for t in customer.transactions
+        for li in (t.items or [])
+        if li.get("item") and len(li["item"].strip()) > 2
+    ]
     kept = []
     for part in customer.interests.split(","):
         s = part.strip()
@@ -100,6 +105,13 @@ def _clear_bought_interests(customer: Customer) -> None:
             continue
         kept.append(s)
     customer.interests = ", ".join(kept)
+
+
+def _tx_key(date, items: list[dict], amount: float) -> tuple:
+    """A hashable fingerprint for a transaction, used to dedupe identical
+    rows when merging customers or re-importing the same CSV twice."""
+    item_key = tuple(sorted(((li.get("item") or "").lower(), float(li.get("qty") or 0), float(li.get("amount") or 0)) for li in items))
+    return (date, item_key, round(float(amount), 2))
 
 
 def _recompute_status(customer: Customer) -> None:
@@ -248,9 +260,9 @@ def merge_customers(db: Session, org_id: UUID, keep_id: UUID, merge_id: UUID) ->
     merged_extra.update(keep.extra or {})
     keep.extra = merged_extra
 
-    existing_keys = {(t.date, (t.item or "").lower(), float(t.amount)) for t in keep.transactions}
+    existing_keys = {_tx_key(t.date, t.items or [], t.amount) for t in keep.transactions}
     for tx in list(merge.transactions):
-        key = (tx.date, (tx.item or "").lower(), float(tx.amount))
+        key = _tx_key(tx.date, tx.items or [], tx.amount)
         if key in existing_keys:
             db.delete(tx)
         else:
@@ -388,17 +400,17 @@ def import_csv(db: Session, org_id: UUID, csv_text: str) -> ImportResult:
                     if not getattr(match, f, None) and fields.get(f):
                         setattr(match, f, fields.get(f))
                 match.extra = {**group["extra"], **(match.extra or {})}
-                existing_keys = {(t.date, (t.item or "").lower(), float(t.amount)) for t in match.transactions}
+                existing_keys = {_tx_key(t.date, t.items or [], t.amount) for t in match.transactions}
                 for tx in group["txs"]:
                     import datetime as _dt
 
                     tx_date = _parse_date(tx["date"]) or _dt.date.today()
-                    tx_key = (tx_date, tx["item"].lower(), float(tx["amount"] or 0))
+                    tx_amount = float(tx["amount"] or 0)
+                    tx_items = [{"item": tx["item"], "qty": float(tx["qty"] or 1), "amount": tx_amount}]
+                    tx_key = _tx_key(tx_date, tx_items, tx_amount)
                     if tx_key in existing_keys:
                         continue
-                    match.transactions.append(
-                        Transaction(date=tx_date, item=tx["item"], qty=float(tx["qty"] or 1), amount=float(tx["amount"] or 0), currency=tx["currency"])
-                    )
+                    match.transactions.append(Transaction(date=tx_date, items=tx_items, amount=tx_amount, currency=tx["currency"]))
                     existing_keys.add(tx_key)
                 recompute_derived_fields(match)
                 db.commit()
@@ -407,9 +419,9 @@ def import_csv(db: Session, org_id: UUID, csv_text: str) -> ImportResult:
                 customer = create_customer(db, org_id, data, force=True)
                 for tx in group["txs"]:
                     tx_date = _parse_date(tx["date"]) or customer.created_at.date()
-                    customer.transactions.append(
-                        Transaction(date=tx_date, item=tx["item"], qty=float(tx["qty"] or 1), amount=float(tx["amount"] or 0), currency=tx["currency"])
-                    )
+                    tx_amount = float(tx["amount"] or 0)
+                    tx_items = [{"item": tx["item"], "qty": float(tx["qty"] or 1), "amount": tx_amount}]
+                    customer.transactions.append(Transaction(date=tx_date, items=tx_items, amount=tx_amount, currency=tx["currency"]))
                 recompute_derived_fields(customer)
                 db.commit()
                 added += 1
@@ -467,10 +479,13 @@ def export_csv(db: Session, org_id: UUID) -> str:
             c.status.value, c.consent_date.isoformat() if c.consent_date else "",
         ]
         extra_vals = [(c.extra or {}).get(k, "") for k in extra_keys]
-        txs = c.transactions or [None]
-        for t in txs:
-            if t is None:
-                writer.writerow(base + extra_vals + ["", "", "", "", ""])
-            else:
-                writer.writerow(base + extra_vals + [t.date.isoformat(), t.item, t.qty, t.amount, t.currency])
+        # One CSV row per transaction line item (a multi-item transaction
+        # re-imports as separate transactions - an accepted round-trip
+        # limitation of the flat CSV format).
+        rows = [(t, li) for t in c.transactions for li in (t.items or [])]
+        if not rows:
+            writer.writerow(base + extra_vals + ["", "", "", "", ""])
+        else:
+            for t, li in rows:
+                writer.writerow(base + extra_vals + [t.date.isoformat(), li.get("item", ""), li.get("qty", ""), li.get("amount", ""), t.currency])
     return buf.getvalue()

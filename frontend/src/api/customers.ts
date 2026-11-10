@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Customer, CustomerListResult, CustomerStatus, DuplicateGroup, ImportResult, Order, OrderItem, Transaction } from "./types";
+import type { Customer, CustomerListResult, CustomerStatus, DuplicateGroup, ImportResult, Order, OrderItem, Transaction, TransactionLineItem } from "./types";
 
 export interface CustomerInput {
   name?: string;
@@ -59,7 +59,11 @@ export function mergeCustomers(keepId: string, mergeId: string): Promise<Custome
   return api.post<Customer>("/api/customers/merge", { keep_id: keepId, merge_id: mergeId });
 }
 
-export type TransactionInput = Pick<Transaction, "date" | "item" | "qty" | "amount" | "currency">;
+export interface TransactionInput {
+  date: string;
+  items: TransactionLineItem[];
+  currency: string;
+}
 
 export function addTransaction(customerId: string, data: TransactionInput): Promise<Transaction> {
   return api.post<Transaction>(`/api/customers/${customerId}/transactions`, data);

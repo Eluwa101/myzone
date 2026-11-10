@@ -65,7 +65,7 @@ def _field_value(customer: Customer, field: str):
     if field == "transaction_count":
         return len(customer.transactions)
     if field == "total_spent":
-        return sum(float(t.amount or 0) * float(t.qty or 1) for t in customer.transactions)
+        return sum(float(t.amount or 0) for t in customer.transactions)
     if field == "last_purchase_date":
         dates = [t.date for t in customer.transactions]
         return max(dates) if dates else None

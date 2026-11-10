@@ -1,11 +1,16 @@
 export type CustomerStatus = "lead" | "customer" | "inactive";
 
+export interface TransactionLineItem {
+  item: string;
+  qty: number;
+  amount: number;
+}
+
 export interface Transaction {
   id: string;
   customer_id: string;
   date: string;
-  item: string;
-  qty: number;
+  items: TransactionLineItem[];
   amount: number;
   currency: string;
 }

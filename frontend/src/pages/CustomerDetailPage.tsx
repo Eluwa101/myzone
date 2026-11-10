@@ -400,32 +400,24 @@ function TransactionsTab({
     setError(null);
     setSaving(true);
     try {
-      let anyQueued = false;
-      for (const line of cleanLines) {
-        const body = {
-          date,
-          item: line.item.trim(),
-          qty: Number(line.qty) || 1,
-          amount: Number(line.amount) || 0,
-          currency,
-        };
-        const result = await withOfflineFallback(() => addTransaction(customer.id, body), {
-          method: "POST",
-          path: `/api/customers/${customer.id}/transactions`,
-          body,
-          label: `Transaction: ${body.item}`,
-        });
-        if (result.queued) {
-          anyQueued = true;
-          addPending(result.id, body);
-        }
-      }
+      const body: TransactionInput = {
+        date,
+        items: cleanLines.map((l) => ({ item: l.item.trim(), qty: Number(l.qty) || 1, amount: Number(l.amount) || 0 })),
+        currency,
+      };
+      const result = await withOfflineFallback(() => addTransaction(customer.id, body), {
+        method: "POST",
+        path: `/api/customers/${customer.id}/transactions`,
+        body,
+        label: `Transaction: ${body.items.map((i) => i.item).join(", ")}`,
+      });
+      if (result.queued) addPending(result.id, body);
       setLines([blankLine()]);
       setAdding(false);
       // onChanged() re-fetches from the server - pointless while offline,
       // and its loading state would unmount this tab and lose the
       // just-added pending rows. usePendingSync calls it once they sync.
-      if (!anyQueued) onChanged();
+      if (!result.queued) onChanged();
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -444,10 +436,10 @@ function TransactionsTab({
         {pending.map((p) => (
           <div key={p.id} className="row-between" style={{ opacity: 0.7 }}>
             <span>
-              {p.data.item} <PendingSyncBadge />
+              {p.data.items.map((i) => i.item).join(", ")} <PendingSyncBadge />
             </span>
             <span className="muted small">
-              {p.data.qty} × {p.data.currency} {p.data.amount}
+              {p.data.currency} {p.data.items.reduce((sum, i) => sum + i.amount, 0)}
             </span>
           </div>
         ))}
@@ -492,7 +484,7 @@ function PurchaseSummary({ transactions }: { transactions: Customer["transaction
   const byCurrency = new Map<string, number>();
   for (const t of transactions) {
     const key = t.currency || "";
-    byCurrency.set(key, (byCurrency.get(key) ?? 0) + Number(t.amount || 0) * Number(t.qty || 1));
+    byCurrency.set(key, (byCurrency.get(key) ?? 0) + Number(t.amount || 0));
   }
   const dates = transactions.map((t) => t.date).sort();
   const first = dates[0];

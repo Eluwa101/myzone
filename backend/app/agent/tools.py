@@ -15,17 +15,18 @@ directly: they create a PendingAction row and return a confirm_required
 payload. A human must call the /api/agent/pending/{id}/confirm endpoint
 before the action actually runs.
 """
+import json
 from uuid import UUID
 
 from langchain.tools import tool
 from sqlalchemy.orm import Session
 
-from app.controllers import agent_controller, customer_controller, note_controller, order_controller, transaction_controller
+from app.controllers import agent_controller, customer_controller, note_controller, order_controller, settings_controller, transaction_controller
 from app.models.customer import CustomerStatus
 from app.schemas.customer import CustomerCreate, CustomerUpdate
 from app.schemas.note import NoteCreate, NoteUpdate
 from app.schemas.order import OrderCreate, OrderItem, OrderUpdate
-from app.schemas.transaction import TransactionCreate, TransactionUpdate
+from app.schemas.transaction import TransactionCreate, TransactionItem, TransactionUpdate
 
 
 def _clean(value: str) -> str | None:
@@ -41,6 +42,9 @@ def _serialize_customer(customer) -> dict:
 def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
     def log(tool_name: str, payload: dict, result: dict) -> None:
         agent_controller.log_action(db, org_id, user_id, tool_name, payload, result)
+
+    def default_currency() -> str:
+        return (settings_controller.get_settings(db, org_id).default_currency or "").upper()
 
     @tool
     def create_customer(
@@ -176,39 +180,92 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         }
 
     @tool
-    def add_transaction(customer_id: str, date: str, item: str, amount: float, qty: float = 1, currency: str = "") -> dict:
+    def add_transaction(
+        customer_id: str,
+        date: str,
+        item: str = "",
+        amount: float = -1,
+        qty: float = 1,
+        currency: str = "",
+        items_json: str = "",
+    ) -> dict:
         """Record a purchase/transaction for a customer. date must be
-        YYYY-MM-DD. amount is the unit price (a plain number, no currency
-        symbol). currency is an ISO code like NGN, USD, EUR if known."""
+        YYYY-MM-DD. For a single item bought, pass item and amount (this
+        item's own total price, not a per-unit price - e.g. 2 bags of rice
+        sold together for 5000 is item="Rice", qty=2, amount=5000). For
+        several items bought together in the SAME checkout, leave item/amount
+        blank and pass items_json instead: a JSON array like
+        '[{"item": "Rice", "qty": 2, "amount": 5000}, {"item": "Sugar", "qty": 1, "amount": 1200}]'
+        - do NOT call add_transaction once per item for one purchase, that
+        would wrongly record them as separate transactions. currency is an
+        ISO code like NGN, USD, EUR; if left blank, the organization's
+        configured default currency is used."""
+        if items_json.strip():
+            try:
+                raw_items = json.loads(items_json)
+                line_items = [TransactionItem(item=i["item"], qty=i.get("qty", 1), amount=i["amount"]) for i in raw_items]
+            except (ValueError, KeyError, TypeError, AttributeError):
+                return {"status": "error", "message": 'items_json must be a JSON array of {"item", "qty", "amount"} objects.'}
+        elif item.strip() and amount >= 0:
+            line_items = [TransactionItem(item=item, qty=qty, amount=amount)]
+        else:
+            return {"status": "error", "message": "Provide either item + amount for a single item, or items_json for several."}
+        resolved_currency = currency.upper().strip() or default_currency()
         try:
             tx = transaction_controller.add_transaction(
                 db, org_id, UUID(customer_id),
-                TransactionCreate(date=date, item=item, qty=qty, amount=amount, currency=currency.upper().strip()),
+                TransactionCreate(date=date, items=line_items, currency=resolved_currency),
             )
         except customer_controller.CustomerNotFoundError:
             return {"status": "error", "message": "No customer with that id."}
         from app.schemas.transaction import TransactionOut
 
         result = {"status": "created", **TransactionOut.model_validate(tx).model_dump(mode="json")}
-        log("add_transaction", {"customer_id": customer_id, "date": date, "item": item, "qty": qty, "amount": amount, "currency": currency}, result)
+        log("add_transaction", {"customer_id": customer_id, "date": date, "items": [i.model_dump() for i in line_items], "currency": resolved_currency}, result)
         return result
 
     @tool
-    def update_transaction(customer_id: str, transaction_id: str, date: str = "", item: str = "", amount: float = -1, qty: float = -1, currency: str = "") -> dict:
-        """Correct a previously recorded transaction. Only pass the fields
-        that should change; leave amount/qty as -1 and others blank to leave
-        them unchanged."""
+    def update_transaction(
+        customer_id: str,
+        transaction_id: str,
+        date: str = "",
+        item: str = "",
+        amount: float = -1,
+        qty: float = -1,
+        currency: str = "",
+        items_json: str = "",
+    ) -> dict:
+        """Correct a previously recorded transaction. For a transaction with
+        several items, pass items_json (same JSON-array format as
+        add_transaction) to replace its whole item list. For a single-item
+        transaction, item/amount/qty edit that one line - leave them blank/-1
+        to leave unchanged. Leave currency blank to leave it unchanged."""
         updates: dict = {}
         if date.strip():
             updates["date"] = date
-        if item.strip():
-            updates["item"] = item
-        if amount >= 0:
-            updates["amount"] = amount
-        if qty >= 0:
-            updates["qty"] = qty
         if currency.strip():
             updates["currency"] = currency.upper().strip()
+        if items_json.strip():
+            try:
+                raw_items = json.loads(items_json)
+                updates["items"] = [TransactionItem(item=i["item"], qty=i.get("qty", 1), amount=i["amount"]) for i in raw_items]
+            except (ValueError, KeyError, TypeError, AttributeError):
+                return {"status": "error", "message": 'items_json must be a JSON array of {"item", "qty", "amount"} objects.'}
+        elif item.strip() or amount >= 0 or qty >= 0:
+            try:
+                current = transaction_controller.get_transaction(db, org_id, UUID(customer_id), UUID(transaction_id))
+            except (customer_controller.CustomerNotFoundError, transaction_controller.TransactionNotFoundError):
+                return {"status": "error", "message": "No such customer/transaction."}
+            if len(current.items or []) != 1:
+                return {"status": "error", "message": "This transaction has multiple items - use items_json to replace the whole list instead."}
+            line = dict(current.items[0])
+            if item.strip():
+                line["item"] = item.strip()
+            if amount >= 0:
+                line["amount"] = amount
+            if qty >= 0:
+                line["qty"] = qty
+            updates["items"] = [TransactionItem(**line)]
         try:
             tx = transaction_controller.update_transaction(db, org_id, UUID(customer_id), UUID(transaction_id), TransactionUpdate(**updates))
         except (customer_controller.CustomerNotFoundError, transaction_controller.TransactionNotFoundError):
@@ -216,7 +273,8 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         from app.schemas.transaction import TransactionOut
 
         result = {"status": "updated", **TransactionOut.model_validate(tx).model_dump(mode="json")}
-        log("update_transaction", {"customer_id": customer_id, "transaction_id": transaction_id, **updates}, result)
+        loggable_updates = {k: ([i.model_dump() for i in v] if k == "items" else v) for k, v in updates.items()}
+        log("update_transaction", {"customer_id": customer_id, "transaction_id": transaction_id, **loggable_updates}, result)
         return result
 
     @tool
@@ -228,10 +286,13 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         generators"). order_date defaults to today if blank. delivery_date is
         the expected future delivery date (YYYY-MM-DD), leave blank if
         unknown. amount is the order's total value if known (leave as -1 if
-        unknown)."""
+        unknown). currency is an ISO code like NGN, USD, EUR; if left blank
+        and amount is known, the organization's configured default currency
+        is used."""
         import datetime as _dt
 
         order_items = [OrderItem(name=part.strip()) for part in items.split(",") if part.strip()]
+        resolved_currency = _clean(currency.upper()) if currency.strip() else (default_currency() or None if amount >= 0 else None)
         try:
             order = order_controller.create_order(
                 db, org_id, UUID(customer_id),
@@ -240,7 +301,7 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
                     delivery_date=_clean(delivery_date),
                     items=order_items,
                     amount=amount if amount >= 0 else None,
-                    currency=_clean(currency.upper() if currency else ""),
+                    currency=resolved_currency,
                 ),
             )
         except customer_controller.CustomerNotFoundError:

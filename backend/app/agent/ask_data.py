@@ -47,8 +47,14 @@ def _customer_line(index: int, c: Customer) -> str:
     if c.extra:
         parts.append("other: " + ", ".join(f"{k}={v}" for k, v in c.extra.items()))
     if c.transactions:
-        total = sum(float(t.amount or 0) * float(t.qty or 1) for t in c.transactions)
-        txs = "; ".join(f"{t.date} {t.item} x{t.qty} @{t.amount}{(' ' + t.currency) if t.currency else ''}" for t in c.transactions)
+        total = sum(float(t.amount or 0) for t in c.transactions)
+
+        def _tx_line(t) -> str:
+            items_str = ", ".join(f"{li['item']} x{li['qty']}" for li in (t.items or []))
+            currency_str = f" {t.currency}" if t.currency else ""
+            return f"{t.date} {items_str} = {t.amount}{currency_str}"
+
+        txs = "; ".join(_tx_line(t) for t in c.transactions)
         parts.append(f"transactions ({len(c.transactions)}, total {total:,.2f}): {txs}")
     else:
         parts.append("no transactions")

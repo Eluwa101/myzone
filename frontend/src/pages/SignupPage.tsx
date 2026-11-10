@@ -2,11 +2,12 @@ import { useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import AuthBrand from "../components/AuthBrand";
 import ErrorText from "../components/ErrorText";
+import GoogleSignInButton from "../components/GoogleSignInButton";
 import { errorMessage } from "../api/errorMessage";
 import { useAuth } from "../context/AuthContext";
 
 export default function SignupPage() {
-  const { user, signup } = useAuth();
+  const { user, signup, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [orgName, setOrgName] = useState("");
   const [email, setEmail] = useState("");
@@ -14,9 +15,7 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Captured once at mount: redirect only if the user was already logged in
-  // when they landed here. signup() sets `user` before navigate("/onboarding")
-  // runs below, and re-checking `user` on every render would send them to
-  // /customers first, racing out the onboarding redirect.
+  // when they landed here.
   const alreadyLoggedIn = useRef(!!user);
 
   if (alreadyLoggedIn.current) return <Navigate to="/customers" replace />;
@@ -26,12 +25,22 @@ export default function SignupPage() {
     setError(null);
     setBusy(true);
     try {
-      await signup(orgName, email, password);
-      navigate("/onboarding");
+      const result = await signup(orgName, email, password);
+      navigate(`/check-email?email=${encodeURIComponent(result.email)}`);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function onGoogle(credential: string) {
+    setError(null);
+    try {
+      const { isNewUser } = await loginWithGoogle(credential);
+      navigate(isNewUser ? "/onboarding" : "/customers");
+    } catch (err) {
+      setError(errorMessage(err));
     }
   }
 
@@ -52,6 +61,7 @@ export default function SignupPage() {
             {busy ? "Creating account…" : "Create account"}
           </button>
         </form>
+        <GoogleSignInButton onCredential={onGoogle} text="signup_with" />
         <p className="muted">
           Already have an account? <Link to="/login">Log in</Link>
         </p>

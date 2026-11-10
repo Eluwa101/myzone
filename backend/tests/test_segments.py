@@ -183,7 +183,7 @@ def test_segment_members_between_on_total_spent(client, auth_headers):
     for cust, amount in [(low, 1000), (mid, 5000), (high, 50000)]:
         client.post(
             f"/api/customers/{cust['id']}/transactions",
-            json={"date": "2026-11-01", "item": "Item", "amount": amount, "currency": "NGN"},
+            json={"date": "2026-11-01", "items": [{"item": "Item", "amount": amount}], "currency": "NGN"},
             headers=auth_headers,
         )
 
@@ -199,12 +199,12 @@ def test_segment_members_transaction_count_greater_than(client, auth_headers):
     for i in range(3):
         client.post(
             f"/api/customers/{frequent['id']}/transactions",
-            json={"date": "2026-11-01", "item": "Item", "amount": 1000, "currency": "NGN"},
+            json={"date": "2026-11-01", "items": [{"item": "Item", "amount": 1000}], "currency": "NGN"},
             headers=auth_headers,
         )
     client.post(
         f"/api/customers/{rare['id']}/transactions",
-        json={"date": "2026-11-01", "item": "Item", "amount": 1000, "currency": "NGN"},
+        json={"date": "2026-11-01", "items": [{"item": "Item", "amount": 1000}], "currency": "NGN"},
         headers=auth_headers,
     )
 
@@ -219,12 +219,12 @@ def test_segment_members_last_purchase_within_days(client, auth_headers):
     stale = _create_customer(client, auth_headers, name="Bo Chen")
     client.post(
         f"/api/customers/{recent['id']}/transactions",
-        json={"date": "2026-11-01", "item": "Rice", "amount": 1000, "currency": "NGN"},
+        json={"date": "2026-11-01", "items": [{"item": "Rice", "amount": 1000}], "currency": "NGN"},
         headers=auth_headers,
     )
     client.post(
         f"/api/customers/{stale['id']}/transactions",
-        json={"date": "2026-01-01", "item": "Rice", "amount": 1000, "currency": "NGN"},
+        json={"date": "2026-01-01", "items": [{"item": "Rice", "amount": 1000}], "currency": "NGN"},
         headers=auth_headers,
     )
 
@@ -239,7 +239,7 @@ def test_segment_members_last_purchase_over_days_includes_never_purchased(client
     recent_buyer = _create_customer(client, auth_headers, name="Bo Chen")
     client.post(
         f"/api/customers/{recent_buyer['id']}/transactions",
-        json={"date": "2026-11-01", "item": "Rice", "amount": 1000, "currency": "NGN"},
+        json={"date": "2026-11-01", "items": [{"item": "Rice", "amount": 1000}], "currency": "NGN"},
         headers=auth_headers,
     )
 
@@ -309,7 +309,7 @@ def test_segment_members_nested_group_combination(client, auth_headers):
     for cust, amount in [(big_generator_buyer, 5000), (small_generator_buyer, 100), (irrelevant, 5000)]:
         client.post(
             f"/api/customers/{cust['id']}/transactions",
-            json={"date": "2026-11-01", "item": "Item", "amount": amount, "currency": "NGN"},
+            json={"date": "2026-11-01", "items": [{"item": "Item", "amount": amount}], "currency": "NGN"},
             headers=auth_headers,
         )
 

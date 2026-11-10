@@ -7,7 +7,10 @@ interface AuthState {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (orgName: string, email: string, password: string) => Promise<void>;
+  signup: (orgName: string, email: string, password: string) => Promise<{ status: string; email: string }>;
+  loginWithGoogle: (credential: string) => Promise<{ isNewUser: boolean }>;
+  verifyEmail: (token: string) => Promise<void>;
+  resetPassword: (token: string, newPassword: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -43,7 +46,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signup(orgName: string, email: string, password: string) {
-    await authApi.signup(orgName, email, password);
+    // signup no longer logs the caller in directly - the account must be
+    // verified by email first (see routes /verify-email, /check-email)
+    return authApi.signup(orgName, email, password);
+  }
+
+  async function loginWithGoogle(credential: string) {
+    const result = await authApi.loginWithGoogle(credential);
+    await refresh();
+    return result;
+  }
+
+  async function verifyEmail(token: string) {
+    await authApi.verifyEmail(token);
+    await refresh();
+  }
+
+  async function resetPassword(token: string, newPassword: string) {
+    await authApi.resetPassword(token, newPassword);
     await refresh();
   }
 
@@ -52,7 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }
 
-  return <AuthContext.Provider value={{ user, loading, login, signup, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, loading, login, signup, loginWithGoogle, verifyEmail, resetPassword, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthState {

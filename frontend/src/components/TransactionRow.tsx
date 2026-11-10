@@ -5,9 +5,18 @@ import { errorMessage } from "../api/errorMessage";
 import type { Transaction } from "../api/types";
 import CurrencySelect from "./CurrencySelect";
 import ErrorText from "./ErrorText";
+import TransactionLinesEditor, { type TransactionLine } from "./TransactionLinesEditor";
 
 function money(n: number): string {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function itemsToText(items: Transaction["items"]): string {
+  return items.map((i) => (i.qty && i.qty !== 1 ? `${i.item} x${i.qty}` : i.item)).join(", ");
+}
+
+function toLines(items: Transaction["items"]): TransactionLine[] {
+  return items.map((i) => ({ item: i.item, qty: String(i.qty), amount: String(i.amount) }));
 }
 
 export default function TransactionRow({
@@ -21,9 +30,7 @@ export default function TransactionRow({
 }) {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(transaction.date);
-  const [item, setItem] = useState(transaction.item);
-  const [qty, setQty] = useState(String(transaction.qty));
-  const [amount, setAmount] = useState(String(transaction.amount));
+  const [lines, setLines] = useState<TransactionLine[]>(toLines(transaction.items));
   const [currency, setCurrency] = useState(transaction.currency);
   const [error, setError] = useState<string | null>(null);
   const [armedDelete, setArmedDelete] = useState(false);
@@ -31,9 +38,7 @@ export default function TransactionRow({
 
   function startEdit() {
     setDate(transaction.date);
-    setItem(transaction.item);
-    setQty(String(transaction.qty));
-    setAmount(String(transaction.amount));
+    setLines(toLines(transaction.items));
     setCurrency(transaction.currency);
     setArmedDelete(false);
     setError(null);
@@ -41,14 +46,17 @@ export default function TransactionRow({
   }
 
   async function save() {
+    const cleanLines = lines.filter((l) => l.item.trim());
+    if (cleanLines.length === 0) {
+      setError("Add at least one item.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       await updateTransaction(customerId, transaction.id, {
         date,
-        item,
-        qty: Number(qty) || 0,
-        amount: Number(amount) || 0,
+        items: cleanLines.map((l) => ({ item: l.item.trim(), qty: Number(l.qty) || 1, amount: Number(l.amount) || 0 })),
         currency,
       });
       setOpen(false);
@@ -79,9 +87,9 @@ export default function TransactionRow({
     return (
       <button type="button" className="info-row" onClick={startEdit}>
         <div className="info-row-text">
-          <div className="info-row-label">{transaction.item || "(no item)"}</div>
+          <div className="info-row-label">{itemsToText(transaction.items) || "(no items)"}</div>
           <div className="info-row-value muted">
-            {transaction.date} · qty {transaction.qty} · {transaction.currency} {money(transaction.amount)}
+            {transaction.date} · {transaction.currency} {money(transaction.amount)}
           </div>
         </div>
         <ChevronRight size={16} className="muted" />
@@ -97,22 +105,12 @@ export default function TransactionRow({
           <input id={`tx-date-${transaction.id}`} type="date" value={date} onChange={(e) => setDate(e.target.value)} autoFocus />
         </div>
         <div>
-          <label htmlFor={`tx-item-${transaction.id}`}>Item</label>
-          <input id={`tx-item-${transaction.id}`} value={item} onChange={(e) => setItem(e.target.value)} />
-        </div>
-        <div>
-          <label htmlFor={`tx-qty-${transaction.id}`}>Qty</label>
-          <input id={`tx-qty-${transaction.id}`} type="number" value={qty} onChange={(e) => setQty(e.target.value)} />
-        </div>
-        <div>
-          <label htmlFor={`tx-amount-${transaction.id}`}>Amount</label>
-          <input id={`tx-amount-${transaction.id}`} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
-        </div>
-        <div>
           <label htmlFor={`tx-currency-${transaction.id}`}>Currency</label>
           <CurrencySelect id={`tx-currency-${transaction.id}`} value={currency} onChange={setCurrency} />
         </div>
       </div>
+      <label>Items</label>
+      <TransactionLinesEditor lines={lines} onChange={setLines} />
       <ErrorText message={error} />
       <div className="row" style={{ marginTop: 10 }}>
         <button type="button" className="btn-primary" onClick={save} disabled={busy}>
