@@ -8,12 +8,15 @@ import {
   deleteCustomer,
   getCustomer,
   type CustomerInput,
+  type OrderInput,
+  type TransactionInput,
   updateCustomer,
 } from "../api/customers";
 import { getThreadMessages, listPending, sendChat } from "../api/agent";
 import { ApiError } from "../api/client";
 import { errorMessage } from "../api/errorMessage";
 import { listNotes } from "../api/notes";
+import { getDefaultCurrency } from "../api/settings";
 import type { Customer, CustomerStatus, Order, OrgNote, PendingAction } from "../api/types";
 import CurrencySelect from "../components/CurrencySelect";
 import ErrorText from "../components/ErrorText";
@@ -384,7 +387,11 @@ function TransactionsTab({
   const [lines, setLines] = useState<TransactionLine[]>([blankLine()]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const { pending, add: addPending } = usePendingSync(onChanged);
+  const { pending, add: addPending } = usePendingSync<TransactionInput>(onChanged);
+
+  useEffect(() => {
+    getDefaultCurrency().then((c) => setCurrency((cur) => cur || c));
+  }, []);
 
   async function onAdd(e: FormEvent) {
     e.preventDefault();
@@ -532,7 +539,11 @@ function OrdersTab({
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const { pending, add: addPending } = usePendingSync(onChanged);
+  const { pending, add: addPending } = usePendingSync<OrderInput>(onChanged);
+
+  useEffect(() => {
+    getDefaultCurrency().then((c) => setCurrency((cur) => cur || c));
+  }, []);
 
   function updateItems(next: Order["items"]) {
     setItems(next);

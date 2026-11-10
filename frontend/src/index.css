@@ -374,6 +374,7 @@ button:disabled {
 }
 
 .btn-primary:hover {
+  background: var(--gradient-accent);
   filter: brightness(1.08);
   border-color: transparent;
 }
@@ -1140,6 +1141,7 @@ a.row-between:hover {
 }
 
 .fab:hover {
+  background: var(--gradient-accent);
   filter: brightness(1.08);
   transform: scale(1.05);
 }

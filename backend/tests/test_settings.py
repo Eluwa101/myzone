@@ -9,6 +9,7 @@ EMPTY_SETTINGS = {
     "brand_color": None,
     "manager_name": None,
     "staff_names": None,
+    "default_currency": None,
 }
 
 
@@ -71,3 +72,12 @@ def test_update_org_profile_fields(client, auth_headers):
         "manager_name": "Ada",
         "staff_names": ["Jane", "Kemi"],
     }
+
+
+def test_update_default_currency(client, auth_headers):
+    resp = client.put("/api/settings", json={"default_currency": "NGN"}, headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["default_currency"] == "NGN"
+
+    again = client.get("/api/settings", headers=auth_headers).json()
+    assert again["default_currency"] == "NGN"

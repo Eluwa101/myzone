@@ -1,6 +1,7 @@
 import { Building2, Copy, QrCode } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
+import CurrencySelect from "../components/CurrencySelect";
 import ThemeToggle from "../components/ThemeToggle";
 import { errorMessage } from "../api/errorMessage";
 import { getSettings, updateSettings } from "../api/settings";
@@ -28,6 +29,7 @@ export default function SettingsPage() {
   const [brandColor, setBrandColor] = useState("#4f46e5");
   const [managerName, setManagerName] = useState("");
   const [staffNames, setStaffNames] = useState("");
+  const [defaultCurrency, setDefaultCurrency] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
 
@@ -43,6 +45,7 @@ export default function SettingsPage() {
       setBrandColor(s.brand_color ?? "#4f46e5");
       setManagerName(s.manager_name ?? "");
       setStaffNames((s.staff_names ?? []).join("\n"));
+      setDefaultCurrency(s.default_currency ?? "");
       if (s.whatsapp_number) {
         QRCode.toDataURL(waLink(s.whatsapp_number, s.qr_message ?? DEFAULT_MESSAGE), { width: 220 }).then(setQrDataUrl);
       }
@@ -84,6 +87,7 @@ export default function SettingsPage() {
           .split("\n")
           .map((n) => n.trim())
           .filter(Boolean),
+        default_currency: defaultCurrency || null,
       });
       setProfileStatus("Saved.");
     } catch (err) {
@@ -130,6 +134,9 @@ export default function SettingsPage() {
         <input id="prof-phone" value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" />
         <label htmlFor="prof-address">Business address</label>
         <input id="prof-address" value={address} onChange={(e) => setAddress(e.target.value)} />
+        <label htmlFor="prof-currency">Default currency</label>
+        <CurrencySelect id="prof-currency" value={defaultCurrency} onChange={setDefaultCurrency} />
+        <p className="muted small">Used to pre-fill the currency when adding new orders and transactions.</p>
         <label htmlFor="prof-color">Brand color</label>
         <div className="row" style={{ alignItems: "center" }}>
           <input id="prof-color" type="color" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} style={{ width: 48, padding: 2 }} />

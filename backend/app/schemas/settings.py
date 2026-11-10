@@ -12,6 +12,7 @@ class SettingsUpdate(BaseModel):
     brand_color: str | None = None
     manager_name: str | None = None
     staff_names: list[str] | None = None
+    default_currency: str | None = None
 
 
 class SettingsOut(BaseModel):
@@ -25,5 +26,6 @@ class SettingsOut(BaseModel):
     brand_color: str | None = None
     manager_name: str | None = None
     staff_names: list[str] | None = None
+    default_currency: str | None = None
 
     model_config = {"from_attributes": True}

@@ -20,5 +20,6 @@ class OrgSettings(Base):
     brand_color: Mapped[str | None] = mapped_column(String(20), nullable=True)
     manager_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     staff_names: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    default_currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
 
     organization = relationship("Organization", back_populates="settings")
