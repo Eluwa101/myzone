@@ -1,4 +1,4 @@
-import { Building2, ClipboardList, Copy, Download, QrCode, StickyNote, Upload, Users } from "lucide-react";
+import { Building2, ClipboardList, Copy, Download, Plug, QrCode, StickyNote, Upload, Users } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -214,6 +214,19 @@ export default function SettingsPage() {
         </p>
         <Link to="/forms" className="btn-primary" style={{ display: "inline-flex" }}>
           Open forms
+        </Link>
+      </div>
+
+      <div className="card">
+        <h3>
+          <Plug size={15} className="h3-icon" /> Webhooks
+        </h3>
+        <p className="muted small">
+          Get notified in real time when customers, orders, transactions, or notes change - this app POSTs a signed event
+          to a URL you control.
+        </p>
+        <Link to="/webhooks" className="btn-primary" style={{ display: "inline-flex" }}>
+          Open webhooks
         </Link>
       </div>
 

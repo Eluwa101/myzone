@@ -12,6 +12,10 @@ def generate_public_token() -> str:
     return secrets.token_urlsafe(16)
 
 
+def generate_webhook_secret() -> str:
+    return secrets.token_hex(32)
+
+
 class CustomForm(Base):
     __tablename__ = "custom_forms"
 
@@ -22,6 +26,10 @@ class CustomForm(Base):
     public_token: Mapped[str] = mapped_column(String(64), unique=True, index=True, default=generate_public_token)
     fields: Mapped[list] = mapped_column(JSON, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # When set, /submit requires a valid X-Signature header (HMAC-SHA256 of
+    # the raw request body with this secret) - opt-in, since many no-code
+    # tools (Zapier, Make) can't easily sign requests.
+    webhook_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

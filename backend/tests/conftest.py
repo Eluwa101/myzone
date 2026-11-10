@@ -4,6 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.controllers import webhook_controller
 from app.core.database import Base, get_db
 from app.main import app
 
@@ -13,6 +14,13 @@ engine = create_engine(
     poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# webhook_controller._deliver runs on a background thread and opens its own
+# session directly (it can't use the get_db dependency override, since
+# nothing injects it there) - point it at the same test engine, or a
+# webhook test would silently try to write delivery rows to whatever real
+# DATABASE_URL happens to be configured on the machine running the tests.
+webhook_controller.SessionLocal = TestingSessionLocal
 
 
 @pytest.fixture(autouse=True)

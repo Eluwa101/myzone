@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session, joinedload
 
+from app.controllers import webhook_controller
 from app.models.customer import Customer
 from app.models.org_note import OrgNote
 from app.schemas.note import NoteCreate, NoteUpdate
@@ -35,6 +36,7 @@ def create_note(
     db.add(note)
     db.commit()
     db.refresh(note)
+    webhook_controller.dispatch_event(db, org_id, "note.created", webhook_controller.note_payload(note))
     return note
 
 
@@ -67,10 +69,13 @@ def update_note(db: Session, org_id: UUID, note_id: UUID, data: NoteUpdate) -> O
         note.customers = _resolve_customers(db, org_id, data.customer_ids)
     db.commit()
     db.refresh(note)
+    webhook_controller.dispatch_event(db, org_id, "note.updated", webhook_controller.note_payload(note))
     return note
 
 
 def delete_note(db: Session, org_id: UUID, note_id: UUID) -> None:
     note = _get_note(db, org_id, note_id)
+    payload = webhook_controller.note_payload(note)
     db.delete(note)
     db.commit()
+    webhook_controller.dispatch_event(db, org_id, "note.deleted", payload)

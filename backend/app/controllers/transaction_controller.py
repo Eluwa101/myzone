@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.controllers import webhook_controller
 from app.controllers.customer_controller import get_customer, recompute_derived_fields
 from app.models.transaction import Transaction
 from app.schemas.transaction import TransactionCreate, TransactionUpdate
@@ -18,6 +19,7 @@ def add_transaction(db: Session, org_id: UUID, customer_id: UUID, data: Transact
     recompute_derived_fields(customer)
     db.commit()
     db.refresh(tx)
+    webhook_controller.dispatch_event(db, org_id, "transaction.created", webhook_controller.transaction_payload(tx))
     return tx
 
 
@@ -37,13 +39,16 @@ def update_transaction(db: Session, org_id: UUID, customer_id: UUID, transaction
     recompute_derived_fields(customer)
     db.commit()
     db.refresh(tx)
+    webhook_controller.dispatch_event(db, org_id, "transaction.updated", webhook_controller.transaction_payload(tx))
     return tx
 
 
 def delete_transaction(db: Session, org_id: UUID, customer_id: UUID, transaction_id: UUID) -> None:
     tx = _get_transaction(db, org_id, customer_id, transaction_id)
+    payload = webhook_controller.transaction_payload(tx)
     db.delete(tx)
     db.flush()
     customer = get_customer(db, org_id, customer_id)
     recompute_derived_fields(customer)
     db.commit()
+    webhook_controller.dispatch_event(db, org_id, "transaction.deleted", payload)

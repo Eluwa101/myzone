@@ -1,10 +1,12 @@
 import datetime
+import hashlib
+import hmac
 from uuid import UUID
 
 from sqlalchemy.orm import Session, joinedload
 
 from app.controllers import customer_controller, order_controller, transaction_controller
-from app.models.custom_form import CustomForm, FormSubmission, generate_public_token
+from app.models.custom_form import CustomForm, FormSubmission, generate_public_token, generate_webhook_secret
 from app.models.customer import Customer
 from app.schemas.customer import CustomerCreate
 from app.schemas.form import CUSTOMER_FIELD_KEYS, ORDER_FIELD_KEYS, TRANSACTION_FIELD_KEYS, FormCreate, FormUpdate
@@ -19,6 +21,10 @@ class FormNotFoundError(Exception):
 class MissingRequiredFieldsError(Exception):
     def __init__(self, missing: list[str]):
         self.missing = missing
+
+
+class InvalidSignatureError(Exception):
+    pass
 
 
 def create_form(db: Session, org_id: UUID, data: FormCreate) -> CustomForm:
@@ -50,6 +56,10 @@ def update_form(db: Session, org_id: UUID, form_id: UUID, data: FormUpdate) -> C
         form.is_active = data.is_active
     if data.regenerate_token:
         form.public_token = generate_public_token()
+    if data.enable_signing:
+        form.webhook_secret = generate_webhook_secret()
+    elif data.disable_signing:
+        form.webhook_secret = None
     db.commit()
     db.refresh(form)
     return form
@@ -158,8 +168,15 @@ def _log_submission_order(db: Session, org_id: UUID, customer_id: UUID, order_fi
     return True
 
 
-def submit_public_form(db: Session, token: str, payload: dict[str, str]) -> tuple[FormSubmission, bool, bool, bool]:
+def submit_public_form(
+    db: Session, token: str, payload: dict, raw_body: bytes = b"", signature: str | None = None
+) -> tuple[FormSubmission, bool, bool, bool]:
     form = get_public_form(db, token)
+
+    if form.webhook_secret:
+        expected = hmac.new(form.webhook_secret.encode(), raw_body, hashlib.sha256).hexdigest()
+        if not signature or not hmac.compare_digest(expected, signature):
+            raise InvalidSignatureError()
 
     missing = [f["label"] for f in form.fields if f.get("required") and not str(payload.get(f["key"], "")).strip()]
     if missing:

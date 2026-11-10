@@ -12,6 +12,7 @@ from app.models.pending_action import PendingAction
 from app.models.agent_action import AgentAction
 from app.models.chat_thread import ChatThread
 from app.models.chat_message import ChatMessage
+from app.models.webhook import WebhookSubscription, WebhookDelivery
 
 __all__ = [
     "Organization",
@@ -30,4 +31,6 @@ __all__ = [
     "AgentAction",
     "ChatThread",
     "ChatMessage",
+    "WebhookSubscription",
+    "WebhookDelivery",
 ]

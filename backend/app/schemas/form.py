@@ -63,6 +63,8 @@ class FormUpdate(BaseModel):
     fields: list[FormFieldDef] | None = None
     is_active: bool | None = None
     regenerate_token: bool = False
+    enable_signing: bool = False
+    disable_signing: bool = False
 
     @field_validator("fields")
     @classmethod
@@ -76,6 +78,7 @@ class FormOut(BaseModel):
     public_token: str
     fields: list[FormFieldDef]
     is_active: bool
+    webhook_secret: str | None
     created_at: datetime.datetime
     updated_at: datetime.datetime
 

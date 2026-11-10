@@ -1,7 +1,8 @@
-import { Check, Copy, ExternalLink, Package, QrCode, ShoppingBag, Trash2, User, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Copy, ExternalLink, Package, QrCode, ShoppingBag, Trash2, User, Webhook, X } from "lucide-react";
 import QRCodeLib from "qrcode";
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import { BASE_URL } from "../api/client";
 import { createForm, deleteForm, listForms, listSubmissions, updateForm } from "../api/forms";
 import { errorMessage } from "../api/errorMessage";
 import type { CustomForm, FormFieldCategory, FormFieldDef, FormFieldType, FormSubmission } from "../api/types";
@@ -75,6 +76,10 @@ function templateFields(template: FormTemplate): FormFieldDef[] {
 
 function publicFormUrl(token: string): string {
   return `${window.location.origin}/f/${token}`;
+}
+
+function webhookSubmitUrl(token: string): string {
+  return `${BASE_URL}/api/public/forms/${token}/submit`;
 }
 
 function slugify(label: string): string {
@@ -262,6 +267,112 @@ function FormCard({ form, onChanged }: { form: CustomForm; onChanged: () => void
           <Trash2 size={15} /> {armedDelete ? "Confirm?" : "Delete"}
         </button>
       </div>
+
+      <WebhookPanel form={form} onChanged={onChanged} />
+    </div>
+  );
+}
+
+function WebhookPanel({ form, onChanged }: { form: CustomForm; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const submitUrl = webhookSubmitUrl(form.public_token);
+
+  async function copy(text: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyStatus(`${label} copied.`);
+    } catch {
+      setCopyStatus("Could not copy. Select the text.");
+    }
+  }
+
+  async function toggleSigning() {
+    setBusy(true);
+    setError(null);
+    try {
+      if (form.webhook_secret) await updateForm(form.id, { disable_signing: true });
+      else await updateForm(form.id, { enable_signing: true });
+      onChanged();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function regenerateSecret() {
+    setBusy(true);
+    setError(null);
+    try {
+      await updateForm(form.id, { enable_signing: true });
+      onChanged();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const curl = form.webhook_secret
+    ? `BODY='{"first_name":"Ada","phone":"08012345678"}'\nSIG=$(echo -n "$BODY" | openssl dgst -sha256 -hmac "${form.webhook_secret}" | sed 's/^.* //')\ncurl -X POST ${submitUrl} \\\n  -H "Content-Type: application/json" \\\n  -H "X-Signature: $SIG" \\\n  -d "$BODY"`
+    : `curl -X POST ${submitUrl} \\\n  -H "Content-Type: application/json" \\\n  -d '{"first_name":"Ada","phone":"08012345678"}'`;
+
+  return (
+    <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+      <button type="button" className="btn-ghost" onClick={() => setOpen((v) => !v)}>
+        <Webhook size={14} /> Webhook / API details {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+      </button>
+      {open && (
+        <div style={{ marginTop: 8 }}>
+          <p className="muted small">
+            POST JSON matching this form's field keys to the URL below from Zapier, Make, or any other tool - it behaves
+            exactly like a submission, including creating or updating the matching customer record.
+          </p>
+          <label>Webhook URL (POST)</label>
+          <div className="row" style={{ alignItems: "center" }}>
+            <code className="small" style={{ wordBreak: "break-all" }}>
+              {submitUrl}
+            </code>
+            <button type="button" onClick={() => copy(submitUrl, "URL")}>
+              <Copy size={13} />
+            </button>
+          </div>
+
+          <div className="row" style={{ marginTop: 10, alignItems: "center" }}>
+            <label className="row" style={{ gap: 6 }}>
+              <input type="checkbox" checked={!!form.webhook_secret} onChange={toggleSigning} disabled={busy} />
+              Require signed requests (X-Signature header)
+            </label>
+          </div>
+          {form.webhook_secret && (
+            <>
+              <label>Signing secret</label>
+              <div className="row" style={{ alignItems: "center" }}>
+                <code className="small" style={{ wordBreak: "break-all" }}>
+                  {form.webhook_secret}
+                </code>
+                <button type="button" onClick={() => copy(form.webhook_secret!, "Secret")}>
+                  <Copy size={13} />
+                </button>
+              </div>
+              <button type="button" onClick={regenerateSecret} disabled={busy} style={{ marginTop: 6 }}>
+                New secret
+              </button>
+            </>
+          )}
+
+          <label style={{ marginTop: 10 }}>Example</label>
+          <pre className="small" style={{ whiteSpace: "pre-wrap", wordBreak: "break-all", background: "var(--surface-hover)", padding: 8, borderRadius: 6 }}>
+            {curl}
+          </pre>
+
+          {copyStatus && <p className="muted small">{copyStatus}</p>}
+          <ErrorText message={error} />
+        </div>
+      )}
     </div>
   );
 }
@@ -300,7 +411,7 @@ function SubmissionsList({ formId, fields }: { formId: string; fields: FormField
                   {categoryByKey.get(k) === "order" && <Package size={11} className="h3-icon" />}
                   {labelByKey.get(k) ?? k}
                 </span>
-                <span className="small">{v}</span>
+                <span className="small">{String(v)}</span>
               </div>
             ))}
           </div>

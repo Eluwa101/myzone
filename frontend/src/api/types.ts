@@ -129,6 +129,7 @@ export interface CustomForm {
   public_token: string;
   fields: FormFieldDef[];
   is_active: boolean;
+  webhook_secret: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -142,7 +143,27 @@ export interface FormSubmission {
   id: string;
   customer_id: string | null;
   customer_name: string | null;
-  raw_payload: Record<string, string>;
+  raw_payload: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface WebhookSubscription {
+  id: string;
+  target_url: string;
+  secret: string;
+  event_types: string[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  event_type: string;
+  status: "success" | "failed";
+  response_code: number | null;
+  attempt_count: number;
+  payload: Record<string, unknown>;
   created_at: string;
 }
 

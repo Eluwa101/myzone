@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.controllers import webhook_controller
 from app.controllers.customer_controller import get_customer
 from app.models.order import Order
 from app.schemas.order import OrderCreate, OrderUpdate
@@ -28,6 +29,7 @@ def create_order(db: Session, org_id: UUID, customer_id: UUID, data: OrderCreate
     db.add(order)
     db.commit()
     db.refresh(order)
+    webhook_controller.dispatch_event(db, org_id, "order.created", webhook_controller.order_payload(order))
     return order
 
 
@@ -62,10 +64,13 @@ def update_order(db: Session, org_id: UUID, customer_id: UUID, order_id: UUID, d
         setattr(order, field, value)
     db.commit()
     db.refresh(order)
+    webhook_controller.dispatch_event(db, org_id, "order.updated", webhook_controller.order_payload(order))
     return order
 
 
 def delete_order(db: Session, org_id: UUID, customer_id: UUID, order_id: UUID) -> None:
     order = _get_order(db, org_id, customer_id, order_id)
+    payload = webhook_controller.order_payload(order)
     db.delete(order)
     db.commit()
+    webhook_controller.dispatch_event(db, org_id, "order.deleted", payload)

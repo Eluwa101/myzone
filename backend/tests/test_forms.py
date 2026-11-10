@@ -182,3 +182,91 @@ def test_submission_customer_name_shown_in_submissions_list(client, auth_headers
     client.post(f"/api/public/forms/{form['public_token']}/submit", json={"first_name": "Ada", "last_name": "Obi"})
     submissions = client.get(f"/api/forms/{form['id']}/submissions", headers=auth_headers).json()
     assert submissions[0]["customer_name"] == "Ada Obi"
+
+
+# --- incoming webhook behavior: arbitrary JSON + optional signing ----------
+
+
+def test_submission_accepts_non_string_json_values(client, auth_headers):
+    """A real webhook sender (e.g. Zapier) sends native JSON types, not
+    everything pre-stringified - qty as a number, not "2"."""
+    form = _create_form(client, auth_headers, fields=[*CORE_CONTACT_FIELDS, TX_ITEM_FIELD, TX_AMOUNT_FIELD])
+    resp = client.post(
+        f"/api/public/forms/{form['public_token']}/submit",
+        json={"first_name": "Ada", "last_name": "Obi", "tx_item": "Rice", "tx_amount": 500},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["transaction_logged"] is True
+
+
+def test_submission_rejects_non_object_body(client, auth_headers):
+    form = _create_form(client, auth_headers)
+    resp = client.post(f"/api/public/forms/{form['public_token']}/submit", json=["not", "an", "object"])
+    assert resp.status_code == 400
+
+
+def test_enable_signing_requires_valid_signature(client, auth_headers):
+    import hashlib
+    import hmac
+    import json
+
+    form = _create_form(client, auth_headers)
+    form = client.patch(f"/api/forms/{form['id']}", json={"enable_signing": True}, headers=auth_headers).json()
+    assert form["webhook_secret"]
+
+    body = {"first_name": "Ada", "last_name": "Obi"}
+    raw = json.dumps(body).encode()
+
+    # missing signature
+    resp = client.post(f"/api/public/forms/{form['public_token']}/submit", content=raw, headers={"Content-Type": "application/json"})
+    assert resp.status_code == 401
+
+    # wrong signature
+    resp = client.post(
+        f"/api/public/forms/{form['public_token']}/submit",
+        content=raw,
+        headers={"Content-Type": "application/json", "X-Signature": "deadbeef"},
+    )
+    assert resp.status_code == 401
+
+    # correct signature
+    sig = hmac.new(form["webhook_secret"].encode(), raw, hashlib.sha256).hexdigest()
+    resp = client.post(
+        f"/api/public/forms/{form['public_token']}/submit",
+        content=raw,
+        headers={"Content-Type": "application/json", "X-Signature": sig},
+    )
+    assert resp.status_code == 200
+
+
+def test_disable_signing_removes_secret_and_requirement(client, auth_headers):
+    form = _create_form(client, auth_headers)
+    form = client.patch(f"/api/forms/{form['id']}", json={"enable_signing": True}, headers=auth_headers).json()
+    form = client.patch(f"/api/forms/{form['id']}", json={"disable_signing": True}, headers=auth_headers).json()
+    assert form["webhook_secret"] is None
+
+    resp = client.post(f"/api/public/forms/{form['public_token']}/submit", json={"first_name": "Ada", "last_name": "Obi"})
+    assert resp.status_code == 200
+
+
+def test_regenerate_signing_secret_invalidates_old_signature(client, auth_headers):
+    import hashlib
+    import hmac
+    import json
+
+    form = _create_form(client, auth_headers)
+    form = client.patch(f"/api/forms/{form['id']}", json={"enable_signing": True}, headers=auth_headers).json()
+    old_secret = form["webhook_secret"]
+
+    form = client.patch(f"/api/forms/{form['id']}", json={"enable_signing": True}, headers=auth_headers).json()
+    assert form["webhook_secret"] != old_secret
+
+    body = {"first_name": "Ada", "last_name": "Obi"}
+    raw = json.dumps(body).encode()
+    stale_sig = hmac.new(old_secret.encode(), raw, hashlib.sha256).hexdigest()
+    resp = client.post(
+        f"/api/public/forms/{form['public_token']}/submit",
+        content=raw,
+        headers={"Content-Type": "application/json", "X-Signature": stale_sig},
+    )
+    assert resp.status_code == 401

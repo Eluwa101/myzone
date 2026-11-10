@@ -18,7 +18,10 @@ export function getForm(id: string): Promise<CustomForm> {
   return api.get<CustomForm>(`/api/forms/${id}`);
 }
 
-export function updateForm(id: string, data: Partial<FormInput> & { is_active?: boolean; regenerate_token?: boolean }): Promise<CustomForm> {
+export function updateForm(
+  id: string,
+  data: Partial<FormInput> & { is_active?: boolean; regenerate_token?: boolean; enable_signing?: boolean; disable_signing?: boolean }
+): Promise<CustomForm> {
   return api.patch<CustomForm>(`/api/forms/${id}`, data);
 }
 
@@ -34,6 +37,6 @@ export function getPublicForm(token: string): Promise<PublicForm> {
   return api.get<PublicForm>(`/api/public/forms/${token}`);
 }
 
-export function submitPublicForm(token: string, data: Record<string, string>): Promise<{ status: string; customer_created: boolean }> {
+export function submitPublicForm(token: string, data: Record<string, unknown>): Promise<{ status: string; customer_created: boolean }> {
   return api.post(`/api/public/forms/${token}/submit`, data);
 }

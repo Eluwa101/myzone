@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
+from app.controllers import webhook_controller
 from app.models.customer import Customer, CustomerStatus
 from app.models.transaction import Transaction
 from app.schemas.customer import CustomerCreate, CustomerUpdate, ImportResult
@@ -193,6 +194,7 @@ def create_customer(db: Session, org_id: UUID, data: CustomerCreate, force: bool
     db.add(customer)
     db.commit()
     db.refresh(customer)
+    webhook_controller.dispatch_event(db, org_id, "customer.created", webhook_controller.customer_payload(customer))
     return customer
 
 
@@ -211,13 +213,16 @@ def update_customer(db: Session, org_id: UUID, customer_id: UUID, data: Customer
     recompute_derived_fields(customer)
     db.commit()
     db.refresh(customer)
+    webhook_controller.dispatch_event(db, org_id, "customer.updated", webhook_controller.customer_payload(customer))
     return customer
 
 
 def delete_customer(db: Session, org_id: UUID, customer_id: UUID) -> None:
     customer = get_customer(db, org_id, customer_id)
+    payload = webhook_controller.customer_payload(customer)
     db.delete(customer)
     db.commit()
+    webhook_controller.dispatch_event(db, org_id, "customer.deleted", payload)
 
 
 def merge_customers(db: Session, org_id: UUID, keep_id: UUID, merge_id: UUID) -> Customer:

@@ -1,8 +1,14 @@
 """Unauthenticated endpoints, reachable by anyone holding a form's
 public_token - the hosted public form page, and any third-party
 integration (Zapier, a Google Form's Apps Script trigger, a plain curl/
-webhook) that wants to push data into this org's customer list directly."""
-from fastapi import APIRouter, Depends, HTTPException, status
+webhook) that wants to push data into this org's customer list directly.
+submit_form accepts arbitrary JSON (not just string fields) and, when the
+form has signing enabled, verifies an HMAC-SHA256 X-Signature header over
+the raw body - so this endpoint doubles as a real machine-to-machine
+incoming webhook, not just a human form target."""
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.controllers import form_controller
@@ -22,13 +28,26 @@ def get_public_form(token: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{token}/submit", response_model=FormSubmitResult)
-def submit_form(token: str, payload: dict[str, str], db: Session = Depends(get_db)):
+async def submit_form(token: str, request: Request, db: Session = Depends(get_db)):
     if not check_rate_limit(token):
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many submissions - please try again shortly.")
+
+    raw_body = await request.body()
     try:
-        _submission, created, tx_logged, order_logged = form_controller.submit_public_form(db, token, payload)
+        payload = json.loads(raw_body) if raw_body else {}
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON body.")
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payload must be a JSON object.")
+
+    try:
+        _submission, created, tx_logged, order_logged = form_controller.submit_public_form(
+            db, token, payload, raw_body, request.headers.get("x-signature")
+        )
     except form_controller.FormNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Form not found.")
+    except form_controller.InvalidSignatureError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing X-Signature header.")
     except form_controller.MissingRequiredFieldsError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Missing required field(s): {', '.join(e.missing)}")
     return FormSubmitResult(status="ok", customer_created=created, transaction_logged=tx_logged, order_logged=order_logged)

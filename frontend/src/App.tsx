@@ -17,6 +17,7 @@ import PublicFormPage from "./pages/PublicFormPage";
 import SegmentsPage from "./pages/SegmentsPage";
 import SettingsPage from "./pages/SettingsPage";
 import SignupPage from "./pages/SignupPage";
+import WebhooksPage from "./pages/WebhooksPage";
 
 export default function App() {
   return (
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="/notes" element={<NotesPage />} />
           <Route path="/forms" element={<FormsPage />} />
           <Route path="/segments" element={<SegmentsPage />} />
+          <Route path="/webhooks" element={<WebhooksPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
 
