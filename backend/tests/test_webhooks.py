@@ -56,6 +56,50 @@ def test_create_subscription_rejects_non_http_url(client, auth_headers):
     assert resp.status_code == 422
 
 
+@pytest.mark.parametrize(
+    "target_url",
+    [
+        "http://localhost/hook",
+        "http://localhost:8000/hook",
+        "http://127.0.0.1/hook",
+        "http://169.254.169.254/latest/meta-data",  # cloud metadata endpoint
+        "http://10.0.0.5/hook",
+        "http://192.168.1.1/hook",
+        "http://172.16.0.1/hook",
+        "http://0.0.0.0/hook",
+        "http://[::1]/hook",
+        "http://[fc00::1]/hook",
+        "http://[fe80::1]/hook",
+    ],
+)
+def test_create_subscription_rejects_private_and_loopback_urls(client, auth_headers, target_url):
+    resp = client.post(
+        "/api/webhooks",
+        json={"target_url": target_url, "event_types": ["customer.created"]},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_create_subscription_allows_public_hostname(client, auth_headers):
+    resp = client.post(
+        "/api/webhooks",
+        json={"target_url": "https://example.com/hook", "event_types": ["customer.created"]},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201
+
+
+def test_update_subscription_rejects_private_url(client, auth_headers):
+    sub = _create_subscription(client, auth_headers, ["customer.created"])
+    resp = client.patch(
+        f"/api/webhooks/{sub['id']}",
+        json={"target_url": "http://127.0.0.1/hook"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
 def test_customer_created_fires_matching_subscription(client, auth_headers, monkeypatch):
     calls = []
 

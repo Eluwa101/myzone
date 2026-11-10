@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.url_safety import ensure_public_target_url
+
 EVENT_TYPES = {
     "customer.created", "customer.updated", "customer.deleted",
     "order.created", "order.updated", "order.deleted",
@@ -23,8 +25,10 @@ def _check_event_types(value: list[str] | None) -> list[str] | None:
 
 
 def _check_url(value: str | None) -> str | None:
-    if value is not None and not value.startswith(("http://", "https://")):
-        raise ValueError("target_url must start with http:// or https://.")
+    if value is not None:
+        if not value.startswith(("http://", "https://")):
+            raise ValueError("target_url must start with http:// or https://.")
+        ensure_public_target_url(value)
     return value
 
 
