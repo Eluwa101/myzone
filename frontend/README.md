@@ -1,32 +1,44 @@
-# React + TypeScript + Vite
+# MyShop frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The MyShop frontend is the React web application for managing customer relationships and sales activity. It connects to the FastAPI backend and provides the CRM interface, dashboards, settings, and AI chat experiences.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Sign up and sign in to an organization workspace.
+- Browse and manage customer records, including duplicate review and merge flows.
+- View customer transactions and dashboard summaries.
+- Import and export customer data as CSV.
+- Use the general CRM assistant and the separate read-only Ask Your Data chat.
+- Reopen saved assistant conversations; use voice input in browsers that support the Web Speech API.
+- Configure WhatsApp contact details and generate a QR code.
 
-## React Compiler
+The frontend is built with React, TypeScript, and Vite. Markdown responses are rendered in chat. The general assistant can display image-enabled interactions supported by the backend and configured model provider.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Run locally
 
-## Expanding the Oxlint configuration
+Install dependencies and start the Vite development server:
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Open the local URL printed by Vite (typically <http://localhost:5173>). The backend must be running, and its `CORS_ORIGINS` environment variable must allow the frontend's origin. See the [root README](../README.md) for the full-stack setup and the [backend guide](../backend/README.md) for API configuration.
+
+## Checks
+
+Build the production frontend:
+
+```bash
+npm run build
+```
+
+Run the linter:
+
+```bash
+npm run lint
+```
+
+## Configuration and deployment
+
+The frontend is configured for deployment on Vercel; `vercel.json` provides the single-page-app rewrite. The API URL and deployment environment settings should match the backend deployment and its CORS configuration.
