@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.agent.checkpointer import close_checkpointer
 from app.core.config import settings as app_settings
+from app.core.idempotency import IdempotencyMiddleware
 from app.routes import agent, auth, customers, forms, notes, orders, public_forms, saved_widgets, segments, settings, summary, transactions, webhooks
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(IdempotencyMiddleware)
 
 app.include_router(auth.router)
 app.include_router(customers.router)

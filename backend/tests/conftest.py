@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.controllers import webhook_controller
+from app.core import idempotency
 from app.core.database import Base, get_db
 from app.main import app
 
@@ -21,6 +22,11 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 # webhook test would silently try to write delivery rows to whatever real
 # DATABASE_URL happens to be configured on the machine running the tests.
 webhook_controller.SessionLocal = TestingSessionLocal
+
+# IdempotencyMiddleware runs outside the request's dependency-injected
+# session too (middleware has no access to get_db overrides), so it needs
+# the same redirect to the test engine.
+idempotency.SessionLocal = TestingSessionLocal
 
 
 @pytest.fixture(autouse=True)

@@ -113,7 +113,7 @@ export default function FormsPage() {
 
   return (
     <div>
-      <TopBar title="Forms" backTo="/settings" />
+      <TopBar title="Forms" backTo="/data" />
       <p className="muted small page-note">
         Build a custom intake form, share its link with customers, or use the link's API directly from Zapier, a Google
         Form's Apps Script, or any other tool that can POST JSON. Every form always collects first name, last name, phone,

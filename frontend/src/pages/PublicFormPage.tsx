@@ -54,6 +54,7 @@ export default function PublicFormPage() {
           </>
         ) : (
           <form onSubmit={onSubmit}>
+            {form.business_name && <p className="muted small public-form-business">{form.business_name}</p>}
             <h1 style={{ fontSize: 19 }}>{form.name}</h1>
             {form.fields.map((f) => (
               <div key={f.key}>

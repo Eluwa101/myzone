@@ -1,4 +1,4 @@
-import { Plus, Search, UserRound } from "lucide-react";
+import { Search, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { listCustomers } from "../api/customers";
@@ -69,7 +69,12 @@ export default function CustomersPage() {
             <li key={c.id}>
               <Link to={`/customers/${c.id}`} className="card customer-card">
                 <div className="customer-card-top">
-                  <b>{c.name}</b>
+                  <b>
+                    {c.name}
+                    {c.orders.some((o) => !o.delivered) && (
+                      <span className="pending-order-dot" title="Has an order awaiting delivery" aria-label="Has an order awaiting delivery" />
+                    )}
+                  </b>
                   <StatusBadge status={c.status} />
                 </div>
                 <div className="muted small">
@@ -82,9 +87,6 @@ export default function CustomersPage() {
       )}
 
       {!loading && <p className="muted small page-note">{total} total</p>}
-      <Link to="/customers/new" className="fab" aria-label="New customer">
-        <Plus size={24} strokeWidth={2.5} />
-      </Link>
     </div>
   );
 }

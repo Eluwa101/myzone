@@ -58,6 +58,14 @@ async function fetchWithWakeRetry(input: string, init: RequestInit): Promise<Res
       setWakingUp(false);
       return res;
     } catch (err) {
+      // The browser itself reports no connection at all - this is not a
+      // slow/cold-starting server, so retrying on a timer for up to 40s
+      // would just stall the UI for that long before the offline queue
+      // (which needs this to throw) ever gets a chance to kick in.
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        setWakingUp(false);
+        throw err;
+      }
       if (attempt >= WAKE_RETRY_ATTEMPTS) {
         setWakingUp(false);
         throw err;

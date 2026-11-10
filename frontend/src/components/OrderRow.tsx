@@ -1,11 +1,14 @@
 import { Check, ChevronRight, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { deleteOrder, updateOrder } from "../api/customers";
 import { errorMessage } from "../api/errorMessage";
 import type { Order } from "../api/types";
+import { listOutbox, subscribeOutbox } from "../offline/outbox";
+import { withOfflineFallback } from "../offline/queue";
 import CurrencySelect from "./CurrencySelect";
 import ErrorText from "./ErrorText";
 import OrderItemsEditor, { hasPricedItems, itemsTotal } from "./OrderItemsEditor";
+import PendingSyncBadge from "./PendingSyncBadge";
 
 function itemsToText(items: Order["items"]): string {
   return items.map((i) => (i.qty && i.qty !== 1 ? `${i.name} x${i.qty}` : i.name)).join(", ");
@@ -31,6 +34,23 @@ export default function OrderRow({
   const [error, setError] = useState<string | null>(null);
   const [armedDelete, setArmedDelete] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [queuedOverride, setQueuedOverride] = useState<Partial<Order> | null>(null);
+  const [queuedId, setQueuedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!queuedId) return;
+    return subscribeOutbox(() => {
+      listOutbox().then((items) => {
+        if (!items.some((i) => i.id === queuedId)) {
+          setQueuedOverride(null);
+          setQueuedId(null);
+          onChanged();
+        }
+      });
+    });
+  }, [queuedId, onChanged]);
+
+  const displayOrder = queuedOverride ? { ...order, ...queuedOverride } : order;
 
   function startEdit() {
     setOrderDate(order.order_date);
@@ -54,7 +74,7 @@ export default function OrderRow({
     setBusy(true);
     setError(null);
     try {
-      await updateOrder(customerId, order.id, {
+      const body = {
         order_date: orderDate,
         delivery_date: deliveryDate || null,
         items: items.filter((it) => it.name.trim()),
@@ -62,9 +82,20 @@ export default function OrderRow({
         currency: currency || null,
         paid,
         delivered,
+      };
+      const result = await withOfflineFallback(() => updateOrder(customerId, order.id, body), {
+        method: "PATCH",
+        path: `/api/customers/${customerId}/orders/${order.id}`,
+        body,
+        label: `Update order: ${itemsToText(body.items)}`,
       });
+      if (result.queued) {
+        setQueuedOverride(body);
+        setQueuedId(result.id);
+      } else {
+        onChanged();
+      }
       setOpen(false);
-      onChanged();
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -91,12 +122,14 @@ export default function OrderRow({
     return (
       <button type="button" className="info-row" onClick={startEdit}>
         <div className="info-row-text">
-          <div className="info-row-label">{itemsToText(order.items) || "(no items)"}</div>
+          <div className="info-row-label">
+            {itemsToText(displayOrder.items) || "(no items)"} {queuedOverride && <PendingSyncBadge />}
+          </div>
           <div className="info-row-value muted">
-            Ordered {order.order_date}
-            {order.delivery_date ? ` · due ${order.delivery_date}` : ""}
+            Ordered {displayOrder.order_date}
+            {displayOrder.delivery_date ? ` · due ${displayOrder.delivery_date}` : ""}
             {" · "}
-            {order.paid ? "Paid" : "Unpaid"} · {order.delivered ? "Delivered" : "Pending delivery"}
+            {displayOrder.paid ? "Paid" : "Unpaid"} · {displayOrder.delivered ? "Delivered" : "Pending delivery"}
           </div>
         </div>
         <ChevronRight size={16} className="muted" />

@@ -43,7 +43,7 @@ export default function NotesPage() {
 
   return (
     <div>
-      <TopBar title="Notes" backTo="/settings" />
+      <TopBar title="Notes" backTo="/data" />
       <p className="muted small page-note">
         Define your own notes - creditors, VIPs, anything you want to flag - and attach them to one or many customers.
       </p>

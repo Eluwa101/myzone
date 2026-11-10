@@ -9,6 +9,7 @@ import DashboardPage from "./pages/DashboardPage";
 import DashboardInterestsPage from "./pages/DashboardInterestsPage";
 import DashboardMonthlyPage from "./pages/DashboardMonthlyPage";
 import DashboardTopCustomersPage from "./pages/DashboardTopCustomersPage";
+import DataPage from "./pages/DataPage";
 import FormsPage from "./pages/FormsPage";
 import LoginPage from "./pages/LoginPage";
 import NotesPage from "./pages/NotesPage";
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="/forms" element={<FormsPage />} />
           <Route path="/segments" element={<SegmentsPage />} />
           <Route path="/webhooks" element={<WebhooksPage />} />
+          <Route path="/data" element={<DataPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
 

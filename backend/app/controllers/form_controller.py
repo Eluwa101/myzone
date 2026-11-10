@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.controllers import customer_controller, order_controller, transaction_controller
 from app.models.custom_form import CustomForm, FormSubmission, generate_public_token, generate_webhook_secret
 from app.models.customer import Customer
+from app.models.organization import Organization
 from app.schemas.customer import CustomerCreate
 from app.schemas.form import CUSTOMER_FIELD_KEYS, ORDER_FIELD_KEYS, TRANSACTION_FIELD_KEYS, FormCreate, FormUpdate
 from app.schemas.order import OrderCreate, OrderItem
@@ -90,6 +91,18 @@ def get_public_form(db: Session, token: str) -> CustomForm:
     if not form or not form.is_active:
         raise FormNotFoundError()
     return form
+
+
+def get_public_form_business_name(db: Session, form: CustomForm) -> str | None:
+    """The business identity to show a customer filling out this form -
+    the org's own business-profile name if they've set one (Settings ->
+    Business profile), falling back to the org's account name."""
+    org = db.query(Organization).options(joinedload(Organization.settings)).filter(Organization.id == form.org_id).first()
+    if org is None:
+        return None
+    if org.settings and org.settings.biz_name:
+        return org.settings.biz_name
+    return org.name
 
 
 def _upsert_customer(db: Session, org_id: UUID, data: CustomerCreate) -> tuple[Customer, bool]:

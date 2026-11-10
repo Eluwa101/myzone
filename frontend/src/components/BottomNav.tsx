@@ -1,11 +1,11 @@
-import { LayoutDashboard, MessageCircle, Settings, Users } from "lucide-react";
+import { ArrowLeftRight, LayoutDashboard, MessageCircle, Users } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const ITEMS = [
   { to: "/customers", label: "Customers", Icon: Users },
   { to: "/chat", label: "Assistant", Icon: MessageCircle },
   { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
-  { to: "/settings", label: "Settings", Icon: Settings },
+  { to: "/data", label: "Data", Icon: ArrowLeftRight },
 ];
 
 export default function BottomNav() {

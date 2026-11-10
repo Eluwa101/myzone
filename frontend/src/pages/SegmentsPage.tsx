@@ -54,7 +54,7 @@ export default function SegmentsPage() {
 
   return (
     <div>
-      <TopBar title="Segments" backTo="/settings" />
+      <TopBar title="Segments" backTo="/data" />
       <p className="muted small page-note">
         Define a group of customers by filters - always resolved live, never a stale snapshot - then email or WhatsApp
         everyone in it at once.

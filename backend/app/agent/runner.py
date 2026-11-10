@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.agent.checkpointer import get_checkpointer
 from app.agent.model import call_vision_with_fallback, call_with_fallback, extract_text, get_model
 from app.agent.tools import build_tools
-from app.controllers import agent_controller, customer_controller
+from app.controllers import agent_controller, customer_controller, settings_controller
 from app.models.pending_action import PendingAction
 
 SYSTEM_PROMPT = (
@@ -51,6 +51,30 @@ SYSTEM_PROMPT = (
 )
 
 
+def _business_context(db: Session, org_id: UUID) -> str:
+    """The org's own Business profile (Settings), so the assistant's replies
+    are actually grounded in the real business instead of being generic -
+    e.g. addressing the right industry, or naming the right manager/staff
+    when a customer asks who they're speaking with."""
+    settings = settings_controller.get_settings(db, org_id)
+    facts = []
+    if settings.biz_name:
+        facts.append(f"business name: {settings.biz_name}")
+    if settings.industry:
+        facts.append(f"industry: {settings.industry}")
+    if settings.manager_name:
+        facts.append(f"manager: {settings.manager_name}")
+    if settings.staff_names:
+        facts.append(f"staff: {', '.join(settings.staff_names)}")
+    if settings.phone:
+        facts.append(f"business phone: {settings.phone}")
+    if settings.address:
+        facts.append(f"business address: {settings.address}")
+    if not facts:
+        return ""
+    return "\n\nBusiness you're assisting (from Settings -> Business profile): " + "; ".join(facts) + "."
+
+
 def _build_user_content(message: str, image_data_url: str | None):
     if not image_data_url:
         return message
@@ -77,7 +101,7 @@ def run_chat(
     config = {"configurable": {"thread_id": f"{org_id}:{user_id}:{thread_id or 'default'}"}}
     content = _build_user_content(message, image_data_url)
 
-    system_prompt = SYSTEM_PROMPT
+    system_prompt = SYSTEM_PROMPT + _business_context(db, org_id)
     if customer_id:
         try:
             customer = customer_controller.get_customer(db, org_id, customer_id)

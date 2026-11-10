@@ -1,10 +1,11 @@
-import { Download, Heart, MessageCircleQuestion, RefreshCw, Trash2, Trophy, Users, Wallet } from "lucide-react";
+import { Download, Heart, MessageCircleQuestion, PackageSearch, RefreshCw, Trash2, Trophy, Users, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { askData } from "../api/agent";
+import { listCustomers } from "../api/customers";
 import { getSummary } from "../api/summary";
 import { errorMessage } from "../api/errorMessage";
-import type { SavedWidget, Summary } from "../api/types";
+import type { Customer, Order, SavedWidget, Summary } from "../api/types";
 import { deleteWidget, listWidgets } from "../api/widgets";
 import DashboardRangeFilter from "../components/DashboardRangeFilter";
 import ErrorText from "../components/ErrorText";
@@ -70,6 +71,8 @@ export default function DashboardPage() {
         </div>
       </Link>
 
+      <PendingOrdersWidget />
+
       <DashboardRangeFilter
         preset={preset}
         customFrom={customFrom}
@@ -96,7 +99,7 @@ export default function DashboardPage() {
               </div>
             </Link>
             <div className="card stat-card">
-              <div className="stat-icon">
+              <div className="stat-icon stat-icon-secondary">
                 <Wallet size={18} />
               </div>
               <div className="stat-value stat-value-money">{fmtCurrencyMap(summary.all_time_by_currency)}</div>
@@ -188,6 +191,38 @@ export default function DashboardPage() {
           <SavedWidgets />
         </>
       )}
+    </div>
+  );
+}
+
+function PendingOrdersWidget() {
+  const [pending, setPending] = useState<{ customer: Customer; order: Order }[] | null>(null);
+
+  useEffect(() => {
+    listCustomers({ pageSize: 200 })
+      .then((res) => {
+        const rows = res.items
+          .flatMap((customer) => customer.orders.filter((o) => !o.delivered).map((order) => ({ customer, order })))
+          .sort((a, b) => a.order.order_date.localeCompare(b.order.order_date));
+        setPending(rows);
+      })
+      .catch(() => setPending([]));
+  }, []);
+
+  if (!pending || pending.length === 0) return null;
+
+  return (
+    <div className="card">
+      <h3>
+        <PackageSearch size={15} className="h3-icon" /> Orders awaiting delivery ({pending.length})
+      </h3>
+      {pending.slice(0, 5).map(({ customer, order }) => (
+        <Link key={order.id} to={`/customers/${customer.id}?tab=orders`} className="row-between">
+          <span>{customer.name}</span>
+          <span className="muted small">{order.order_date}</span>
+        </Link>
+      ))}
+      {pending.length > 5 && <p className="muted small page-note">and {pending.length - 5} more…</p>}
     </div>
   );
 }

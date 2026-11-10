@@ -39,7 +39,7 @@ export default function WebhooksPage() {
 
   return (
     <div>
-      <TopBar title="Webhooks" backTo="/settings" />
+      <TopBar title="Webhooks" backTo="/data" />
       <p className="muted small page-note">
         Get notified the moment something changes in your CRM - new customers, orders, transactions, or notes - by having
         this app POST a signed JSON event to a URL you control.

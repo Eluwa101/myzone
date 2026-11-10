@@ -91,6 +91,7 @@ class PublicFormOut(BaseModel):
 
     name: str
     fields: list[FormFieldDef]
+    business_name: str | None = None
 
     model_config = {"from_attributes": True}
 

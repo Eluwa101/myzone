@@ -137,6 +137,7 @@ export interface CustomForm {
 export interface PublicForm {
   name: string;
   fields: FormFieldDef[];
+  business_name?: string | null;
 }
 
 export interface FormSubmission {

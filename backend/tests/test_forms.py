@@ -54,6 +54,19 @@ def test_public_form_metadata_hides_org_id(client, auth_headers):
     assert "id" not in body
 
 
+def test_public_form_business_name_falls_back_to_org_name(client, auth_headers):
+    form = _create_form(client, auth_headers)
+    resp = client.get(f"/api/public/forms/{form['public_token']}")
+    assert resp.json()["business_name"] == "Ada's Store"
+
+
+def test_public_form_business_name_uses_biz_name_when_set(client, auth_headers):
+    client.put("/api/settings", json={"biz_name": "Ada's Fabrics"}, headers=auth_headers)
+    form = _create_form(client, auth_headers)
+    resp = client.get(f"/api/public/forms/{form['public_token']}")
+    assert resp.json()["business_name"] == "Ada's Fabrics"
+
+
 def test_public_submission_creates_customer_with_extra_field(client, auth_headers):
     form = _create_form(client, auth_headers)
     resp = client.post(

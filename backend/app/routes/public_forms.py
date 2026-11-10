@@ -22,9 +22,11 @@ router = APIRouter(prefix="/api/public/forms", tags=["public-forms"])
 @router.get("/{token}", response_model=PublicFormOut)
 def get_public_form(token: str, db: Session = Depends(get_db)):
     try:
-        return form_controller.get_public_form(db, token)
+        form = form_controller.get_public_form(db, token)
     except form_controller.FormNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Form not found.")
+    business_name = form_controller.get_public_form_business_name(db, form)
+    return PublicFormOut(name=form.name, fields=form.fields, business_name=business_name)
 
 
 @router.post("/{token}/submit", response_model=FormSubmitResult)

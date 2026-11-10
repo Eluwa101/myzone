@@ -3,8 +3,9 @@ run_chat's thread-id namespacing, tested directly without a real model:
 create_agent is stubbed to capture the config it's invoked with.
 """
 import app.agent.runner as runner
-from app.controllers import customer_controller
+from app.controllers import customer_controller, settings_controller
 from app.schemas.customer import CustomerCreate
+from app.schemas.settings import SettingsUpdate
 
 
 class _FakeMessage:
@@ -59,3 +60,25 @@ def test_customer_id_adds_context_to_the_system_prompt(db_session, seeded_org, m
 
     runner.run_chat(db_session, org_id, user_id, "hello")
     assert "Ada Obi" not in captured_kwargs[-1]["system_prompt"]
+
+
+def test_business_profile_is_added_to_the_system_prompt(db_session, seeded_org, monkeypatch):
+    org_id, user_id = seeded_org
+
+    captured_kwargs = []
+    monkeypatch.setattr(runner, "get_model", lambda: None)
+    monkeypatch.setattr(runner, "get_checkpointer", lambda: None)
+    monkeypatch.setattr(runner, "create_agent", lambda **kwargs: captured_kwargs.append(kwargs) or _FakeAgent([]))
+
+    runner.run_chat(db_session, org_id, user_id, "hello")
+    assert "Business profile" not in captured_kwargs[-1]["system_prompt"]
+
+    settings_controller.update_settings(
+        db_session, org_id, SettingsUpdate(biz_name="Ada's Fabrics", industry="Tailoring", manager_name="Ada")
+    )
+
+    runner.run_chat(db_session, org_id, user_id, "hello")
+    prompt = captured_kwargs[-1]["system_prompt"]
+    assert "Ada's Fabrics" in prompt
+    assert "Tailoring" in prompt
+    assert "manager: Ada" in prompt

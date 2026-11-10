@@ -22,11 +22,15 @@ import MarkdownMessage from "../components/MarkdownMessage";
 import OrderItemsEditor, { hasPricedItems, itemsTotal } from "../components/OrderItemsEditor";
 import OrderRow from "../components/OrderRow";
 import PendingActionCard from "../components/PendingActionCard";
+import PendingSyncBadge from "../components/PendingSyncBadge";
 import Spinner from "../components/Spinner";
 import Tabs from "../components/Tabs";
 import TopBar from "../components/TopBar";
+import TransactionLinesEditor, { blankLine, type TransactionLine } from "../components/TransactionLinesEditor";
 import TransactionRow from "../components/TransactionRow";
 import { useVoiceAutoSend } from "../hooks/useVoiceAutoSend";
+import { withOfflineFallback } from "../offline/queue";
+import { usePendingSync } from "../offline/usePendingSync";
 
 const BLANK: CustomerInput = { first_name: "", last_name: "", phone: "", email: "" };
 const STATUS_OPTIONS = [
@@ -52,6 +56,7 @@ export default function CustomerDetailPage() {
   const [tab, setTab] = useState<"info" | "transactions" | "orders" | "assistant">(
     initialTab === "transactions" || initialTab === "orders" || initialTab === "assistant" ? initialTab : "info"
   );
+  const autoOpenAdd = searchParams.get("new") === "1";
 
   function loadCustomer() {
     if (!id || isNew) return;
@@ -94,22 +99,44 @@ export default function CustomerDetailPage() {
   async function saveField(key: keyof CustomerInput, value: string, isDate = false) {
     if (!id) return;
     const payload = { [key]: isDate && !value ? null : value } as Partial<CustomerInput>;
-    await updateCustomer(id, payload);
-    loadCustomer();
+    const result = await withOfflineFallback(() => updateCustomer(id, payload), {
+      method: "PATCH",
+      path: `/api/customers/${id}`,
+      body: payload,
+      label: `Update ${String(key)}`,
+    });
+    if (result.queued) {
+      setCustomer((c) => (c ? ({ ...c, ...payload } as Customer) : c));
+    } else {
+      loadCustomer();
+    }
   }
 
   async function saveExtraField(key: string, value: string) {
     if (!id || !customer) return;
-    await updateCustomer(id, { extra: { ...customer.extra, [key]: value } });
-    loadCustomer();
+    const extra = { ...customer.extra, [key]: value };
+    const result = await withOfflineFallback(() => updateCustomer(id, { extra }), {
+      method: "PATCH",
+      path: `/api/customers/${id}`,
+      body: { extra },
+      label: `Update custom field: ${key}`,
+    });
+    if (result.queued) setCustomer((c) => (c ? { ...c, extra } : c));
+    else loadCustomer();
   }
 
   async function deleteExtraField(key: string) {
     if (!id || !customer) return;
     const next = { ...customer.extra };
     delete next[key];
-    await updateCustomer(id, { extra: next });
-    loadCustomer();
+    const result = await withOfflineFallback(() => updateCustomer(id, { extra: next }), {
+      method: "PATCH",
+      path: `/api/customers/${id}`,
+      body: { extra: next },
+      label: `Remove custom field: ${key}`,
+    });
+    if (result.queued) setCustomer((c) => (c ? { ...c, extra: next } : c));
+    else loadCustomer();
   }
 
   async function onDeleteCustomer() {
@@ -204,9 +231,9 @@ export default function CustomerDetailPage() {
           deleting={saving}
         />
       ) : tab === "transactions" ? (
-        <TransactionsTab customer={customer} onChanged={loadCustomer} />
+        <TransactionsTab customer={customer} onChanged={loadCustomer} autoOpenAdd={autoOpenAdd} />
       ) : tab === "orders" ? (
-        <OrdersTab customer={customer} onChanged={loadCustomer} />
+        <OrdersTab customer={customer} onChanged={loadCustomer} autoOpenAdd={autoOpenAdd} />
       ) : (
         <AssistantTab customer={customer} onChanged={loadCustomer} />
       )}
@@ -342,33 +369,60 @@ function InfoTab({
   );
 }
 
-function TransactionsTab({ customer, onChanged }: { customer: Customer; onChanged: () => void }) {
-  const [adding, setAdding] = useState(false);
+function TransactionsTab({
+  customer,
+  onChanged,
+  autoOpenAdd,
+}: {
+  customer: Customer;
+  onChanged: () => void;
+  autoOpenAdd?: boolean;
+}) {
+  const [adding, setAdding] = useState(!!autoOpenAdd);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [item, setItem] = useState("");
-  const [qty, setQty] = useState("1");
-  const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("");
+  const [lines, setLines] = useState<TransactionLine[]>([blankLine()]);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const { pending, add: addPending } = usePendingSync(onChanged);
 
   async function onAdd(e: FormEvent) {
     e.preventDefault();
-    if (!item.trim()) return;
+    const cleanLines = lines.filter((l) => l.item.trim());
+    if (cleanLines.length === 0) return;
     setError(null);
+    setSaving(true);
     try {
-      await addTransaction(customer.id, {
-        date,
-        item: item.trim(),
-        qty: Number(qty) || 1,
-        amount: Number(amount) || 0,
-        currency,
-      });
-      setItem("");
-      setAmount("");
+      let anyQueued = false;
+      for (const line of cleanLines) {
+        const body = {
+          date,
+          item: line.item.trim(),
+          qty: Number(line.qty) || 1,
+          amount: Number(line.amount) || 0,
+          currency,
+        };
+        const result = await withOfflineFallback(() => addTransaction(customer.id, body), {
+          method: "POST",
+          path: `/api/customers/${customer.id}/transactions`,
+          body,
+          label: `Transaction: ${body.item}`,
+        });
+        if (result.queued) {
+          anyQueued = true;
+          addPending(result.id, body);
+        }
+      }
+      setLines([blankLine()]);
       setAdding(false);
-      onChanged();
+      // onChanged() re-fetches from the server - pointless while offline,
+      // and its loading state would unmount this tab and lose the
+      // just-added pending rows. usePendingSync calls it once they sync.
+      if (!anyQueued) onChanged();
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -376,9 +430,19 @@ function TransactionsTab({ customer, onChanged }: { customer: Customer; onChange
     <div>
       <PurchaseSummary transactions={customer.transactions} />
       <div className="card">
-        {customer.transactions.length === 0 && !adding && <p className="muted small">No transactions yet.</p>}
+        {customer.transactions.length === 0 && pending.length === 0 && !adding && <p className="muted small">No transactions yet.</p>}
         {customer.transactions.map((t) => (
           <TransactionRow key={t.id} customerId={customer.id} transaction={t} onChanged={onChanged} />
+        ))}
+        {pending.map((p) => (
+          <div key={p.id} className="row-between" style={{ opacity: 0.7 }}>
+            <span>
+              {p.data.item} <PendingSyncBadge />
+            </span>
+            <span className="muted small">
+              {p.data.qty} × {p.data.currency} {p.data.amount}
+            </span>
+          </div>
         ))}
 
       {adding ? (
@@ -389,28 +453,18 @@ function TransactionsTab({ customer, onChanged }: { customer: Customer; onChange
               <input id="new-tx-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} autoFocus />
             </div>
             <div>
-              <label htmlFor="new-tx-item">Item</label>
-              <input id="new-tx-item" value={item} onChange={(e) => setItem(e.target.value)} />
-            </div>
-            <div>
-              <label htmlFor="new-tx-qty">Qty</label>
-              <input id="new-tx-qty" type="number" value={qty} onChange={(e) => setQty(e.target.value)} />
-            </div>
-            <div>
-              <label htmlFor="new-tx-amount">Amount</label>
-              <input id="new-tx-amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
-            </div>
-            <div>
               <label htmlFor="new-tx-currency">Currency</label>
               <CurrencySelect id="new-tx-currency" value={currency} onChange={setCurrency} />
             </div>
           </div>
+          <label>Items</label>
+          <TransactionLinesEditor lines={lines} onChange={setLines} />
           <ErrorText message={error} />
           <div className="row" style={{ marginTop: 10 }}>
-            <button type="submit" className="btn-primary">
-              <Check size={15} /> Add
+            <button type="submit" className="btn-primary" disabled={saving}>
+              <Check size={15} /> {saving ? "Adding…" : "Add"}
             </button>
-            <button type="button" onClick={() => setAdding(false)}>
+            <button type="button" onClick={() => setAdding(false)} disabled={saving}>
               <X size={15} /> Cancel
             </button>
           </div>
@@ -462,14 +516,23 @@ function PurchaseSummary({ transactions }: { transactions: Customer["transaction
   );
 }
 
-function OrdersTab({ customer, onChanged }: { customer: Customer; onChanged: () => void }) {
-  const [adding, setAdding] = useState(false);
+function OrdersTab({
+  customer,
+  onChanged,
+  autoOpenAdd,
+}: {
+  customer: Customer;
+  onChanged: () => void;
+  autoOpenAdd?: boolean;
+}) {
+  const [adding, setAdding] = useState(!!autoOpenAdd);
   const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
   const [deliveryDate, setDeliveryDate] = useState("");
   const [items, setItems] = useState<Order["items"]>([]);
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const { pending, add: addPending } = usePendingSync(onChanged);
 
   function updateItems(next: Order["items"]) {
     setItems(next);
@@ -482,18 +545,25 @@ function OrdersTab({ customer, onChanged }: { customer: Customer; onChanged: () 
     if (cleanItems.length === 0) return;
     setError(null);
     try {
-      await addOrder(customer.id, {
+      const body = {
         order_date: orderDate,
         delivery_date: deliveryDate || null,
         items: cleanItems,
         amount: amount.trim() ? Number(amount) : null,
         currency: currency || null,
+      };
+      const result = await withOfflineFallback(() => addOrder(customer.id, body), {
+        method: "POST",
+        path: `/api/customers/${customer.id}/orders`,
+        body,
+        label: `Order: ${cleanItems.map((i) => i.name).join(", ")}`,
       });
+      if (result.queued) addPending(result.id, body);
       setItems([]);
       setDeliveryDate("");
       setAmount("");
       setAdding(false);
-      onChanged();
+      if (!result.queued) onChanged();
     } catch (err) {
       setError(errorMessage(err));
     }
@@ -501,9 +571,17 @@ function OrdersTab({ customer, onChanged }: { customer: Customer; onChanged: () 
 
   return (
     <div className="card">
-      {customer.orders.length === 0 && !adding && <p className="muted small">No orders yet.</p>}
+      {customer.orders.length === 0 && pending.length === 0 && !adding && <p className="muted small">No orders yet.</p>}
       {customer.orders.map((o) => (
         <OrderRow key={o.id} customerId={customer.id} order={o} onChanged={onChanged} />
+      ))}
+      {pending.map((p) => (
+        <div key={p.id} className="row-between" style={{ opacity: 0.7 }}>
+          <span>
+            {p.data.items.map((i) => i.name).join(", ")} <PendingSyncBadge />
+          </span>
+          <span className="muted small">{p.data.order_date}</span>
+        </div>
       ))}
 
       {adding ? (

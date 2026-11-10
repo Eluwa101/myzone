@@ -138,7 +138,7 @@ def list_customers(
     page: int = 1,
     page_size: int = 20,
 ) -> tuple[list[Customer], int]:
-    q = db.query(Customer).options(joinedload(Customer.transactions)).filter(Customer.org_id == org_id)
+    q = db.query(Customer).options(joinedload(Customer.transactions), joinedload(Customer.orders)).filter(Customer.org_id == org_id)
     if status:
         q = q.filter(Customer.status == status)
     if search:
