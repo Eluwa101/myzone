@@ -423,6 +423,18 @@ button:disabled {
   border-bottom: none;
 }
 
+.interest-convert-group {
+  margin-bottom: 14px;
+}
+
+.interest-convert-group:last-child {
+  margin-bottom: 0;
+}
+
+.interest-convert-row {
+  padding-left: 4px;
+}
+
 a.row-between:hover {
   background: var(--surface-hover);
   margin: 0 -8px;
@@ -674,6 +686,53 @@ a.row-between:hover {
 .notes-bell-item {
   padding: 8px 0;
   border-bottom: 1px solid var(--border);
+}
+
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  border-radius: 0;
+  text-align: left;
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+.notification-item:hover {
+  background: var(--surface-hover);
+}
+
+.notification-item-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.notification-item-unread .notification-item-icon {
+  color: var(--accent);
+}
+
+.notification-item-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.notification-item-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  margin-top: 5px;
 }
 
 .notes-bell-item:last-child {

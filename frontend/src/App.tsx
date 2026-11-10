@@ -14,6 +14,7 @@ import FormsPage from "./pages/FormsPage";
 import LoginPage from "./pages/LoginPage";
 import NotesPage from "./pages/NotesPage";
 import OnboardingPage from "./pages/OnboardingPage";
+import OrdersPage from "./pages/OrdersPage";
 import PublicFormPage from "./pages/PublicFormPage";
 import SegmentsPage from "./pages/SegmentsPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="/dashboard/interests" element={<DashboardInterestsPage />} />
           <Route path="/ask" element={<AskDataPage />} />
           <Route path="/notes" element={<NotesPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
           <Route path="/forms" element={<FormsPage />} />
           <Route path="/segments" element={<SegmentsPage />} />
           <Route path="/webhooks" element={<WebhooksPage />} />

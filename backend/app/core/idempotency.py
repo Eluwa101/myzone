@@ -57,18 +57,24 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         db = SessionLocal()
         try:
-            cutoff = datetime.datetime.now(datetime.timezone.utc) - REPLAY_WINDOW
-            cached = (
-                db.query(IdempotencyKey)
-                .filter(
-                    IdempotencyKey.org_id == org_id,
-                    IdempotencyKey.key == key,
-                    IdempotencyKey.method == request.method,
-                    IdempotencyKey.path == path,
-                    IdempotencyKey.created_at >= cutoff,
+            try:
+                cutoff = datetime.datetime.now(datetime.timezone.utc) - REPLAY_WINDOW
+                cached = (
+                    db.query(IdempotencyKey)
+                    .filter(
+                        IdempotencyKey.org_id == org_id,
+                        IdempotencyKey.key == key,
+                        IdempotencyKey.method == request.method,
+                        IdempotencyKey.path == path,
+                        IdempotencyKey.created_at >= cutoff,
+                    )
+                    .first()
                 )
-                .first()
-            )
+            except Exception:  # noqa: BLE001 - a broken lookup must degrade to "not cached", never break the real request
+                db.rollback()
+                logger.exception("Idempotency lookup failed for org %s - proceeding without replay protection", org_id)
+                cached = None
+
             if cached is not None:
                 return Response(
                     content=cached.response_body,

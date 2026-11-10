@@ -64,3 +64,19 @@ def test_get_requests_are_never_cached(client, auth_headers):
     second = client.get("/api/customers", headers=headers)
     assert first.json()["total"] == 1
     assert second.json()["total"] == 2
+
+
+def test_broken_lookup_degrades_to_no_replay_protection(client, auth_headers, monkeypatch):
+    """If the idempotency_keys table is ever unreachable (e.g. mid-
+    migration), the request must still succeed instead of 500ing."""
+    from sqlalchemy.orm import Query
+
+    def broken_first(self, *a, **k):
+        raise RuntimeError("relation does not exist")
+
+    monkeypatch.setattr(Query, "first", broken_first)
+
+    resp = client.post(
+        "/api/customers", json={"name": "Ada Obi"}, headers={**auth_headers, "Idempotency-Key": "doesnt-matter"}
+    )
+    assert resp.status_code == 201

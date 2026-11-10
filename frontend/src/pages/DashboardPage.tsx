@@ -2,10 +2,10 @@ import { Download, Heart, MessageCircleQuestion, PackageSearch, RefreshCw, Trash
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { askData } from "../api/agent";
-import { listCustomers } from "../api/customers";
+import { listAllOrders, type OrderWithCustomer } from "../api/orders";
 import { getSummary } from "../api/summary";
 import { errorMessage } from "../api/errorMessage";
-import type { Customer, Order, SavedWidget, Summary } from "../api/types";
+import type { SavedWidget, Summary } from "../api/types";
 import { deleteWidget, listWidgets } from "../api/widgets";
 import DashboardRangeFilter from "../components/DashboardRangeFilter";
 import ErrorText from "../components/ErrorText";
@@ -196,16 +196,11 @@ export default function DashboardPage() {
 }
 
 function PendingOrdersWidget() {
-  const [pending, setPending] = useState<{ customer: Customer; order: Order }[] | null>(null);
+  const [pending, setPending] = useState<OrderWithCustomer[] | null>(null);
 
   useEffect(() => {
-    listCustomers({ pageSize: 200 })
-      .then((res) => {
-        const rows = res.items
-          .flatMap((customer) => customer.orders.filter((o) => !o.delivered).map((order) => ({ customer, order })))
-          .sort((a, b) => a.order.order_date.localeCompare(b.order.order_date));
-        setPending(rows);
-      })
+    listAllOrders({ pending: true })
+      .then(setPending)
       .catch(() => setPending([]));
   }, []);
 
@@ -213,12 +208,17 @@ function PendingOrdersWidget() {
 
   return (
     <div className="card">
-      <h3>
-        <PackageSearch size={15} className="h3-icon" /> Orders awaiting delivery ({pending.length})
-      </h3>
-      {pending.slice(0, 5).map(({ customer, order }) => (
-        <Link key={order.id} to={`/customers/${customer.id}?tab=orders`} className="row-between">
-          <span>{customer.name}</span>
+      <div className="row-between" style={{ borderBottom: "none", paddingBottom: 4 }}>
+        <h3 style={{ margin: 0 }}>
+          <PackageSearch size={15} className="h3-icon" /> Orders awaiting delivery ({pending.length})
+        </h3>
+        <Link to="/orders?pending=true" className="muted small">
+          View all →
+        </Link>
+      </div>
+      {pending.slice(0, 5).map((order) => (
+        <Link key={order.id} to={`/customers/${order.customer_id}?tab=orders`} className="row-between">
+          <span>{order.customer_name}</span>
           <span className="muted small">{order.order_date}</span>
         </Link>
       ))}

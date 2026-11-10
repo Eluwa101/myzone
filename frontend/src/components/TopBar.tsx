@@ -2,7 +2,7 @@ import { ChevronLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import HeaderMenu from "./HeaderMenu";
-import NotesBell from "./NotesBell";
+import NotificationBell from "./NotificationBell";
 import SyncStatusIndicator from "./SyncStatusIndicator";
 import UserMenu from "./UserMenu";
 
@@ -21,7 +21,7 @@ export default function TopBar({ title, actions, backTo }: { title: string; acti
       <div className="top-bar-actions">
         {actions}
         <SyncStatusIndicator />
-        <NotesBell />
+        <NotificationBell />
         <HeaderMenu />
         <UserMenu />
       </div>
