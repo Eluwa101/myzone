@@ -16,6 +16,8 @@ from app.models.webhook import WebhookSubscription, WebhookDelivery
 from app.models.idempotency import IdempotencyKey
 from app.models.notification import Notification
 from app.models.auth_token import AuthToken, AuthTokenPurpose
+from app.models.email_template import EmailTemplate
+from app.models.outbound_message import OutboundMessage, MessageChannel, MessageStatus
 
 __all__ = [
     "Organization",
@@ -40,4 +42,8 @@ __all__ = [
     "Notification",
     "AuthToken",
     "AuthTokenPurpose",
+    "EmailTemplate",
+    "OutboundMessage",
+    "MessageChannel",
+    "MessageStatus",
 ]

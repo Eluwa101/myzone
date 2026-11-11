@@ -21,7 +21,7 @@ from uuid import UUID
 from langchain.tools import tool
 from sqlalchemy.orm import Session
 
-from app.controllers import agent_controller, customer_controller, note_controller, order_controller, settings_controller, transaction_controller
+from app.controllers import agent_controller, customer_controller, messaging_controller, note_controller, order_controller, settings_controller, transaction_controller
 from app.models.customer import CustomerStatus
 from app.schemas.customer import CustomerCreate, CustomerUpdate
 from app.schemas.note import NoteCreate, NoteUpdate
@@ -589,6 +589,61 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         pending = agent_controller.create_pending_action(db, org_id, user_id, "merge_customers", {"keep_id": keep_id, "merge_id": merge_id}, description)
         return {"status": "confirm_required", "action_id": str(pending.id), "description": pending.description}
 
+    @tool
+    def list_email_templates() -> dict:
+        """List this org's saved email templates (name + subject), so you
+        can offer to use one by name when sending an email instead of
+        writing the content yourself."""
+        templates = messaging_controller.list_templates(db, org_id)
+        return {"templates": [{"id": str(t.id), "name": t.name, "subject": t.subject} for t in templates]}
+
+    @tool
+    def send_customer_email(customer_ids: str, template_name: str = "", subject: str = "", body_html: str = "") -> dict:
+        """Request sending an email to one or more customers. Reaches real
+        people, so this never sends immediately - it creates a pending
+        confirmation a human must approve first (same pattern as
+        delete_customer/merge_customers).
+        customer_ids is a comma-separated list of customer ids - look them
+        up with search_customers or find_customer_by_id first, not names.
+        Either pass template_name (an existing saved template - check
+        list_email_templates first) to use its subject/body, or write your
+        own subject and body_html (an HTML string) directly.
+        body_html may use merge tags that get filled in per-recipient at
+        send time, e.g. {{customer.first_name}}, {{customer.display_id}},
+        {{business.name}}, {{latest_order.amount}}, {{latest_transaction.items}}.
+        Any custom field this org has set on a customer (via
+        set_customer_custom_field or CSV import) is also available, as
+        {{extra.<field_name>}} with the name lowercased and spaces turned
+        to underscores (e.g. a "Favorite Color" field is {{extra.favorite_color}})."""
+        ids = [cid.strip() for cid in customer_ids.split(",") if cid.strip()]
+        if not ids:
+            return {"status": "error", "message": "customer_ids is required - look up the customer(s) first."}
+        try:
+            parsed_ids = [str(UUID(cid)) for cid in ids]
+        except ValueError:
+            return {"status": "error", "message": "customer_ids must be valid customer ids, not names - look them up first."}
+
+        template_id = None
+        resolved_subject, resolved_body = subject.strip(), body_html.strip()
+        if template_name.strip():
+            match = next(
+                (t for t in messaging_controller.list_templates(db, org_id) if t.name.lower() == template_name.strip().lower()),
+                None,
+            )
+            if not match:
+                return {"status": "error", "message": f"No saved template named {template_name!r} - check list_email_templates."}
+            template_id = str(match.id)
+            resolved_subject = resolved_subject or match.subject
+            resolved_body = resolved_body or match.body_html
+
+        if not resolved_subject or not resolved_body:
+            return {"status": "error", "message": "Provide subject and body_html, or a template_name to use."}
+
+        description = f"Send email to {len(parsed_ids)} customer(s): {resolved_subject}"
+        payload = {"customer_ids": parsed_ids, "subject": resolved_subject, "body_html": resolved_body, "template_id": template_id}
+        pending = agent_controller.create_pending_action(db, org_id, user_id, "send_customer_email", payload, description)
+        return {"status": "confirm_required", "action_id": str(pending.id), "description": pending.description}
+
     return [
         create_customer,
         create_customer_as_new,
@@ -611,4 +666,6 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         get_dashboard_summary,
         delete_customer,
         merge_customers,
+        list_email_templates,
+        send_customer_email,
     ]

@@ -1,4 +1,4 @@
-import { ClipboardList, Download, Plug, StickyNote, Upload, Users } from "lucide-react";
+import { ClipboardList, Download, Mail, Plug, StickyNote, Upload, Users } from "lucide-react";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { exportCsv, importCsv } from "../api/customers";
@@ -69,6 +69,17 @@ export default function DataPage() {
             <p className="muted small">Group customers by filters, then email or WhatsApp everyone in the group at once.</p>
           </div>
           <button type="button" className="btn-primary" onClick={() => navigate("/segments")}>
+            Open
+          </button>
+        </div>
+        <div className="settings-automation-row">
+          <div>
+            <h3>
+              <Mail size={15} className="h3-icon" /> Messages
+            </h3>
+            <p className="muted small">Email customers directly from the app, with merge tags and reusable templates.</p>
+          </div>
+          <button type="button" className="btn-primary" onClick={() => navigate("/messages")}>
             Open
           </button>
         </div>

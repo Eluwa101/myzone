@@ -4,12 +4,12 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from app.core.branding import branding_for
 from app.core.email import send_password_reset_email, send_verification_email, send_google_only_account_notice
 from app.core.google_auth import InvalidGoogleTokenError, verify_google_id_token
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.auth_token import AuthToken, AuthTokenPurpose
 from app.models.organization import Organization
-from app.models.org_settings import OrgSettings
 from app.models.user import User, UserRole
 from app.schemas.auth import LoginRequest, SignupRequest
 
@@ -66,21 +66,6 @@ def _consume_token(db: Session, raw: str, purpose: AuthTokenPurpose) -> AuthToke
     return row
 
 
-def _branding_for(db: Session, org_id) -> tuple[str | None, str | None]:
-    """(display_name, reply_to) for this org's outgoing account emails - the
-    "From" name shows the business (so it doesn't just say generic MyShop),
-    and replies land in the shop's own inbox if they've set one. Falls back
-    to (None, None) - the plain MyShop sender - if neither is set, which is
-    always true right after signup (org_settings doesn't exist yet) but the
-    org's own name still carries through as the fallback display name."""
-    org = db.get(Organization, org_id)
-    org_settings = db.get(OrgSettings, org_id)
-    biz_name = (org_settings.biz_name if org_settings else None) or (org.name if org else None)
-    display_name = f"{biz_name} via MyShop" if biz_name else None
-    reply_to = org_settings.support_email if org_settings else None
-    return display_name, reply_to
-
-
 def signup(db: Session, data: SignupRequest) -> User:
     if db.query(User).filter(User.email == data.email).first():
         raise EmailAlreadyRegisteredError()
@@ -101,7 +86,7 @@ def signup(db: Session, data: SignupRequest) -> User:
     db.refresh(user)
 
     raw = _issue_token(db, user.id, AuthTokenPurpose.verify_email, VERIFY_EMAIL_TTL)
-    display_name, reply_to = _branding_for(db, user.org_id)
+    display_name, reply_to = branding_for(db, user.org_id)
     send_verification_email(user.email, raw, from_name=display_name, reply_to=reply_to)
     return user
 
@@ -133,7 +118,7 @@ def resend_verification(db: Session, email: str) -> None:
     user = db.query(User).filter(User.email == email).first()
     if user and not user.email_verified:
         raw = _issue_token(db, user.id, AuthTokenPurpose.verify_email, VERIFY_EMAIL_TTL)
-        display_name, reply_to = _branding_for(db, user.org_id)
+        display_name, reply_to = branding_for(db, user.org_id)
         send_verification_email(user.email, raw, from_name=display_name, reply_to=reply_to)
     # silent no-op otherwise (unknown email, or already verified) - never
     # confirm/deny whether an email is registered
@@ -143,7 +128,7 @@ def forgot_password(db: Session, email: str) -> None:
     user = db.query(User).filter(User.email == email).first()
     if not user:
         return
-    display_name, reply_to = _branding_for(db, user.org_id)
+    display_name, reply_to = branding_for(db, user.org_id)
     if not user.hashed_password:
         send_google_only_account_notice(user.email, from_name=display_name, reply_to=reply_to)
         return
@@ -204,7 +189,7 @@ def google_auth(db: Session, credential: str) -> tuple[User, str, bool]:
             is_new_user = True
             if not user.email_verified:
                 raw = _issue_token(db, user.id, AuthTokenPurpose.verify_email, VERIFY_EMAIL_TTL)
-                display_name, reply_to = _branding_for(db, user.org_id)
+                display_name, reply_to = branding_for(db, user.org_id)
                 send_verification_email(user.email, raw, from_name=display_name, reply_to=reply_to)
 
     token = create_access_token(user.id, user.org_id)

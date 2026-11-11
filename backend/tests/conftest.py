@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.controllers import webhook_controller
+from app.controllers import messaging_controller, webhook_controller
 from app.core import idempotency
 from app.core.database import Base, get_db
 from app.main import app
@@ -27,6 +27,10 @@ webhook_controller.SessionLocal = TestingSessionLocal
 # session too (middleware has no access to get_db overrides), so it needs
 # the same redirect to the test engine.
 idempotency.SessionLocal = TestingSessionLocal
+
+# messaging_controller's batch email sender runs on its own background
+# thread with its own session too, same reason as webhook_controller above.
+messaging_controller.SessionLocal = TestingSessionLocal
 
 
 @pytest.fixture(autouse=True)

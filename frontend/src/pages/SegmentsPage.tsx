@@ -316,6 +316,12 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
               <Mail size={13} className="h3-icon" /> Email ({emails.length} with an address - BCC'd, so no one sees the
               others)
             </p>
+            <Link to={`/messages/compose?segment_id=${segment.id}`} className="btn-primary" style={{ marginBottom: 8, display: "inline-flex" }}>
+              <Mail size={14} /> Message this segment
+            </Link>
+            <p className="muted small" style={{ marginTop: 0 }}>
+              Sends from inside the app with real merge tags per recipient, instead of opening your own email client below.
+            </p>
             {emails.length === 0 ? (
               <p className="muted small">No one in this segment has an email on file.</p>
             ) : (

@@ -17,9 +17,12 @@ const DashboardInterestsPage = lazy(() => import("./pages/DashboardInterestsPage
 const DashboardMonthlyPage = lazy(() => import("./pages/DashboardMonthlyPage"));
 const DashboardTopCustomersPage = lazy(() => import("./pages/DashboardTopCustomersPage"));
 const DataPage = lazy(() => import("./pages/DataPage"));
+const EmailTemplatesPage = lazy(() => import("./pages/EmailTemplatesPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const FormsPage = lazy(() => import("./pages/FormsPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
+const MessageComposePage = lazy(() => import("./pages/MessageComposePage"));
+const MessagesPage = lazy(() => import("./pages/MessagesPage"));
 const NotesPage = lazy(() => import("./pages/NotesPage"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 const OrdersPage = lazy(() => import("./pages/OrdersPage"));
@@ -56,6 +59,9 @@ export default function App() {
             <Route path="/dashboard/interests" element={<DashboardInterestsPage />} />
             <Route path="/ask" element={<AskDataPage />} />
             <Route path="/notes" element={<NotesPage />} />
+            <Route path="/messages" element={<MessagesPage />} />
+            <Route path="/messages/compose" element={<MessageComposePage />} />
+            <Route path="/messages/templates" element={<EmailTemplatesPage />} />
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/forms" element={<FormsPage />} />
             <Route path="/segments" element={<SegmentsPage />} />

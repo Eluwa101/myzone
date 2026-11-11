@@ -33,19 +33,31 @@ def _from_address() -> str:
     return raw
 
 
-def _send(to: str, subject: str, html: str, from_name: str | None = None, reply_to: str | None = None) -> None:
+def send_raw(to: str, subject: str, html: str, from_name: str | None = None, reply_to: str | None = None) -> str | None:
+    """Actually calls Resend - raises on any failure (including no API key
+    configured) and returns the provider's message id on success. Used by
+    callers that need to know per-recipient success/failure to record it
+    (e.g. the messaging batch sender's send history), as opposed to the
+    fire-and-forget auth emails below, which use _send instead."""
     if not settings.resend_api_key:
-        logger.info("RESEND_API_KEY not configured - skipping email to %s (subject: %r)", to, subject)
-        return
+        raise RuntimeError("RESEND_API_KEY is not configured.")
     resend.api_key = settings.resend_api_key
     sender = f"{from_name} <{_from_address()}>" if from_name else settings.email_from
     payload = {"from": sender, "to": [to], "subject": subject, "html": html}
     if reply_to:
         payload["reply_to"] = reply_to
+    result = resend.Emails.send(payload)
+    return result.get("id") if isinstance(result, dict) else None
+
+
+def _send(to: str, subject: str, html: str, from_name: str | None = None, reply_to: str | None = None) -> None:
+    """Fire-and-forget version for the platform's own account emails
+    (verification, password reset) - a failed send must never break the
+    signup/login/reset request that triggered it, so this only logs."""
     try:
-        resend.Emails.send(payload)
-    except Exception:  # noqa: BLE001 - a failed send must never break the caller's request
-        logger.exception("Failed to send email to %s", to)
+        send_raw(to, subject, html, from_name=from_name, reply_to=reply_to)
+    except Exception:  # noqa: BLE001 - must never raise to the caller
+        logger.info("Email to %s not sent (subject: %r)", to, subject, exc_info=True)
 
 
 def send_verification_email(to: str, token: str, from_name: str | None = None, reply_to: str | None = None) -> None:

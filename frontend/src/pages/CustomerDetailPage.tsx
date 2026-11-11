@@ -1,6 +1,6 @@
-import { Bot, Check, Mic, Plus, Send, Square, Trash2, X } from "lucide-react";
+import { Bot, Check, Mail, Mic, Plus, Send, Square, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   addOrder,
   addTransaction,
@@ -209,7 +209,15 @@ export default function CustomerDetailPage() {
 
   return (
     <div>
-      <TopBar title={customer.name} backTo="/customers" />
+      <TopBar
+        title={customer.name}
+        backTo="/customers"
+        actions={
+          <Link to={`/messages/compose?customer_id=${customer.id}`} className="icon-btn btn-ghost" aria-label="Message this customer" title="Message this customer">
+            <Mail size={18} />
+          </Link>
+        }
+      />
       <p className="muted small customer-display-id-row">{customer.display_id}</p>
       <Tabs
         tabs={[

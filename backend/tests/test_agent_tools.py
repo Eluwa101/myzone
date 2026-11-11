@@ -3,6 +3,7 @@ Unit tests for the agent's tools, bypassing the LLM entirely (no API key
 needed, no network calls). These are the safety-critical paths: dedup
 conflicts, the confirm-before-destructive-write flow, and audit logging.
 """
+from datetime import date
 from uuid import UUID
 
 import pytest
@@ -11,6 +12,7 @@ from app.agent.tools import build_tools
 from app.controllers import agent_controller, customer_controller
 from app.models.agent_action import AgentAction
 from app.models.pending_action import PendingAction
+from app.schemas.customer import CustomerUpdate
 
 
 @pytest.fixture
@@ -268,3 +270,61 @@ def test_list_notes_update_note_delete_note_tools(db_session, seeded_org, tools)
     deleted = tools["delete_note"].invoke({"note_id": note["id"]})
     assert deleted["status"] == "deleted"
     assert tools["list_notes"].invoke({})["notes"] == []
+
+
+def test_send_customer_email_tool_requires_confirmation(db_session, seeded_org, tools):
+    org_id, user_id = seeded_org
+    created = tools["create_customer"].invoke({"name": "Ada Obi", "email": "ada@customer.com"})
+    # the create_customer tool doesn't expose consent_date - set it
+    # directly so this customer is actually eligible to be emailed
+    customer_controller.update_customer(db_session, org_id, UUID(created["id"]), CustomerUpdate(consent_date=date(2026, 1, 1)))
+
+    result = tools["send_customer_email"].invoke(
+        {"customer_ids": created["id"], "subject": "Hi {{customer.first_name}}", "body_html": "<p>Hello!</p>"}
+    )
+    assert result["status"] == "confirm_required"
+
+    pending = db_session.query(PendingAction).filter(PendingAction.org_id == org_id).one()
+    assert pending.tool_name == "send_customer_email"
+    assert pending.payload["customer_ids"] == [created["id"]]
+
+    confirmed = agent_controller.confirm_pending_action(db_session, org_id, user_id, UUID(result["action_id"]))
+    assert confirmed["status"] == "queued"
+    assert confirmed["queued"] == 1
+
+
+def test_send_customer_email_tool_rejects_invalid_customer_id(db_session, seeded_org, tools):
+    result = tools["send_customer_email"].invoke({"customer_ids": "not-a-uuid", "subject": "Hi", "body_html": "x"})
+    assert result["status"] == "error"
+
+
+def test_send_customer_email_tool_requires_content_or_template(db_session, seeded_org, tools):
+    created = tools["create_customer"].invoke({"name": "Ada Obi", "email": "ada@customer.com"})
+    result = tools["send_customer_email"].invoke({"customer_ids": created["id"]})
+    assert result["status"] == "error"
+
+
+def test_send_customer_email_tool_uses_named_template(db_session, seeded_org, tools):
+    from app.controllers import messaging_controller
+    from app.schemas.messaging import EmailTemplateCreate
+
+    org_id, _user_id = seeded_org
+    messaging_controller.create_template(
+        db_session, org_id, EmailTemplateCreate(name="Welcome", subject="Hi there", body_html="<p>Welcome!</p>")
+    )
+    listed = tools["list_email_templates"].invoke({})
+    assert listed["templates"][0]["name"] == "Welcome"
+
+    created = tools["create_customer"].invoke({"name": "Ada Obi", "email": "ada@customer.com"})
+    result = tools["send_customer_email"].invoke({"customer_ids": created["id"], "template_name": "Welcome"})
+    assert result["status"] == "confirm_required"
+
+    pending = db_session.query(PendingAction).filter(PendingAction.org_id == org_id).one()
+    assert pending.payload["subject"] == "Hi there"
+    assert pending.payload["template_id"] is not None
+
+
+def test_send_customer_email_tool_unknown_template_name(db_session, seeded_org, tools):
+    created = tools["create_customer"].invoke({"name": "Ada Obi", "email": "ada@customer.com"})
+    result = tools["send_customer_email"].invoke({"customer_ids": created["id"], "template_name": "Nope"})
+    assert result["status"] == "error"

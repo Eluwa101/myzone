@@ -1529,6 +1529,81 @@ a.row-between:hover {
   filter: brightness(0.96);
 }
 
+.chip button {
+  display: inline-flex;
+  padding: 2px;
+  margin-left: 4px;
+  background: none;
+  border: none;
+  color: inherit;
+  border-radius: var(--radius-full);
+}
+
+.chip button:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.recipient-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.merge-tag-picker {
+  position: relative;
+}
+
+.merge-tag-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 15;
+  width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 10px;
+}
+
+@media (max-width: 480px) {
+  .merge-tag-panel {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+}
+
+.merge-tag-group {
+  margin-bottom: 8px;
+}
+
+.merge-tag-group-label {
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+
+.merge-tag-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.merge-tag-option:hover {
+  background: var(--surface-hover);
+}
+
 .history-overlay {
   position: fixed;
   inset: 0;
