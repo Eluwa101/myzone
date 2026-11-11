@@ -10,6 +10,7 @@ EMPTY_SETTINGS = {
     "manager_name": None,
     "staff_names": None,
     "default_currency": None,
+    "support_email": None,
 }
 
 

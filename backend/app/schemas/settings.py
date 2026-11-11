@@ -13,6 +13,7 @@ class SettingsUpdate(BaseModel):
     manager_name: str | None = None
     staff_names: list[str] | None = None
     default_currency: str | None = None
+    support_email: str | None = None
 
 
 class SettingsOut(BaseModel):
@@ -27,5 +28,6 @@ class SettingsOut(BaseModel):
     manager_name: str | None = None
     staff_names: list[str] | None = None
     default_currency: str | None = None
+    support_email: str | None = None
 
     model_config = {"from_attributes": True}

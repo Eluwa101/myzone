@@ -7,7 +7,7 @@ def _signup(client, email="ada@example.com", password="supersecret", org_name="A
 
 def test_signup_requires_verification_before_login(client, monkeypatch):
     captured = {}
-    monkeypatch.setattr(auth_controller, "send_verification_email", lambda to, token: captured.update(to=to, token=token))
+    monkeypatch.setattr(auth_controller, "send_verification_email", lambda to, token, **kw: captured.update(to=to, token=token))
 
     resp = _signup(client)
     assert resp.status_code == 201
@@ -35,7 +35,7 @@ def test_signup_requires_verification_before_login(client, monkeypatch):
 
 def test_verify_email_rejects_unknown_or_reused_token(client, monkeypatch):
     captured = {}
-    monkeypatch.setattr(auth_controller, "send_verification_email", lambda to, token: captured.update(token=token))
+    monkeypatch.setattr(auth_controller, "send_verification_email", lambda to, token, **kw: captured.update(token=token))
     _signup(client)
 
     bad = client.post("/api/auth/verify-email", json={"token": "not-a-real-token"})
@@ -50,7 +50,7 @@ def test_verify_email_rejects_unknown_or_reused_token(client, monkeypatch):
 
 def test_resend_verification_does_not_reveal_whether_email_exists(client, monkeypatch):
     sent = []
-    monkeypatch.setattr(auth_controller, "send_verification_email", lambda to, token: sent.append(to))
+    monkeypatch.setattr(auth_controller, "send_verification_email", lambda to, token, **kw: sent.append(to))
     _signup(client)
 
     known = client.post("/api/auth/resend-verification", json={"email": "ada@example.com"})
@@ -60,6 +60,33 @@ def test_resend_verification_does_not_reveal_whether_email_exists(client, monkey
     assert known.json() == unknown.json() == {"status": "ok"}
     # one from signup itself, one from the resend - "nobody@example.com" got none
     assert sent == ["ada@example.com", "ada@example.com"]
+
+
+def test_verification_email_is_branded_with_org_name_and_support_email(client, monkeypatch, db_session):
+    captured = {}
+    monkeypatch.setattr(
+        auth_controller,
+        "send_verification_email",
+        lambda to, token, **kw: captured.update(to=to, from_name=kw.get("from_name"), reply_to=kw.get("reply_to")),
+    )
+
+    _signup(client, org_name="Ada's Store")
+    # right after signup there's no org_settings row yet - falls back to the
+    # org name itself for the display name, and no reply-to
+    assert captured["from_name"] == "Ada's Store via MyShop"
+    assert captured["reply_to"] is None
+
+    from app.models.org_settings import OrgSettings
+    from app.models.user import User
+
+    user = db_session.query(User).filter(User.email == "ada@example.com").first()
+    db_session.add(OrgSettings(org_id=user.org_id, biz_name="Ada's Boutique", support_email="ada@realmail.com"))
+    db_session.commit()
+
+    resend_resp = client.post("/api/auth/resend-verification", json={"email": "ada@example.com"})
+    assert resend_resp.status_code == 200
+    assert captured["from_name"] == "Ada's Boutique via MyShop"
+    assert captured["reply_to"] == "ada@realmail.com"
 
 
 def test_signup_duplicate_email_rejected(client):
@@ -86,8 +113,8 @@ def test_forgot_password_then_reset_logs_in_with_new_password(client, monkeypatc
     from tests.conftest import verify_user_email
 
     captured = {}
-    monkeypatch.setattr(auth_controller, "send_verification_email", lambda to, token: None)
-    monkeypatch.setattr(auth_controller, "send_password_reset_email", lambda to, token: captured.update(to=to, token=token))
+    monkeypatch.setattr(auth_controller, "send_verification_email", lambda to, token, **kw: None)
+    monkeypatch.setattr(auth_controller, "send_password_reset_email", lambda to, token, **kw: captured.update(to=to, token=token))
 
     _signup(client)
     verify_user_email("ada@example.com")
@@ -117,8 +144,8 @@ def test_reset_password_rejects_unknown_or_reused_token(client, monkeypatch):
     from tests.conftest import verify_user_email
 
     captured = {}
-    monkeypatch.setattr(auth_controller, "send_verification_email", lambda to, token: None)
-    monkeypatch.setattr(auth_controller, "send_password_reset_email", lambda to, token: captured.update(token=token))
+    monkeypatch.setattr(auth_controller, "send_verification_email", lambda to, token, **kw: None)
+    monkeypatch.setattr(auth_controller, "send_password_reset_email", lambda to, token, **kw: captured.update(token=token))
     _signup(client)
     verify_user_email("ada@example.com")
     client.post("/api/auth/forgot-password", json={"email": "ada@example.com"})
@@ -145,8 +172,8 @@ def test_forgot_password_on_google_only_account_sends_notice_not_reset_link(clie
 
     notice_sent = []
     reset_sent = []
-    monkeypatch.setattr(auth_controller, "send_google_only_account_notice", lambda to: notice_sent.append(to))
-    monkeypatch.setattr(auth_controller, "send_password_reset_email", lambda to, token: reset_sent.append(to))
+    monkeypatch.setattr(auth_controller, "send_google_only_account_notice", lambda to, **kw: notice_sent.append(to))
+    monkeypatch.setattr(auth_controller, "send_password_reset_email", lambda to, token, **kw: reset_sent.append(to))
 
     resp = client.post("/api/auth/forgot-password", json={"email": "g@example.com"})
 

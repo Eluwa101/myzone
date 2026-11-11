@@ -30,6 +30,7 @@ export default function SettingsPage() {
   const [managerName, setManagerName] = useState("");
   const [staffNames, setStaffNames] = useState("");
   const [defaultCurrency, setDefaultCurrency] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
 
@@ -46,6 +47,7 @@ export default function SettingsPage() {
       setManagerName(s.manager_name ?? "");
       setStaffNames((s.staff_names ?? []).join("\n"));
       setDefaultCurrency(s.default_currency ?? "");
+      setSupportEmail(s.support_email ?? "");
       if (s.whatsapp_number) {
         QRCode.toDataURL(waLink(s.whatsapp_number, s.qr_message ?? DEFAULT_MESSAGE), { width: 220 }).then(setQrDataUrl);
       }
@@ -88,6 +90,7 @@ export default function SettingsPage() {
           .map((n) => n.trim())
           .filter(Boolean),
         default_currency: defaultCurrency || null,
+        support_email: supportEmail || null,
       });
       setProfileStatus("Saved.");
     } catch (err) {
@@ -137,6 +140,18 @@ export default function SettingsPage() {
         <label htmlFor="prof-currency">Default currency</label>
         <CurrencySelect id="prof-currency" value={defaultCurrency} onChange={setDefaultCurrency} />
         <p className="muted small">Used to pre-fill the currency when adding new orders and transactions.</p>
+        <label htmlFor="prof-support-email">Support email</label>
+        <input
+          id="prof-support-email"
+          type="email"
+          value={supportEmail}
+          onChange={(e) => setSupportEmail(e.target.value)}
+          placeholder="e.g. hello@yourbusiness.com"
+        />
+        <p className="muted small">
+          Account emails (verification, password reset) show "{bizName || "your business"} via MyShop" as the sender, and
+          replies go here instead of to MyShop.
+        </p>
         <label htmlFor="prof-color">Brand color</label>
         <div className="row" style={{ alignItems: "center" }}>
           <input id="prof-color" type="color" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} style={{ width: 48, padding: 2 }} />

@@ -1,4 +1,12 @@
-"""Transactional email (verification links, password resets) via Resend.
+"""Transactional email (verification links, password resets, and - later -
+any customer-facing email) via Resend.
+
+Every org shares the one verified Resend sending address (no per-tenant
+domain verification required), but an email can still look branded: the
+"From" display name can show the org's business name and a "Reply-To" can
+point at the org's own contact email, while the underlying address stays
+the platform's verified one. See auth_controller._branding_for for how
+callers compute (from_name, reply_to) for a given org.
 
 Never raises: a failed send must not break the signup/login/reset request
 that triggered it (same defensive pattern as webhook dispatch and
@@ -14,18 +22,33 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-def _send(to: str, subject: str, html: str) -> None:
+def _from_address() -> str:
+    """The bare email address part of settings.email_from (e.g.
+    'MyShop <onboarding@resend.dev>' -> 'onboarding@resend.dev'), so a
+    per-org display name can be swapped in while keeping the one verified
+    sending address."""
+    raw = settings.email_from
+    if "<" in raw and raw.endswith(">"):
+        return raw.split("<", 1)[1].rstrip(">").strip()
+    return raw
+
+
+def _send(to: str, subject: str, html: str, from_name: str | None = None, reply_to: str | None = None) -> None:
     if not settings.resend_api_key:
         logger.info("RESEND_API_KEY not configured - skipping email to %s (subject: %r)", to, subject)
         return
     resend.api_key = settings.resend_api_key
+    sender = f"{from_name} <{_from_address()}>" if from_name else settings.email_from
+    payload = {"from": sender, "to": [to], "subject": subject, "html": html}
+    if reply_to:
+        payload["reply_to"] = reply_to
     try:
-        resend.Emails.send({"from": settings.email_from, "to": [to], "subject": subject, "html": html})
+        resend.Emails.send(payload)
     except Exception:  # noqa: BLE001 - a failed send must never break the caller's request
         logger.exception("Failed to send email to %s", to)
 
 
-def send_verification_email(to: str, token: str) -> None:
+def send_verification_email(to: str, token: str, from_name: str | None = None, reply_to: str | None = None) -> None:
     link = f"{settings.frontend_url}/verify-email?token={token}"
     _send(
         to,
@@ -33,10 +56,12 @@ def send_verification_email(to: str, token: str) -> None:
         f'<p>Welcome! Click below to verify your email and activate your account:</p>'
         f'<p><a href="{link}">{link}</a></p>'
         f'<p>This link expires in 24 hours.</p>',
+        from_name=from_name,
+        reply_to=reply_to,
     )
 
 
-def send_password_reset_email(to: str, token: str) -> None:
+def send_password_reset_email(to: str, token: str, from_name: str | None = None, reply_to: str | None = None) -> None:
     link = f"{settings.frontend_url}/reset-password?token={token}"
     _send(
         to,
@@ -44,13 +69,17 @@ def send_password_reset_email(to: str, token: str) -> None:
         f'<p>Click below to choose a new password:</p>'
         f'<p><a href="{link}">{link}</a></p>'
         f"<p>This link expires in 1 hour. If you didn't request this, you can ignore this email.</p>",
+        from_name=from_name,
+        reply_to=reply_to,
     )
 
 
-def send_google_only_account_notice(to: str) -> None:
+def send_google_only_account_notice(to: str, from_name: str | None = None, reply_to: str | None = None) -> None:
     _send(
         to,
         "About your MyShop account",
         "<p>This account signs in with Google - there's no password to reset. "
         'Use "Continue with Google" on the login page instead.</p>',
+        from_name=from_name,
+        reply_to=reply_to,
     )

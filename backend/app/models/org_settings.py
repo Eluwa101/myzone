@@ -21,5 +21,10 @@ class OrgSettings(Base):
     manager_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     staff_names: Mapped[list | None] = mapped_column(JSON, nullable=True)
     default_currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    # reply-to address for outgoing account emails sent on this org's behalf
+    # (verification, password reset, etc.) - lets the "From" display name
+    # show the business while replies land in the shop's own inbox, without
+    # needing them to verify a sending domain of their own
+    support_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     organization = relationship("Organization", back_populates="settings")
