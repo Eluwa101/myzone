@@ -684,31 +684,52 @@ a.row-between:hover {
   padding: 12px;
 }
 
+/* Anchoring the panel to its own (small) icon wrapper falls apart on a
+   narrow screen - the bell isn't the rightmost header icon, so the panel
+   floats detached from any edge and can overlap page content below the
+   header instead of reading as a dropdown. Below this width it docks to
+   the viewport instead: full-width (minus a safe margin), flush under the
+   sticky top bar, so it's always fully on-screen regardless of the bell's
+   position among its sibling icons. */
+@media (max-width: 480px) {
+  .notes-bell-panel {
+    position: fixed;
+    top: calc(64px + env(safe-area-inset-top, 0px));
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: 75vh;
+  }
+}
+
 .notes-bell-item {
   padding: 8px 0;
   border-bottom: 1px solid var(--border);
 }
 
 .notification-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
   width: 100%;
-  padding: 8px 0;
   border-bottom: 1px solid var(--border);
-  background: none;
-  border-left: none;
-  border-right: none;
-  border-top: none;
-  border-radius: 0;
-  text-align: left;
+  position: relative;
 }
 
 .notification-item:last-child {
   border-bottom: none;
 }
 
-.notification-item:hover {
+.notification-item-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 28px 8px 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  text-align: left;
+}
+
+.notification-item-main:hover {
   background: var(--surface-hover);
 }
 
@@ -734,6 +755,28 @@ a.row-between:hover {
   background: var(--accent);
   flex-shrink: 0;
   margin-top: 5px;
+}
+
+.notification-item-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 2px;
+  padding: 4px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  border-radius: var(--radius-full);
+  display: flex;
+}
+
+.notification-item-dismiss:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.notification-item-details {
+  padding: 0 0 10px;
+  margin-top: -4px;
 }
 
 .notes-bell-item:last-child {
@@ -1107,6 +1150,17 @@ a.row-between:hover {
   gap: 6px;
 }
 
+.customer-display-id {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.customer-display-id-row {
+  margin: -4px 0 8px;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+
 .pending-order-dot {
   width: 8px;
   height: 8px;
@@ -1170,12 +1224,21 @@ a.row-between:hover {
   justify-content: center;
   box-shadow: var(--shadow-lg);
   transition: transform 0.15s ease, filter 0.15s ease;
+  touch-action: none;
+  cursor: grab;
 }
 
 .fab:hover {
   background: var(--gradient-accent);
   filter: brightness(1.08);
   transform: scale(1.05);
+}
+
+.fab-dragging {
+  transition: none;
+  cursor: grabbing;
+  transform: scale(1.1);
+  box-shadow: var(--shadow-lg), 0 0 0 6px var(--accent-soft-bg);
 }
 
 .quick-create-fab {

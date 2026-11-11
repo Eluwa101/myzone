@@ -58,6 +58,47 @@ def test_mark_read_unknown_notification_404s(client, auth_headers):
     assert resp.status_code == 404
 
 
+def test_delete_notification_dismisses_it(client, auth_headers):
+    customer = _create_customer(client, auth_headers)
+    client.post(
+        f"/api/customers/{customer['id']}/orders",
+        json={"order_date": "2026-11-05", "items": [{"name": "Rice"}]},
+        headers=auth_headers,
+    )
+    notification_id = client.get("/api/notifications", headers=auth_headers).json()[0]["id"]
+
+    resp = client.delete(f"/api/notifications/{notification_id}", headers=auth_headers)
+    assert resp.status_code == 204
+
+    remaining = client.get("/api/notifications", headers=auth_headers).json()
+    assert all(n["id"] != notification_id for n in remaining)
+
+
+def test_delete_unknown_notification_404s(client, auth_headers):
+    resp = client.delete("/api/notifications/00000000-0000-0000-0000-000000000000", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_delete_notification_scoped_to_org(client, auth_headers):
+    from tests.conftest import verify_user_email
+
+    customer = _create_customer(client, auth_headers)
+    client.post(
+        f"/api/customers/{customer['id']}/orders",
+        json={"order_date": "2026-11-05", "items": [{"name": "Rice"}]},
+        headers=auth_headers,
+    )
+    notification_id = client.get("/api/notifications", headers=auth_headers).json()[0]["id"]
+
+    client.post("/api/auth/signup", json={"org_name": "Other Co", "email": "other@example.com", "password": "secret123"})
+    verify_user_email("other@example.com")
+    other_token = client.post("/api/auth/login", json={"email": "other@example.com", "password": "secret123"}).json()["access_token"]
+    other_headers = {"Authorization": f"Bearer {other_token}"}
+
+    resp = client.delete(f"/api/notifications/{notification_id}", headers=other_headers)
+    assert resp.status_code == 404
+
+
 def test_notifications_require_auth(client):
     assert client.get("/api/notifications").status_code == 401
 

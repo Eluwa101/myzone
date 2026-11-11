@@ -31,6 +31,39 @@ def test_create_customer_tool_creates_and_logs(db_session, seeded_org, tools):
     assert logged[0].tool_name == "create_customer"
 
 
+def test_create_customer_tool_splits_two_word_name(db_session, seeded_org, tools):
+    result = tools["create_customer"].invoke({"name": "Ada Obi"})
+    assert result["first_name"] == "Ada"
+    assert result["last_name"] == "Obi"
+    assert result["name"] == "Ada Obi"
+
+
+def test_create_customer_tool_single_word_name_has_no_last_name(db_session, seeded_org, tools):
+    result = tools["create_customer"].invoke({"name": "Madonna"})
+    assert result["first_name"] == "Madonna"
+    assert result["last_name"] is None
+    assert result["name"] == "Madonna"
+
+
+def test_create_customer_tool_three_word_name_keeps_rest_as_last_name(db_session, seeded_org, tools):
+    result = tools["create_customer"].invoke({"name": "Ada Bello Obi"})
+    assert result["first_name"] == "Ada"
+    assert result["last_name"] == "Bello Obi"
+
+
+def test_update_customer_tool_renaming_resplits_first_last(db_session, seeded_org, tools):
+    created = tools["create_customer"].invoke({"name": "Ada"})
+    assert created["last_name"] is None
+
+    updated = tools["update_customer"].invoke({"customer_id": created["id"], "name": "Ada Obi"})
+    assert updated["first_name"] == "Ada"
+    assert updated["last_name"] == "Obi"
+
+    renamed_single = tools["update_customer"].invoke({"customer_id": created["id"], "name": "Adaeze"})
+    assert renamed_single["first_name"] == "Adaeze"
+    assert renamed_single["last_name"] is None
+
+
 def test_create_customer_tool_flags_duplicate_instead_of_creating(db_session, seeded_org, tools):
     org_id, _ = seeded_org
     tools["create_customer"].invoke({"name": "Ada Obi", "phone": "08012345678"})
@@ -155,6 +188,29 @@ def test_search_customers_tool(db_session, seeded_org, tools):
     result = tools["search_customers"].invoke({"query": "generator"})
     assert result["total"] == 1
     assert result["customers"][0]["name"] == "Ada Obi"
+    assert result["customers"][0]["display_id"] == "CR001"
+
+
+def test_search_customers_tool_matches_display_id(db_session, seeded_org, tools):
+    created = tools["create_customer"].invoke({"name": "Ada Obi"})
+    tools["create_customer_as_new"].invoke({"name": "Bo Chen"})
+
+    result = tools["search_customers"].invoke({"query": created["display_id"]})
+    assert result["total"] == 1
+    assert result["customers"][0]["name"] == "Ada Obi"
+
+
+def test_find_customer_by_id_tool(db_session, seeded_org, tools):
+    created = tools["create_customer"].invoke({"name": "Ada Obi"})
+
+    found = tools["find_customer_by_id"].invoke({"display_id": created["display_id"]})
+    assert found["action"] == "found"
+    assert found["name"] == "Ada Obi"
+
+
+def test_find_customer_by_id_tool_unknown_id(db_session, seeded_org, tools):
+    result = tools["find_customer_by_id"].invoke({"display_id": "CR999"})
+    assert result["status"] == "error"
 
 
 def test_update_transaction_tool_then_delete_tool(db_session, seeded_org, tools):

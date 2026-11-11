@@ -64,8 +64,9 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         customer and ask whether to update it (use update_customer) or save
         this as a separate new customer anyway (use create_customer_as_new,
         same arguments)."""
+        first_name, last_name = customer_controller.split_name(name)
         data = CustomerCreate(
-            name=name, phone=_clean(phone), email=_clean(email), job=_clean(job),
+            first_name=first_name, last_name=last_name, phone=_clean(phone), email=_clean(email), job=_clean(job),
             nationality=_clean(nationality), pet=_clean(pet), address=_clean(address),
             notes=_clean(notes), interests=_clean(interests),
         )
@@ -97,8 +98,9 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         """Create a new customer record even if it looks like a duplicate of
         an existing one. Only use this after create_customer returned a
         conflict and the user confirmed they want a separate record anyway."""
+        first_name, last_name = customer_controller.split_name(name)
         data = CustomerCreate(
-            name=name, phone=_clean(phone), email=_clean(email), job=_clean(job),
+            first_name=first_name, last_name=last_name, phone=_clean(phone), email=_clean(email), job=_clean(job),
             nationality=_clean(nationality), pet=_clean(pet), address=_clean(address),
             notes=_clean(notes), interests=_clean(interests),
         )
@@ -125,11 +127,15 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         should change - leave others blank. status, if given, must be one of
         lead, customer, inactive."""
         fields = {
-            "name": _clean(name), "phone": _clean(phone), "email": _clean(email), "job": _clean(job),
+            "phone": _clean(phone), "email": _clean(email), "job": _clean(job),
             "nationality": _clean(nationality), "pet": _clean(pet), "address": _clean(address),
             "notes": _clean(notes), "interests": _clean(interests),
         }
         updates = {k: v for k, v in fields.items() if v is not None}
+        if name.strip():
+            first_name, last_name = customer_controller.split_name(name)
+            updates["first_name"] = first_name
+            updates["last_name"] = last_name
         if status.strip():
             try:
                 updates["status"] = CustomerStatus(status.strip().lower())
@@ -145,8 +151,10 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
 
     @tool
     def search_customers(query: str = "", status: str = "") -> dict:
-        """Search/list customers by name, phone, email, job, pet, or
-        interests, optionally filtered by status (lead, customer, inactive).
+        """Search/list customers by name, phone, email, job, pet,
+        interests, their CR-id (e.g. "CR007"), or an item name from any of
+        their past transactions (e.g. "rice" finds everyone who bought
+        rice) - optionally filtered by status (lead, customer, inactive).
         Leave both blank to list everyone (first 20)."""
         status_filter = None
         if status.strip():
@@ -158,10 +166,33 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         return {
             "total": total,
             "customers": [
-                {"id": str(c.id), "name": c.name, "status": c.status.value, "phone": c.phone, "email": c.email, "interests": c.interests}
+                {
+                    "id": str(c.id),
+                    "display_id": c.display_id,
+                    "name": c.name,
+                    "status": c.status.value,
+                    "phone": c.phone,
+                    "email": c.email,
+                    "interests": c.interests,
+                }
                 for c in items
             ],
         }
+
+    @tool
+    def find_customer_by_id(display_id: str) -> dict:
+        """Look up the one customer with this exact CR-id (e.g. "CR007" -
+        the short id shown on their profile, often written by hand on a
+        receipt or document). Use this whenever a customer is referenced
+        by that id rather than by name."""
+        try:
+            customer = customer_controller.get_customer_by_display_id(db, org_id, display_id)
+        except customer_controller.CustomerNotFoundError:
+            return {"status": "error", "message": f"No customer with id {display_id!r}."}
+        # "action" (not "status") - the customer's own lifecycle status is
+        # already a field in the spread dict below, and a same-named
+        # wrapper key would silently clobber it.
+        return {"action": "found", **_serialize_customer(customer)}
 
     @tool
     def find_duplicate_customers() -> dict:
@@ -563,6 +594,7 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         create_customer_as_new,
         update_customer,
         search_customers,
+        find_customer_by_id,
         find_duplicate_customers,
         add_transaction,
         update_transaction,

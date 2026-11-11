@@ -6,10 +6,12 @@ import {
   Plug,
   StickyNote,
   Upload,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
+  deleteNotification,
   getUnreadNotificationCount,
   listNotifications,
   markAllNotificationsRead,
@@ -47,6 +49,7 @@ export default function NotificationBell() {
   const [loading, setLoading] = useState(false);
   const [pendingNotes, setPendingNotes] = useState<OrgNote[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   function refreshCounts() {
@@ -72,6 +75,7 @@ export default function NotificationBell() {
     const next = !open;
     setOpen(next);
     if (next) {
+      setExpandedId(null);
       setLoading(true);
       Promise.all([listNotes({ pending: true }), listNotifications()])
         .then(([notes, notifs]) => {
@@ -97,9 +101,29 @@ export default function NotificationBell() {
       setNotifications((list) => list.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
       setUnreadCount((c) => Math.max(0, c - 1));
     }
-    if (n.link) {
-      setOpen(false);
-      navigate(n.link);
+    // first tap expands in place to show the technical details (type,
+    // full body, exact time); a second tap on the same row follows its
+    // link, if it has one - this way a link navigation is always a
+    // deliberate second action, not an accidental side effect of reading.
+    if (expandedId === n.id) {
+      if (n.link) {
+        setOpen(false);
+        navigate(n.link);
+      }
+    } else {
+      setExpandedId(n.id);
+    }
+  }
+
+  async function onDismiss(e: React.MouseEvent, n: Notification) {
+    e.stopPropagation();
+    setNotifications((list) => list.filter((x) => x.id !== n.id));
+    if (!n.read) setUnreadCount((c) => Math.max(0, c - 1));
+    if (expandedId === n.id) setExpandedId(null);
+    try {
+      await deleteNotification(n.id);
+    } catch {
+      // non-fatal - worst case it reappears next time the panel opens
     }
   }
 
@@ -172,20 +196,41 @@ export default function NotificationBell() {
               ) : (
                 notifications.map((n) => {
                   const Icon = iconFor(n.type);
+                  const expanded = expandedId === n.id;
                   return (
-                    <button
-                      key={n.id}
-                      type="button"
-                      className={`notification-item${n.read ? "" : " notification-item-unread"}`}
-                      onClick={() => onNotificationClick(n)}
-                    >
-                      <Icon size={15} className="notification-item-icon" />
-                      <div className="notification-item-text">
-                        <div className="small">{n.title}</div>
-                        <div className="muted small">{timeAgo(n.created_at)}</div>
-                      </div>
-                      {!n.read && <span className="notification-item-dot" />}
-                    </button>
+                    <div key={n.id} className={`notification-item${n.read ? "" : " notification-item-unread"}${expanded ? " notification-item-expanded" : ""}`}>
+                      <button type="button" className="notification-item-main" onClick={() => onNotificationClick(n)}>
+                        <Icon size={15} className="notification-item-icon" />
+                        <div className="notification-item-text">
+                          <div className="small">{n.title}</div>
+                          <div className="muted small">{timeAgo(n.created_at)}</div>
+                        </div>
+                        {!n.read && <span className="notification-item-dot" />}
+                      </button>
+                      <button type="button" className="notification-item-dismiss" aria-label="Dismiss" onClick={(e) => onDismiss(e, n)}>
+                        <X size={14} />
+                      </button>
+                      {expanded && (
+                        <div className="notification-item-details">
+                          <div className="muted small">Type: {n.type}</div>
+                          <div className="muted small">{new Date(n.created_at).toLocaleString()}</div>
+                          {n.body && <p className="small" style={{ margin: "6px 0 0" }}>{n.body}</p>}
+                          {n.link && (
+                            <button
+                              type="button"
+                              className="icon-btn btn-ghost small"
+                              style={{ marginTop: 6, padding: 0 }}
+                              onClick={() => {
+                                setOpen(false);
+                                navigate(n.link!);
+                              }}
+                            >
+                              View →
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   );
                 })
               )}

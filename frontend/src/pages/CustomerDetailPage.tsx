@@ -1,6 +1,6 @@
 import { Bot, Check, Mic, Plus, Send, Square, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   addOrder,
   addTransaction,
@@ -15,7 +15,7 @@ import {
 import { getThreadMessages, listPending, sendChat } from "../api/agent";
 import { ApiError } from "../api/client";
 import { errorMessage } from "../api/errorMessage";
-import { listNotes } from "../api/notes";
+import { createNote, deleteNote, listNotes, updateNote } from "../api/notes";
 import { getDefaultCurrency } from "../api/settings";
 import type { Customer, CustomerStatus, Order, OrgNote, PendingAction } from "../api/types";
 import CurrencySelect from "../components/CurrencySelect";
@@ -210,6 +210,7 @@ export default function CustomerDetailPage() {
   return (
     <div>
       <TopBar title={customer.name} backTo="/customers" />
+      <p className="muted small customer-display-id-row">{customer.display_id}</p>
       <Tabs
         tabs={[
           { key: "info", label: "Info" },
@@ -789,36 +790,156 @@ function AssistantTab({ customer, onChanged }: { customer: Customer; onChanged: 
 
 function CustomerNotesSection({ customerId }: { customerId: string }) {
   const [notes, setNotes] = useState<OrgNote[] | null>(null);
+  const [adding, setAdding] = useState(false);
 
-  useEffect(() => {
+  function load() {
     listNotes({ customerId })
       .then(setNotes)
       .catch(() => setNotes([]));
-  }, [customerId]);
+  }
+  useEffect(load, [customerId]);
 
   return (
     <div className="card">
       <h3>Notes</h3>
       {notes === null && <p className="muted small">Loading…</p>}
-      {notes !== null && notes.length === 0 && <p className="muted small">No notes for this customer yet.</p>}
+      {notes !== null && notes.length === 0 && !adding && <p className="muted small">No notes for this customer yet.</p>}
       {notes?.map((n) => (
-        <div key={n.id} className="info-row" style={{ cursor: "default" }}>
-          <div className="info-row-text">
-            <div className="row" style={{ marginBottom: 2 }}>
-              <span className="info-row-label" style={{ marginBottom: 0, fontWeight: 600, fontSize: 14, color: "var(--text)" }}>
-                {n.title}
-              </span>
-              {n.is_pending_review && <span className="badge badge-lead">Needs review</span>}
-            </div>
-            <div className="info-row-value muted" style={{ fontWeight: 400 }}>
-              {n.content}
-            </div>
+        <CustomerNoteRow key={n.id} note={n} onChanged={load} />
+      ))}
+      {adding ? (
+        <CustomerNoteEditor
+          customerId={customerId}
+          onCancel={() => setAdding(false)}
+          onSaved={() => {
+            setAdding(false);
+            load();
+          }}
+        />
+      ) : (
+        <button type="button" className="icon-btn btn-ghost" style={{ marginTop: 8 }} onClick={() => setAdding(true)}>
+          <Plus size={15} /> Add note
+        </button>
+      )}
+    </div>
+  );
+}
+
+function CustomerNoteEditor({
+  customerId,
+  note,
+  onCancel,
+  onSaved,
+}: {
+  customerId: string;
+  note?: OrgNote;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState(note?.title ?? "");
+  const [content, setContent] = useState(note?.content ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!title.trim() || !content.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (note) await updateNote(note.id, { title: title.trim(), content: content.trim() });
+      else await createNote({ title: title.trim(), content: content.trim(), customer_ids: [customerId] });
+      onSaved();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="info-row-editing" onSubmit={onSubmit} style={{ marginTop: note ? 0 : 10 }}>
+      <label htmlFor={`note-title-${note?.id ?? "new"}`}>Title</label>
+      <input id={`note-title-${note?.id ?? "new"}`} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Creditor" autoFocus />
+      <label htmlFor={`note-content-${note?.id ?? "new"}`}>Note</label>
+      <textarea id={`note-content-${note?.id ?? "new"}`} rows={3} value={content} onChange={(e) => setContent(e.target.value)} />
+      <ErrorText message={error} />
+      <div className="row" style={{ marginTop: 10 }}>
+        <button type="submit" className="btn-primary" disabled={busy}>
+          <Check size={15} /> Save
+        </button>
+        <button type="button" onClick={onCancel} disabled={busy}>
+          <X size={15} /> Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function CustomerNoteRow({ note, onChanged }: { note: OrgNote; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [armedDelete, setArmedDelete] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function markReviewed() {
+    setBusy(true);
+    setError(null);
+    try {
+      await updateNote(note.id, { is_pending_review: false });
+      onChanged();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!armedDelete) {
+      setArmedDelete(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      await deleteNote(note.id);
+      onChanged();
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  }
+
+  if (editing) {
+    return <CustomerNoteEditor customerId="" note={note} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged(); }} />;
+  }
+
+  return (
+    <div className="note-card" style={{ marginBottom: 10 }}>
+      <button type="button" className="info-row" onClick={() => setEditing(true)}>
+        <div className="info-row-text">
+          <div className="row" style={{ marginBottom: 2 }}>
+            <span className="info-row-label" style={{ marginBottom: 0, fontWeight: 600, fontSize: 14, color: "var(--text)" }}>
+              {note.title}
+            </span>
+            {note.is_pending_review && <span className="badge badge-lead">Needs review</span>}
+          </div>
+          <div className="info-row-value muted" style={{ fontWeight: 400 }}>
+            {note.content}
           </div>
         </div>
-      ))}
-      <Link to={`/notes?customer_id=${customerId}`} className="icon-btn btn-ghost" style={{ marginTop: 8, display: "inline-flex" }}>
-        <Plus size={15} /> Add note
-      </Link>
+      </button>
+      <ErrorText message={error} />
+      <div className="row" style={{ marginTop: 6 }}>
+        {note.is_pending_review && (
+          <button type="button" className="btn-primary small" onClick={markReviewed} disabled={busy}>
+            Mark reviewed
+          </button>
+        )}
+        <button type="button" className="btn-danger small" onClick={remove} disabled={busy} style={{ marginLeft: "auto" }}>
+          <Trash2 size={13} /> {armedDelete ? "Confirm?" : "Delete"}
+        </button>
+      </div>
     </div>
   );
 }

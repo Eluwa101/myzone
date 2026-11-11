@@ -33,3 +33,11 @@ def mark_read(notification_id: UUID, db: Session = Depends(get_db), current_user
 @router.post("/read-all")
 def mark_all_read(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return {"updated": notification_controller.mark_all_read(db, current_user.org_id)}
+
+
+@router.delete("/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_notification(notification_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    try:
+        notification_controller.delete_notification(db, current_user.org_id, notification_id)
+    except notification_controller.NotificationNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found.")

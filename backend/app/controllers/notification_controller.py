@@ -48,6 +48,12 @@ def mark_read(db: Session, org_id: UUID, notification_id: UUID) -> Notification:
     return notification
 
 
+def delete_notification(db: Session, org_id: UUID, notification_id: UUID) -> None:
+    notification = _get_notification(db, org_id, notification_id)
+    db.delete(notification)
+    db.commit()
+
+
 def mark_all_read(db: Session, org_id: UUID) -> int:
     updated = (
         db.query(Notification)

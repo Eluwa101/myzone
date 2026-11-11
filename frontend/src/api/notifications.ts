@@ -25,3 +25,7 @@ export function markNotificationRead(id: string): Promise<Notification> {
 export function markAllNotificationsRead(): Promise<{ updated: number }> {
   return api.post<{ updated: number }>("/api/notifications/read-all");
 }
+
+export function deleteNotification(id: string): Promise<void> {
+  return api.delete<void>(`/api/notifications/${id}`);
+}

@@ -19,6 +19,10 @@ class Customer(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     org_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id"), index=True)
+    # org-scoped human-friendly id (CR001, CR002, ...) - lets staff tag/refer
+    # to a customer quickly (e.g. writing it on a receipt), and lets the
+    # receipt-scanning flow resolve a photographed id back to this record
+    display_id: Mapped[str] = mapped_column(String(20), index=True)
 
     name: Mapped[str] = mapped_column(String(200))
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)

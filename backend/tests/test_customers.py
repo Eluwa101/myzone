@@ -1,3 +1,65 @@
+def test_customers_get_sequential_display_ids_per_org(client, auth_headers):
+    first = client.post("/api/customers", json={"name": "Ada Obi"}, headers=auth_headers).json()
+    second = client.post("/api/customers", json={"name": "Bo Chen"}, headers=auth_headers).json()
+    assert first["display_id"] == "CR001"
+    assert second["display_id"] == "CR002"
+
+
+def test_customers_display_id_sequence_is_scoped_to_org(client, auth_headers):
+    from tests.conftest import verify_user_email
+
+    client.post("/api/customers", json={"name": "Ada Obi"}, headers=auth_headers)
+
+    client.post("/api/auth/signup", json={"org_name": "Other Co", "email": "other2@example.com", "password": "secret123"})
+    verify_user_email("other2@example.com")
+    other_token = client.post("/api/auth/login", json={"email": "other2@example.com", "password": "secret123"}).json()["access_token"]
+    other_headers = {"Authorization": f"Bearer {other_token}"}
+
+    other_first = client.post("/api/customers", json={"name": "Chi Eze"}, headers=other_headers).json()
+    assert other_first["display_id"] == "CR001"  # own sequence, unaffected by the first org
+
+
+def test_get_customer_by_display_id(client, auth_headers):
+    created = client.post("/api/customers", json={"name": "Ada Obi"}, headers=auth_headers).json()
+
+    resp = client.get(f"/api/customers/by-id/{created['display_id']}", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["id"] == created["id"]
+
+    # case-insensitive
+    resp_lower = client.get(f"/api/customers/by-id/{created['display_id'].lower()}", headers=auth_headers)
+    assert resp_lower.status_code == 200
+    assert resp_lower.json()["id"] == created["id"]
+
+
+def test_get_customer_by_unknown_display_id_404s(client, auth_headers):
+    resp = client.get("/api/customers/by-id/CR999", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_search_customers_by_display_id(client, auth_headers):
+    created = client.post("/api/customers", json={"name": "Ada Obi"}, headers=auth_headers).json()
+    client.post("/api/customers", json={"name": "Bo Chen"}, headers=auth_headers)
+
+    resp = client.get("/api/customers", params={"search": created["display_id"]}, headers=auth_headers)
+    names = [c["name"] for c in resp.json()["items"]]
+    assert names == ["Ada Obi"]
+
+
+def test_search_customers_by_transaction_item_name(client, auth_headers):
+    buyer = client.post("/api/customers", json={"name": "Ada Obi"}, headers=auth_headers).json()
+    client.post("/api/customers", json={"name": "Bo Chen"}, headers=auth_headers)
+    client.post(
+        f"/api/customers/{buyer['id']}/transactions",
+        json={"date": "2026-11-01", "items": [{"item": "Generator", "qty": 1, "amount": 50000}], "currency": "NGN"},
+        headers=auth_headers,
+    )
+
+    resp = client.get("/api/customers", params={"search": "generator"}, headers=auth_headers)
+    names = [c["name"] for c in resp.json()["items"]]
+    assert names == ["Ada Obi"]
+
+
 def test_create_customer_defaults_to_customer_status(client, auth_headers):
     resp = client.post("/api/customers", json={"name": "Ada Obi"}, headers=auth_headers)
     assert resp.status_code == 201

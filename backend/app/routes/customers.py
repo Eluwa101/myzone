@@ -85,6 +85,14 @@ def export_customers(db: Session = Depends(get_db), current_user: User = Depends
     return Response(content=csv_text, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=customers.csv"})
 
 
+@router.get("/by-id/{display_id}", response_model=CustomerOut)
+def get_customer_by_display_id(display_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    try:
+        return customer_controller.get_customer_by_display_id(db, current_user.org_id, display_id)
+    except customer_controller.CustomerNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No customer with that id.")
+
+
 @router.get("/{customer_id}", response_model=CustomerOut)
 def get_customer(customer_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:

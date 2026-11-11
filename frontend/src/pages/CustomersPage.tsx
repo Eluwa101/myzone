@@ -42,7 +42,7 @@ export default function CustomersPage() {
           <input
             aria-label="Search customers"
             className="search-input"
-            placeholder="Search name, job, pet, phone…"
+            placeholder="Search name, job, pet, phone, ID, item bought…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -78,7 +78,8 @@ export default function CustomersPage() {
                   <StatusBadge status={c.status} />
                 </div>
                 <div className="muted small">
-                  {c.transactions.length} transaction{c.transactions.length === 1 ? "" : "s"}
+                  <span className="customer-display-id">{c.display_id}</span> · {c.transactions.length} transaction
+                  {c.transactions.length === 1 ? "" : "s"}
                 </div>
               </Link>
             </li>

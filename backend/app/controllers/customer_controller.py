@@ -3,11 +3,12 @@ import io
 import re
 from uuid import UUID
 
-from sqlalchemy import func, or_
+from sqlalchemy import Text, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.controllers import notification_controller, webhook_controller
 from app.models.customer import Customer, CustomerStatus
+from app.models.organization import Organization
 from app.models.transaction import Transaction
 from app.schemas.customer import CustomerCreate, CustomerUpdate, ImportResult
 
@@ -107,6 +108,19 @@ def _clear_bought_interests(customer: Customer) -> None:
     customer.interests = ", ".join(kept)
 
 
+def split_name(name: str) -> tuple[str, str | None]:
+    """Splits a full name into (first_name, last_name) the way the AI
+    agent stores a name it's given in conversation: the first word is the
+    first name, everything after is the last name, and a single word has
+    no last name at all."""
+    parts = name.strip().split(None, 1)
+    if not parts:
+        return "", None
+    if len(parts) == 1:
+        return parts[0], None
+    return parts[0], parts[1]
+
+
 def _tx_key(date, items: list[dict], amount: float) -> tuple:
     """A hashable fingerprint for a transaction, used to dedupe identical
     rows when merging customers or re-importing the same CSV twice."""
@@ -142,6 +156,18 @@ def get_customer(db: Session, org_id: UUID, customer_id: UUID) -> Customer:
     return customer
 
 
+def get_customer_by_display_id(db: Session, org_id: UUID, display_id: str) -> Customer:
+    customer = (
+        db.query(Customer)
+        .options(joinedload(Customer.transactions), joinedload(Customer.orders))
+        .filter(Customer.org_id == org_id, func.upper(Customer.display_id) == display_id.strip().upper())
+        .first()
+    )
+    if not customer:
+        raise CustomerNotFoundError()
+    return customer
+
+
 def list_customers(
     db: Session,
     org_id: UUID,
@@ -155,6 +181,15 @@ def list_customers(
         q = q.filter(Customer.status == status)
     if search:
         like = f"%{search.lower()}%"
+        # Deep match: also searches inside each transaction's line items
+        # (e.g. "Rice" finds every customer who bought rice) by casting the
+        # JSON column to text - crude, but correct at this app's data scale,
+        # and avoids a second paginated query to merge results from.
+        tx_item_match = (
+            db.query(Transaction.customer_id)
+            .filter(func.lower(Transaction.items.cast(Text)).like(like))
+            .subquery()
+        )
         q = q.filter(
             or_(
                 func.lower(Customer.name).like(like),
@@ -163,6 +198,8 @@ def list_customers(
                 func.lower(func.coalesce(Customer.job, "")).like(like),
                 func.lower(func.coalesce(Customer.pet, "")).like(like),
                 func.lower(func.coalesce(Customer.interests, "")).like(like),
+                func.lower(Customer.display_id).like(like),
+                Customer.id.in_(db.query(tx_item_match.c.customer_id)),
             )
         )
     total = q.count()
@@ -178,6 +215,16 @@ def _apply_status(customer: Customer, status: CustomerStatus | None) -> None:
         customer.status_auto = True
 
 
+def _next_display_id(db: Session, org_id: UUID) -> str:
+    """CR001, CR002, ... scoped to this org. Locks the org row for the rest
+    of this transaction so two concurrent creates can't be handed the same
+    number (with_for_update is a no-op on SQLite, which is fine - the test
+    suite never creates customers concurrently)."""
+    org = db.query(Organization).filter(Organization.id == org_id).with_for_update().one()
+    org.customer_seq += 1
+    return f"CR{org.customer_seq:03d}"
+
+
 def create_customer(db: Session, org_id: UUID, data: CustomerCreate, force: bool = False) -> Customer:
     if not force:
         match = find_match(db, org_id, data.model_dump())
@@ -186,6 +233,7 @@ def create_customer(db: Session, org_id: UUID, data: CustomerCreate, force: bool
 
     customer = Customer(
         org_id=org_id,
+        display_id=_next_display_id(db, org_id),
         name=data.name,
         first_name=data.first_name,
         last_name=data.last_name,

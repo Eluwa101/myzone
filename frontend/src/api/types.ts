@@ -53,6 +53,7 @@ export interface OrgNote {
 export interface Customer {
   id: string;
   org_id: string;
+  display_id: string;
   name: string;
   first_name?: string | null;
   last_name?: string | null;

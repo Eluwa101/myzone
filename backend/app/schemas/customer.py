@@ -63,6 +63,7 @@ class CustomerUpdate(BaseModel):
 class CustomerOut(CustomerBase):
     id: UUID
     org_id: UUID
+    display_id: str
     status: CustomerStatus
     status_auto: bool
     created_at: datetime
