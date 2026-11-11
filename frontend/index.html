@@ -5,6 +5,13 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MyShop</title>
+    <!-- Starts the connection to Google's sign-in domains as early as
+         possible, in parallel with the rest of the page - the GSI script,
+         its rendered button iframe, and that iframe's own font each add a
+         fresh DNS+TLS handshake otherwise, which is most of why the Google
+         button visibly lags behind the rest of the login page. -->
+    <link rel="preconnect" href="https://accounts.google.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>

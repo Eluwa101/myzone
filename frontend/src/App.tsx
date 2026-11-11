@@ -1,64 +1,72 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import ProtectedLayout from "./components/ProtectedLayout";
 import ServerWakingBanner from "./components/ServerWakingBanner";
-import AskDataPage from "./pages/AskDataPage";
-import CheckEmailPage from "./pages/CheckEmailPage";
-import ChatPage from "./pages/ChatPage";
-import CustomerDetailPage from "./pages/CustomerDetailPage";
-import CustomersPage from "./pages/CustomersPage";
-import DashboardPage from "./pages/DashboardPage";
-import DashboardInterestsPage from "./pages/DashboardInterestsPage";
-import DashboardMonthlyPage from "./pages/DashboardMonthlyPage";
-import DashboardTopCustomersPage from "./pages/DashboardTopCustomersPage";
-import DataPage from "./pages/DataPage";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage";
-import FormsPage from "./pages/FormsPage";
-import LoginPage from "./pages/LoginPage";
-import NotesPage from "./pages/NotesPage";
-import OnboardingPage from "./pages/OnboardingPage";
-import OrdersPage from "./pages/OrdersPage";
-import PublicFormPage from "./pages/PublicFormPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import SegmentsPage from "./pages/SegmentsPage";
-import SettingsPage from "./pages/SettingsPage";
-import SignupPage from "./pages/SignupPage";
-import VerifyEmailPage from "./pages/VerifyEmailPage";
-import WebhooksPage from "./pages/WebhooksPage";
+import Spinner from "./components/Spinner";
+
+// Routed pages are lazy-loaded so a first visit (almost always /login) only
+// downloads/parses the code it actually needs, instead of one bundle for
+// the whole app - this is the single biggest lever on initial load time.
+const AskDataPage = lazy(() => import("./pages/AskDataPage"));
+const CheckEmailPage = lazy(() => import("./pages/CheckEmailPage"));
+const ChatPage = lazy(() => import("./pages/ChatPage"));
+const CustomerDetailPage = lazy(() => import("./pages/CustomerDetailPage"));
+const CustomersPage = lazy(() => import("./pages/CustomersPage"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const DashboardInterestsPage = lazy(() => import("./pages/DashboardInterestsPage"));
+const DashboardMonthlyPage = lazy(() => import("./pages/DashboardMonthlyPage"));
+const DashboardTopCustomersPage = lazy(() => import("./pages/DashboardTopCustomersPage"));
+const DataPage = lazy(() => import("./pages/DataPage"));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
+const FormsPage = lazy(() => import("./pages/FormsPage"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const NotesPage = lazy(() => import("./pages/NotesPage"));
+const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
+const OrdersPage = lazy(() => import("./pages/OrdersPage"));
+const PublicFormPage = lazy(() => import("./pages/PublicFormPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const SegmentsPage = lazy(() => import("./pages/SegmentsPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const SignupPage = lazy(() => import("./pages/SignupPage"));
+const VerifyEmailPage = lazy(() => import("./pages/VerifyEmailPage"));
+const WebhooksPage = lazy(() => import("./pages/WebhooksPage"));
 
 export default function App() {
   return (
     <>
       <ServerWakingBanner />
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route path="/check-email" element={<CheckEmailPage />} />
-        <Route path="/verify-email" element={<VerifyEmailPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/f/:token" element={<PublicFormPage />} />
+      <Suspense fallback={<Spinner label="Loading…" />}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/check-email" element={<CheckEmailPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/f/:token" element={<PublicFormPage />} />
 
-        <Route element={<ProtectedLayout />}>
-          <Route path="/onboarding" element={<OnboardingPage />} />
-          <Route path="/customers" element={<CustomersPage />} />
-          <Route path="/customers/:id" element={<CustomerDetailPage />} />
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/dashboard/top-customers" element={<DashboardTopCustomersPage />} />
-          <Route path="/dashboard/monthly" element={<DashboardMonthlyPage />} />
-          <Route path="/dashboard/interests" element={<DashboardInterestsPage />} />
-          <Route path="/ask" element={<AskDataPage />} />
-          <Route path="/notes" element={<NotesPage />} />
-          <Route path="/orders" element={<OrdersPage />} />
-          <Route path="/forms" element={<FormsPage />} />
-          <Route path="/segments" element={<SegmentsPage />} />
-          <Route path="/webhooks" element={<WebhooksPage />} />
-          <Route path="/data" element={<DataPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Route>
+          <Route element={<ProtectedLayout />}>
+            <Route path="/onboarding" element={<OnboardingPage />} />
+            <Route path="/customers" element={<CustomersPage />} />
+            <Route path="/customers/:id" element={<CustomerDetailPage />} />
+            <Route path="/chat" element={<ChatPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/dashboard/top-customers" element={<DashboardTopCustomersPage />} />
+            <Route path="/dashboard/monthly" element={<DashboardMonthlyPage />} />
+            <Route path="/dashboard/interests" element={<DashboardInterestsPage />} />
+            <Route path="/ask" element={<AskDataPage />} />
+            <Route path="/notes" element={<NotesPage />} />
+            <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/forms" element={<FormsPage />} />
+            <Route path="/segments" element={<SegmentsPage />} />
+            <Route path="/webhooks" element={<WebhooksPage />} />
+            <Route path="/data" element={<DataPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Route>
 
-        <Route path="*" element={<Navigate to="/customers" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/customers" replace />} />
+        </Routes>
+      </Suspense>
     </>
   );
 }
