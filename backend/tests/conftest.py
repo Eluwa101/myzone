@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.controllers import messaging_controller, webhook_controller
+from app.controllers import messaging_controller, scan_controller, webhook_controller
 from app.core import idempotency
 from app.core.database import Base, get_db
 from app.main import app
@@ -31,6 +31,7 @@ idempotency.SessionLocal = TestingSessionLocal
 # messaging_controller's batch email sender runs on its own background
 # thread with its own session too, same reason as webhook_controller above.
 messaging_controller.SessionLocal = TestingSessionLocal
+scan_controller.SessionLocal = TestingSessionLocal
 
 
 @pytest.fixture(autouse=True)
@@ -44,6 +45,7 @@ def _no_real_email(monkeypatch):
 
     monkeypatch.setattr(settings, "resend_api_key", None)
     monkeypatch.setattr(messaging_controller, "_start_in_background", lambda target, *args: target(*args))
+    monkeypatch.setattr(scan_controller, "_start_in_background", lambda target, *args: target(*args))
 
 
 @pytest.fixture(autouse=True)

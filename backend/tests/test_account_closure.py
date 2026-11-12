@@ -11,6 +11,7 @@ from app.core.database import Base
 from app.models.agent_action import AgentAction
 from app.models.chat_message import ChatMessage
 from app.models.chat_thread import ChatThread
+from app.models.document_scan import DocumentScan
 from app.models.organization import Organization
 from app.models.pending_action import PendingAction
 from app.models.saved_widget import SavedWidget
@@ -165,6 +166,7 @@ def _fill_with_data(client, headers, db, org_email):
             PendingAction(org_id=user.org_id, user_id=user.id, tool_name="delete_customer", payload={}, description="d"),
             AgentAction(org_id=user.org_id, user_id=user.id, tool_name="create_customer", payload={}, result={}),
             SavedWidget(org_id=user.org_id, user_id=user.id, question="q", title="t"),
+            DocumentScan(org_id=user.org_id, user_id=user.id, image_hash=org_email, status="done", extracted={}, actions=[]),
             WebhookDelivery(org_id=user.org_id, subscription_id=sub.id, event_type="customer.created", payload={}, status="success"),
         ]
     )

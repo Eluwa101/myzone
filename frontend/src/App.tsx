@@ -30,6 +30,7 @@ const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 const OrdersPage = lazy(() => import("./pages/OrdersPage"));
 const PublicFormPage = lazy(() => import("./pages/PublicFormPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const ScanPage = lazy(() => import("./pages/ScanPage"));
 const SegmentsPage = lazy(() => import("./pages/SegmentsPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const SignupPage = lazy(() => import("./pages/SignupPage"));
@@ -72,6 +73,7 @@ export default function App() {
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/forms" element={<FormsPage />} />
             <Route path="/segments" element={<SegmentsPage />} />
+            <Route path="/scan" element={<ScanPage />} />
             <Route path="/webhooks" element={<WebhooksPage />} />
             <Route path="/data" element={<DataPage />} />
             <Route path="/settings" element={<SettingsPage />} />

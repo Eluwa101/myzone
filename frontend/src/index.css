@@ -2287,3 +2287,54 @@ textarea.html-source {
   margin-top: 2px;
   color: #dc2626;
 }
+
+/* --- document scanning --------------------------------------------------- */
+
+.scan-actions .row button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.scan-rules {
+  margin: 12px 0 0;
+  padding-left: 18px;
+}
+
+.scan-rules li {
+  margin-bottom: 4px;
+}
+
+.scan-card .row-between {
+  gap: 10px;
+}
+
+.scan-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 2px 9px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.scan-status-processing { background: var(--accent-soft-bg); color: var(--accent-soft-text); }
+.scan-status-done { background: rgba(22, 163, 74, 0.12); color: #15803d; }
+.scan-status-review { background: rgba(234, 179, 8, 0.15); color: #a16207; }
+.scan-status-failed { background: rgba(220, 38, 38, 0.1); color: #b91c1c; }
+
+.scan-action-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.spin {
+  animation: scan-spin 1s linear infinite;
+}
+
+@keyframes scan-spin {
+  to { transform: rotate(360deg); }
+}

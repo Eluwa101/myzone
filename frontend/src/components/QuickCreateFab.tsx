@@ -1,16 +1,17 @@
-import { ClipboardList, Plus, Receipt, StickyNote, UserRound, X } from "lucide-react";
+import { ClipboardList, Plus, Receipt, ScanLine, StickyNote, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { listCustomers } from "../api/customers";
 import type { Customer } from "../api/types";
 
-type Kind = "customer" | "order" | "transaction" | "note";
+type Kind = "customer" | "order" | "transaction" | "note" | "scan";
 
 const KINDS: { kind: Kind; label: string; Icon: typeof UserRound }[] = [
   { kind: "customer", label: "New customer", Icon: UserRound },
   { kind: "order", label: "New order", Icon: ClipboardList },
   { kind: "transaction", label: "New transaction", Icon: Receipt },
   { kind: "note", label: "New note", Icon: StickyNote },
+  { kind: "scan", label: "Scan document", Icon: ScanLine },
 ];
 
 const FAB_SIZE = 56;
@@ -108,9 +109,9 @@ export default function QuickCreateFab() {
   }
 
   function pick(k: Kind) {
-    if (k === "customer") {
+    if (k === "customer" || k === "scan") {
       close();
-      navigate("/customers/new");
+      navigate(k === "customer" ? "/customers/new" : "/scan");
       return;
     }
     setKind(k);

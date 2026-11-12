@@ -19,9 +19,11 @@ from app.models.auth_token import AuthToken, AuthTokenPurpose
 from app.models.email_template import EmailTemplate
 from app.models.outbound_message import OutboundMessage, MessageChannel, MessageStatus
 from app.models.api_key import ApiKey
+from app.models.document_scan import DocumentScan
 
 __all__ = [
     "ApiKey",
+    "DocumentScan",
     "Organization",
     "User",
     "Customer",
