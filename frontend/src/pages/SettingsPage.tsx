@@ -31,6 +31,8 @@ export default function SettingsPage() {
   const [staffNames, setStaffNames] = useState("");
   const [defaultCurrency, setDefaultCurrency] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
+  const [senderHandle, setSenderHandle] = useState("");
+  const [senderDomain, setSenderDomain] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
 
@@ -48,6 +50,8 @@ export default function SettingsPage() {
       setStaffNames((s.staff_names ?? []).join("\n"));
       setDefaultCurrency(s.default_currency ?? "");
       setSupportEmail(s.support_email ?? "");
+      setSenderHandle(s.sender_handle ?? "");
+      setSenderDomain(s.sender_domain ?? "");
       if (s.whatsapp_number) {
         QRCode.toDataURL(waLink(s.whatsapp_number, s.qr_message ?? DEFAULT_MESSAGE), { width: 220 }).then(setQrDataUrl);
       }
@@ -78,7 +82,8 @@ export default function SettingsPage() {
     setSavingProfile(true);
     setProfileStatus(null);
     try {
-      await updateSettings({
+      const saved = await updateSettings({
+        ...(senderHandle.trim() ? { sender_handle: senderHandle.trim() } : {}),
         industry: industry || null,
         team_size: teamSize ? Number(teamSize) : null,
         phone: phone || null,
@@ -92,6 +97,7 @@ export default function SettingsPage() {
         default_currency: defaultCurrency || null,
         support_email: supportEmail || null,
       });
+      setSenderHandle(saved.sender_handle ?? "");
       setProfileStatus("Saved.");
     } catch (err) {
       setProfileStatus(errorMessage(err));
@@ -149,8 +155,23 @@ export default function SettingsPage() {
           placeholder="e.g. hello@yourbusiness.com"
         />
         <p className="muted small">
-          Account emails (verification, password reset) show "{bizName || "your business"} via MyShop" as the sender, and
-          replies go here instead of to MyShop.
+          Where replies to your emails go. If left empty, replies go to the account owner's login email.
+        </p>
+        <label htmlFor="prof-sender-handle">Sending address</label>
+        <div className="row" style={{ alignItems: "center", flexWrap: "nowrap" }}>
+          <input
+            id="prof-sender-handle"
+            value={senderHandle}
+            onChange={(e) => setSenderHandle(e.target.value)}
+            style={{ minWidth: 0 }}
+          />
+          <span className="muted small" style={{ whiteSpace: "nowrap" }}>
+            @{senderDomain}
+          </span>
+        </div>
+        <p className="muted small">
+          Emails you send to customers come from this address. It can't receive mail, so replies go to your support email
+          above. Letters and numbers only.
         </p>
         <label htmlFor="prof-color">Brand color</label>
         <div className="row" style={{ alignItems: "center" }}>

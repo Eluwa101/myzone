@@ -13,6 +13,8 @@ export interface OrgSettings {
   staff_names: string[] | null;
   default_currency: string | null;
   support_email: string | null;
+  sender_handle: string | null;
+  sender_domain?: string | null;
 }
 
 export function getSettings(): Promise<OrgSettings> {

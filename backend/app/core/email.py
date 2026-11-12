@@ -33,16 +33,34 @@ def _from_address() -> str:
     return raw
 
 
-def send_raw(to: str, subject: str, html: str, from_name: str | None = None, reply_to: str | None = None) -> str | None:
+def sending_domain() -> str:
+    """The verified domain every address this app sends from lives on (the
+    part after the @ in settings.email_from)."""
+    return _from_address().rsplit("@", 1)[-1]
+
+
+def send_raw(
+    to: str,
+    subject: str,
+    html: str,
+    from_name: str | None = None,
+    reply_to: str | None = None,
+    from_address: str | None = None,
+) -> str | None:
     """Actually calls Resend - raises on any failure (including no API key
     configured) and returns the provider's message id on success. Used by
     callers that need to know per-recipient success/failure to record it
     (e.g. the messaging batch sender's send history), as opposed to the
-    fire-and-forget auth emails below, which use _send instead."""
+    fire-and-forget auth emails below, which use _send instead.
+    from_address overrides the platform's own address - it must be on the
+    verified sending domain (see sending_domain)."""
     if not settings.resend_api_key:
         raise RuntimeError("RESEND_API_KEY is not configured.")
     resend.api_key = settings.resend_api_key
-    sender = f"{from_name} <{_from_address()}>" if from_name else settings.email_from
+    if from_name:
+        sender = f"{from_name} <{from_address or _from_address()}>"
+    else:
+        sender = from_address or settings.email_from
     payload = {"from": sender, "to": [to], "subject": subject, "html": html}
     if reply_to:
         payload["reply_to"] = reply_to

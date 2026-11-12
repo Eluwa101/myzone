@@ -14,6 +14,7 @@ class SettingsUpdate(BaseModel):
     staff_names: list[str] | None = None
     default_currency: str | None = None
     support_email: str | None = None
+    sender_handle: str | None = None
 
 
 class SettingsOut(BaseModel):
@@ -29,5 +30,9 @@ class SettingsOut(BaseModel):
     staff_names: list[str] | None = None
     default_currency: str | None = None
     support_email: str | None = None
+    sender_handle: str | None = None
+    # read-only: the verified domain sender_handle sits on, so the UI can
+    # show the full address without hardcoding it
+    sender_domain: str | None = None
 
     model_config = {"from_attributes": True}

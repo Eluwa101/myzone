@@ -134,7 +134,7 @@ def test_send_email_batch_resolves_tags_and_logs_sent(client, auth_headers, monk
     monkeypatch.setattr(
         messaging_controller,
         "send_raw",
-        lambda to, subject, html, from_name=None, reply_to=None: sent.append((to, subject, html)) or "msg_123",
+        lambda to, subject, html, **kw: sent.append((to, subject, html)) or "msg_123",
     )
 
     customer = _create_customer(client, auth_headers, email="ada@customer.com")
@@ -155,6 +155,40 @@ def test_send_email_batch_resolves_tags_and_logs_sent(client, auth_headers, monk
 
     notifications = client.get("/api/notifications", headers=auth_headers).json()
     assert any(n["type"] == "message.email.sent" for n in notifications)
+
+
+def test_send_uses_orgs_own_address_and_falls_back_to_owner_reply_to(client, auth_headers, monkeypatch):
+    monkeypatch.setattr(messaging_controller.threading, "Thread", _ImmediateThread)
+    captured = {}
+    monkeypatch.setattr(messaging_controller, "send_raw", lambda to, subject, html, **kw: captured.update(kw) or "msg_1")
+    customer = _create_customer(client, auth_headers)
+
+    client.post(
+        "/api/messages/send",
+        json={"customer_ids": [customer["id"]], "subject": "Hi", "body_html": "<p>x</p>"},
+        headers=auth_headers,
+    )
+    # the auth_headers org is "Ada's Store", owned by ada@example.com, with
+    # no support email set - so replies fall back to the owner
+    assert captured["from_address"] == "adasstore@resend.dev"
+    assert captured["from_name"] == "Ada's Store"
+    assert captured["reply_to"] == "ada@example.com"
+
+
+def test_send_prefers_support_email_for_reply_to(client, auth_headers, monkeypatch):
+    monkeypatch.setattr(messaging_controller.threading, "Thread", _ImmediateThread)
+    captured = {}
+    monkeypatch.setattr(messaging_controller, "send_raw", lambda to, subject, html, **kw: captured.update(kw) or "msg_1")
+    client.put("/api/settings", json={"support_email": "hello@adas.com", "sender_handle": "adaboutique"}, headers=auth_headers)
+    customer = _create_customer(client, auth_headers)
+
+    client.post(
+        "/api/messages/send",
+        json={"customer_ids": [customer["id"]], "subject": "Hi", "body_html": "<p>x</p>"},
+        headers=auth_headers,
+    )
+    assert captured["from_address"] == "adaboutique@resend.dev"
+    assert captured["reply_to"] == "hello@adas.com"
 
 
 def test_send_email_batch_skips_customer_without_email(client, auth_headers, monkeypatch):

@@ -26,5 +26,11 @@ class OrgSettings(Base):
     # show the business while replies land in the shop's own inbox, without
     # needing them to verify a sending domain of their own
     support_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # the part before the @ in this org's own sending address for customer
+    # messages (<sender_handle>@<platform sending domain>) - unique across
+    # every org, generated from the business name the first time settings
+    # are read. A sending identity only: nothing receives mail there, which
+    # is why customer messages always carry a Reply-To.
+    sender_handle: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
 
     organization = relationship("Organization", back_populates="settings")

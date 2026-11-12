@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
 
 from app.controllers import notification_controller
-from app.core.branding import branding_for
+from app.core.branding import customer_sender_for
 from app.core.database import SessionLocal
 from app.core.email import send_raw
 from app.core.merge_tags import MergeTagContext, resolve_merge_tags
@@ -135,7 +135,7 @@ def _send_batch(org_id: UUID, customer_ids: list[UUID], subject: str, body_html:
     try:
         org = db.get(Organization, org_id)
         org_settings = db.get(OrgSettings, org_id)
-        from_name, reply_to = branding_for(db, org_id)
+        from_name, from_address, reply_to = customer_sender_for(db, org_id)
 
         for customer_id in customer_ids:
             customer = _load_customer_for_merge(db, org_id, customer_id)
@@ -145,7 +145,10 @@ def _send_batch(org_id: UUID, customer_ids: list[UUID], subject: str, body_html:
             resolved_subject = resolve_merge_tags(subject, ctx)
             resolved_body = resolve_merge_tags(body_html, ctx)
             try:
-                message_id = send_raw(customer.email, resolved_subject, resolved_body, from_name=from_name, reply_to=reply_to)
+                message_id = send_raw(
+                    customer.email, resolved_subject, resolved_body,
+                    from_name=from_name, reply_to=reply_to, from_address=from_address,
+                )
                 status_, error = MessageStatus.sent, None
                 sent += 1
             except Exception as e:  # noqa: BLE001 - recorded per-recipient, loop must continue
