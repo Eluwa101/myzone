@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { BASE_URL } from "../api/client";
+import BackToTop from "../components/BackToTop";
 
 const API = BASE_URL.replace(/\/$/, "");
 
@@ -264,6 +265,7 @@ Content-Type: application/json
         </section>
       </article>
 
+      <BackToTop plain />
       <footer className="legal-footer small muted">
         <Link to="/developers">Developers</Link> · <Link to="/privacy">Privacy Policy</Link> · <Link to="/terms">Terms of Service</Link>
       </footer>

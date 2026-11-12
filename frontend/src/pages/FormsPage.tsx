@@ -1,4 +1,4 @@
-import { Check, ChevronDown, ChevronUp, Copy, ExternalLink, Package, QrCode, ShoppingBag, Trash2, User, Webhook, X } from "lucide-react";
+import { Check, ClipboardList, Copy, ExternalLink, Inbox, Link2, Package, Pencil, Power, PowerOff, QrCode, RefreshCw, ShoppingBag, Trash2, User, Webhook, X } from "lucide-react";
 import QRCodeLib from "qrcode";
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link } from "react-router-dom";
@@ -6,6 +6,7 @@ import { BASE_URL } from "../api/client";
 import { createForm, deleteForm, listForms, listSubmissions, updateForm } from "../api/forms";
 import { errorMessage } from "../api/errorMessage";
 import type { CustomForm, FormFieldCategory, FormFieldDef, FormFieldType, FormSubmission } from "../api/types";
+import CardHead from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
 import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
@@ -121,12 +122,15 @@ export default function FormsPage() {
       </p>
       <ErrorText message={error} />
 
-      <div className="card">
-        {!creating ? (
-          <button type="button" className="icon-btn btn-ghost" onClick={() => setCreating(true)}>
+      {!creating && (
+        <div className="page-actions">
+          <button type="button" className="btn-primary" onClick={() => setCreating(true)}>
             + New form
           </button>
-        ) : template === null ? (
+        </div>
+      )}
+      <div className={creating ? "card form-card" : undefined}>
+        {!creating ? null : template === null ? (
           <div>
             <label>What's this form for?</label>
             <div className="row" style={{ flexWrap: "wrap" }}>
@@ -149,7 +153,17 @@ export default function FormsPage() {
         )}
       </div>
 
-      {!forms ? <Spinner /> : forms.length === 0 ? <p className="muted small page-note">No forms yet.</p> : forms.map((f) => <FormCard key={f.id} form={f} onChanged={load} />)}
+      {!forms ? (
+        <Spinner />
+      ) : forms.length === 0 ? (
+        <p className="muted small page-note">No forms yet.</p>
+      ) : (
+        <div className="card-grid">
+          {forms.map((f) => (
+            <FormCard key={f.id} form={f} onChanged={load} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -159,7 +173,7 @@ function FormCard({ form, onChanged }: { form: CustomForm; onChanged: () => void
   const [showQr, setShowQr] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [showSubmissions, setShowSubmissions] = useState(false);
-  const [armedDelete, setArmedDelete] = useState(false);
+  const [showWebhook, setShowWebhook] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -201,10 +215,6 @@ function FormCard({ form, onChanged }: { form: CustomForm; onChanged: () => void
   }
 
   async function remove() {
-    if (!armedDelete) {
-      setArmedDelete(true);
-      return;
-    }
     try {
       await deleteForm(form.id);
       onChanged();
@@ -215,7 +225,7 @@ function FormCard({ form, onChanged }: { form: CustomForm; onChanged: () => void
 
   if (editing) {
     return (
-      <div className="card note-card">
+      <div className="card note-card span-all form-card">
         <FormBuilder initialForm={form} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged(); }} />
       </div>
     );
@@ -223,58 +233,46 @@ function FormCard({ form, onChanged }: { form: CustomForm; onChanged: () => void
 
   return (
     <div className="card note-card">
-      <div className="row-between" style={{ borderBottom: "none" }}>
-        <b>{form.name}</b>
-        {!form.is_active && <span className="badge badge-inactive">Inactive</span>}
+      <CardHead
+        icon={<ClipboardList />}
+        tone="rose"
+        title={form.name}
+        subtitle={form.is_active ? "Accepting responses" : "Not accepting responses"}
+        badges={!form.is_active ? <span className="badge badge-inactive">Inactive</span> : undefined}
+        items={[
+          { key: "edit", label: "Edit fields", icon: <Pencil />, onSelect: () => setEditing(true) },
+          { key: "open", label: "Open form", icon: <ExternalLink />, href: link },
+          { key: "qr", label: showQr ? "Hide QR code" : "QR code", icon: <QrCode />, onSelect: toggleQr },
+          { key: "subs", label: showSubmissions ? "Hide submissions" : "Submissions", icon: <Inbox />, onSelect: () => setShowSubmissions((v) => !v) },
+          { key: "api", label: showWebhook ? "Hide webhook / API" : "Webhook / API details", icon: <Webhook />, onSelect: () => setShowWebhook((v) => !v) },
+          { key: "div1", divider: true },
+          { key: "active", label: form.is_active ? "Deactivate" : "Activate", icon: form.is_active ? <PowerOff /> : <Power />, onSelect: toggleActive },
+          { key: "link", label: "New link (old one stops working)", icon: <RefreshCw />, onSelect: regenerateToken },
+          { key: "div2", divider: true },
+          { key: "delete", label: "Delete form", icon: <Trash2 />, danger: true, confirm: "Really delete?", onSelect: remove },
+        ]}
+      />
+      <div className="link-row">
+        <Link2 size={13} aria-hidden="true" />
+        <span className="link-text">{link}</span>
+        <button type="button" className="icon-circle-btn" onClick={copyLink} aria-label="Copy link" title="Copy link">
+          <Copy size={14} />
+        </button>
       </div>
-      <p className="muted small" style={{ wordBreak: "break-all" }}>
-        {link}
-      </p>
-      <div className="row">
-        <button type="button" onClick={copyLink}>
-          <Copy size={14} /> Copy link
-        </button>
-        <a href={link} target="_blank" rel="noreferrer">
-          <ExternalLink size={14} /> Open
-        </a>
-        <button type="button" onClick={toggleQr}>
-          <QrCode size={14} /> QR code
-        </button>
-        <button type="button" onClick={() => setShowSubmissions((v) => !v)}>
-          Submissions
-        </button>
-      </div>
-      {copyStatus && <p className="muted small">{copyStatus}</p>}
+      {copyStatus && <p className="muted small" style={{ margin: "4px 0 0" }}>{copyStatus}</p>}
       {showQr && qrDataUrl && (
         <div className="qr-preview">
-          <img src={qrDataUrl} alt="Form QR code" width={160} height={160} />
+          <img src={qrDataUrl} alt="Form QR code" width={140} height={140} />
         </div>
       )}
       {showSubmissions && <SubmissionsList formId={form.id} fields={form.fields} />}
-
       <ErrorText message={error} />
-      <div className="row" style={{ marginTop: 10 }}>
-        <button type="button" onClick={() => setEditing(true)}>
-          Edit fields
-        </button>
-        <button type="button" onClick={toggleActive}>
-          {form.is_active ? "Deactivate" : "Activate"}
-        </button>
-        <button type="button" onClick={regenerateToken} title="Invalidates the current link">
-          New link
-        </button>
-        <button type="button" className="btn-danger" onClick={remove} style={{ marginLeft: "auto" }}>
-          <Trash2 size={15} /> {armedDelete ? "Confirm?" : "Delete"}
-        </button>
-      </div>
-
-      <WebhookPanel form={form} onChanged={onChanged} />
+      <WebhookPanel form={form} onChanged={onChanged} open={showWebhook} />
     </div>
   );
 }
 
-function WebhookPanel({ form, onChanged }: { form: CustomForm; onChanged: () => void }) {
-  const [open, setOpen] = useState(false);
+function WebhookPanel({ form, onChanged, open }: { form: CustomForm; onChanged: () => void; open: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
@@ -321,12 +319,9 @@ function WebhookPanel({ form, onChanged }: { form: CustomForm; onChanged: () => 
     : `curl -X POST ${submitUrl} \\\n  -H "Content-Type: application/json" \\\n  -d '{"first_name":"Ada","phone":"08012345678"}'`;
 
   return (
-    <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
-      <button type="button" className="btn-ghost" onClick={() => setOpen((v) => !v)}>
-        <Webhook size={14} /> Webhook / API details {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-      </button>
+    <div>
       {open && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
           <p className="muted small">
             POST JSON matching this form's field keys to the URL below from Zapier, Make, or any other tool - it behaves
             exactly like a submission, including creating or updating the matching customer record.

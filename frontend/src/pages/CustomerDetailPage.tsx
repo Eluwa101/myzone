@@ -1,6 +1,7 @@
-import { Bot, Check, Mail, Mic, Plus, Send, Square, Trash2, X } from "lucide-react";
+import { Bot, Check, Mail, Mic, Pencil, Plus, Receipt, Send, ShoppingBag, Square, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import CardMenu from "../components/CardMenu";
 import {
   addOrder,
   addTransaction,
@@ -54,7 +55,6 @@ export default function CustomerDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ message: string; existingId: string } | null>(null);
-  const [armedDelete, setArmedDelete] = useState(false);
   const initialTab = searchParams.get("tab");
   const [tab, setTab] = useState<"info" | "transactions" | "orders" | "assistant">(
     initialTab === "transactions" || initialTab === "orders" || initialTab === "assistant" ? initialTab : "info"
@@ -144,10 +144,6 @@ export default function CustomerDetailPage() {
 
   async function onDeleteCustomer() {
     if (!id) return;
-    if (!armedDelete) {
-      setArmedDelete(true);
-      return;
-    }
     setSaving(true);
     try {
       await deleteCustomer(id);
@@ -213,9 +209,20 @@ export default function CustomerDetailPage() {
         title={customer.name}
         backTo="/customers"
         actions={
-          <Link to={`/messages/compose?customer_id=${customer.id}`} className="icon-btn btn-ghost" aria-label="Message this customer" title="Message this customer">
-            <Mail size={18} />
-          </Link>
+          <>
+            <Link to={`/messages/compose?customer_id=${customer.id}`} className="icon-btn btn-ghost" aria-label="Message this customer" title="Message this customer">
+              <Mail size={18} />
+            </Link>
+            <CardMenu
+              label="More actions for this customer"
+              items={[
+                { key: "tx", label: "Add transaction", icon: <Receipt />, to: `/customers/${customer.id}?tab=transactions&new=1` },
+                { key: "order", label: "Add order", icon: <ShoppingBag />, to: `/customers/${customer.id}?tab=orders&new=1` },
+                { key: "div", divider: true },
+                { key: "delete", label: "Delete customer", icon: <Trash2 />, danger: true, confirm: "Really delete everything?", disabled: saving, onSelect: onDeleteCustomer },
+              ]}
+            />
+          </>
         }
       />
       <p className="muted small customer-display-id-row">{customer.display_id}</p>
@@ -238,9 +245,6 @@ export default function CustomerDetailPage() {
           onSaveField={saveField}
           onSaveExtra={saveExtraField}
           onDeleteExtra={deleteExtraField}
-          onDeleteCustomer={onDeleteCustomer}
-          armedDelete={armedDelete}
-          deleting={saving}
         />
       ) : tab === "transactions" ? (
         <TransactionsTab customer={customer} onChanged={loadCustomer} autoOpenAdd={autoOpenAdd} />
@@ -258,17 +262,11 @@ function InfoTab({
   onSaveField,
   onSaveExtra,
   onDeleteExtra,
-  onDeleteCustomer,
-  armedDelete,
-  deleting,
 }: {
   customer: Customer;
   onSaveField: (key: keyof CustomerInput, value: string, isDate?: boolean) => Promise<void>;
   onSaveExtra: (key: string, value: string) => Promise<void>;
   onDeleteExtra: (key: string) => Promise<void>;
-  onDeleteCustomer: () => void;
-  armedDelete: boolean;
-  deleting: boolean;
 }) {
   const [addingField, setAddingField] = useState(false);
   const [newKey, setNewKey] = useState("");
@@ -377,12 +375,6 @@ function InfoTab({
 
       <CustomerNotesSection customerId={customer.id} />
 
-      <div className="card">
-        <button type="button" className="btn-danger" onClick={onDeleteCustomer} disabled={deleting}>
-          <Trash2 size={15} />
-          {armedDelete ? "Click again to confirm" : "Delete customer"}
-        </button>
-      </div>
     </div>
   );
 }
@@ -892,7 +884,6 @@ function CustomerNoteEditor({
 
 function CustomerNoteRow({ note, customerId, onChanged }: { note: OrgNote; customerId: string; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
-  const [armedDelete, setArmedDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -910,10 +901,6 @@ function CustomerNoteRow({ note, customerId, onChanged }: { note: OrgNote; custo
   }
 
   async function remove() {
-    if (!armedDelete) {
-      setArmedDelete(true);
-      return;
-    }
     setBusy(true);
     try {
       // detach from this customer only - the note itself (and its links to
@@ -931,7 +918,16 @@ function CustomerNoteRow({ note, customerId, onChanged }: { note: OrgNote; custo
   }
 
   return (
-    <div className="note-card" style={{ marginBottom: 10 }}>
+    <div className="note-card customer-note" style={{ marginBottom: 10 }}>
+      <div className="customer-note-menu">
+        <CardMenu
+          items={[
+            { key: "edit", label: "Edit note", icon: <Pencil />, onSelect: () => setEditing(true) },
+            { key: "div", divider: true },
+            { key: "remove", label: "Remove from this customer", icon: <X />, danger: true, confirm: "Really remove?", disabled: busy, onSelect: remove },
+          ]}
+        />
+      </div>
       <button type="button" className="info-row" onClick={() => setEditing(true)}>
         <div className="info-row-text">
           <div className="row" style={{ marginBottom: 2 }}>
@@ -946,16 +942,13 @@ function CustomerNoteRow({ note, customerId, onChanged }: { note: OrgNote; custo
         </div>
       </button>
       <ErrorText message={error} />
-      <div className="row" style={{ marginTop: 6 }}>
-        {note.is_pending_review && (
-          <button type="button" className="btn-primary small" onClick={markReviewed} disabled={busy}>
+      {note.is_pending_review && (
+        <div className="card-actions" style={{ marginTop: 4 }}>
+          <button type="button" className="btn-primary" onClick={markReviewed} disabled={busy}>
             Mark reviewed
           </button>
-        )}
-        <button type="button" className="btn-danger small" onClick={remove} disabled={busy} style={{ marginLeft: "auto" }}>
-          <X size={13} /> {armedDelete ? "Remove from this customer?" : "Remove"}
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

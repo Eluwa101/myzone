@@ -109,19 +109,17 @@ export default function CustomersPage() {
           {customers.map((c) => (
             <li key={c.id}>
               <Link to={`/customers/${c.id}`} className="card customer-card">
-                <div className="customer-card-top">
-                  <b>
-                    {c.name}
-                    {c.orders.some((o) => !o.delivered) && (
-                      <span className="pending-order-dot" title="Has an order awaiting delivery" aria-label="Has an order awaiting delivery" />
-                    )}
-                  </b>
-                  <StatusBadge status={c.status} />
-                </div>
-                <div className="muted small">
+                <b className="cc-name">
+                  {c.name}
+                  {c.orders.some((o) => !o.delivered) && (
+                    <span className="pending-order-dot" title="Has an order awaiting delivery" aria-label="Has an order awaiting delivery" />
+                  )}
+                </b>
+                <span className="cc-meta muted small">
                   <span className="customer-display-id">{c.display_id}</span> · {c.transactions.length} transaction
                   {c.transactions.length === 1 ? "" : "s"}
-                </div>
+                </span>
+                <StatusBadge status={c.status} />
               </Link>
             </li>
           ))}

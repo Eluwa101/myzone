@@ -1,5 +1,6 @@
 import { ArrowLeftRight, LayoutDashboard, MessageCircle, Users } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import Logo from "./Logo";
 
 const ITEMS = [
   { to: "/customers", label: "Customers", Icon: Users },
@@ -11,6 +12,9 @@ const ITEMS = [
 export default function BottomNav() {
   return (
     <nav className="bottom-nav">
+      <span className="nav-logo" aria-hidden="true">
+        <Logo size={36} />
+      </span>
       {ITEMS.map(({ to, label, Icon }) => (
         <NavLink key={to} to={to} className={({ isActive }) => `bottom-nav-item${isActive ? " active" : ""}`}>
           <span className="bottom-nav-icon" aria-hidden="true">

@@ -1,4 +1,4 @@
-import { Bot, Check, Code2, Copy, ExternalLink, ListFilter, Mail, MessageCircle, Sparkles, Trash2, X } from "lucide-react";
+import { Bot, Check, Code2, Copy, ExternalLink, ListFilter, Mail, MessageCircle, Pencil, Sparkles, Trash2, UsersRound, X } from "lucide-react";
 import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -14,6 +14,7 @@ import {
 } from "../api/segments";
 import { errorMessage } from "../api/errorMessage";
 import type { Segment, SegmentFieldsCatalog, SegmentFilters, SegmentMember, SegmentNode, SegmentResult } from "../api/types";
+import CardHead from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
 import SegmentQueryBuilder, { emptyGroup, OPERATOR_LABELS } from "../components/SegmentQueryBuilder";
 import SqlSegmentEditor from "../components/SqlSegmentEditor";
@@ -75,22 +76,28 @@ export default function SegmentsPage() {
       </p>
       <ErrorText message={error} />
 
-      <div className="card">
-        {creating ? (
+      {creating ? (
+        <div className="card form-card">
           <SegmentBuilder onCancel={() => setCreating(false)} onSaved={() => { setCreating(false); load(); }} />
-        ) : (
-          <button type="button" className="icon-btn btn-ghost" onClick={() => setCreating(true)}>
+        </div>
+      ) : (
+        <div className="page-actions">
+          <button type="button" className="btn-primary" onClick={() => setCreating(true)}>
             + New segment
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {!segments ? (
         <Spinner />
       ) : segments.length === 0 ? (
         <p className="muted small page-note">No segments yet.</p>
       ) : (
-        segments.map((s) => <SegmentCard key={s.id} segment={s} onChanged={load} />)
+        <div className="card-grid">
+          {segments.map((s) => (
+            <SegmentCard key={s.id} segment={s} onChanged={load} />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -277,7 +284,6 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
   const [showMembers, setShowMembers] = useState(false);
   const [showReach, setShowReach] = useState(false);
   const [message, setMessage] = useState("");
-  const [armedDelete, setArmedDelete] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -288,10 +294,6 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
   }, [segment.id]);
 
   async function remove() {
-    if (!armedDelete) {
-      setArmedDelete(true);
-      return;
-    }
     try {
       await deleteSegment(segment.id);
       onChanged();
@@ -302,7 +304,7 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
 
   if (editing) {
     return (
-      <div className="card note-card">
+      <div className="card note-card span-all form-card">
         <SegmentBuilder initial={segment} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged(); }} />
       </div>
     );
@@ -328,11 +330,18 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
   }
 
   return (
-    <div className="card note-card">
-      <div className="row-between" style={{ borderBottom: "none" }}>
-        <b>{segment.name}</b>
-        <span className="muted small">{members ? `${members.total} customer${members.total === 1 ? "" : "s"}` : "…"}</span>
-      </div>
+    <div className={`card note-card${showReach ? " span-all" : ""}`}>
+      <CardHead
+        icon={<UsersRound />}
+        tone="violet"
+        title={segment.name}
+        subtitle={members ? `${members.total} customer${members.total === 1 ? "" : "s"}` : "…"}
+        items={[
+          { key: "edit", label: "Edit segment", icon: <Pencil />, onSelect: () => setEditing(true) },
+          { key: "div", divider: true },
+          { key: "delete", label: "Delete segment", icon: <Trash2 />, danger: true, confirm: "Really delete?", onSelect: remove },
+        ]}
+      />
       {segment.sql ? (
         <details className="sql-reference">
           <summary className="muted small">
@@ -344,15 +353,12 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
         <p className="muted small">{describeFilters(segment.filters)}</p>
       )}
 
-      <div className="row">
+      <div className="card-actions" style={{ marginTop: 6 }}>
         <button type="button" onClick={() => setShowMembers((v) => !v)}>
           {showMembers ? "Hide" : "View"} members
         </button>
-        <button type="button" onClick={() => setShowReach((v) => !v)}>
-          Reach segment
-        </button>
-        <button type="button" onClick={() => setEditing(true)}>
-          Edit
+        <button type="button" className={showReach ? undefined : "btn-primary"} onClick={() => setShowReach((v) => !v)}>
+          {showReach ? "Close" : "Reach segment"}
         </button>
       </div>
 
@@ -449,11 +455,6 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
       )}
 
       <ErrorText message={error} />
-      <div className="row" style={{ marginTop: 10 }}>
-        <button type="button" className="btn-danger" onClick={remove} style={{ marginLeft: "auto" }}>
-          <Trash2 size={15} /> {armedDelete ? "Confirm?" : "Delete"}
-        </button>
-      </div>
     </div>
   );
 }

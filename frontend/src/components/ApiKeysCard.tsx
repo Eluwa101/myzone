@@ -1,8 +1,9 @@
-import { Copy, KeyRound, Plus } from "lucide-react";
+import { Ban, Copy, KeyRound, Plus } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { createApiKey, listApiKeys, revokeApiKey, type ApiKey, type CreatedApiKey } from "../api/apiKeys";
 import { errorMessage } from "../api/errorMessage";
+import CardMenu from "./CardMenu";
 import ErrorText from "./ErrorText";
 
 function when(iso: string | null): string {
@@ -17,7 +18,6 @@ export default function ApiKeysCard() {
   const [busy, setBusy] = useState(false);
   const [fresh, setFresh] = useState<CreatedApiKey | null>(null);
   const [copied, setCopied] = useState(false);
-  const [armedRevoke, setArmedRevoke] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function load() {
@@ -46,11 +46,6 @@ export default function ApiKeysCard() {
   }
 
   async function onRevoke(id: string) {
-    if (armedRevoke !== id) {
-      setArmedRevoke(id);
-      return;
-    }
-    setArmedRevoke(null);
     try {
       await revokeApiKey(id);
       if (fresh?.id === id) setFresh(null);
@@ -119,9 +114,10 @@ export default function ApiKeysCard() {
               · <code>{k.prefix}…</code> · created {when(k.created_at)} · last used {when(k.last_used_at)}
             </span>
           </span>
-          <button type="button" className="btn-danger small" onClick={() => onRevoke(k.id)}>
-            {armedRevoke === k.id ? "Revoke - can't undo?" : "Revoke"}
-          </button>
+          <CardMenu
+            label={`Options for ${k.name}`}
+            items={[{ key: "revoke", label: "Revoke key", icon: <Ban />, danger: true, confirm: "Revoke - can't undo?", onSelect: () => onRevoke(k.id) }]}
+          />
         </div>
       ))}
       {revoked.length > 0 && (

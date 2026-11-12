@@ -1,10 +1,11 @@
-import { Check, ChevronRight, Plus, Search, Trash2, X } from "lucide-react";
+import { Check, CheckCheck, Pencil, Plus, Search, StickyNote, Trash2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { listCustomers } from "../api/customers";
 import { createNote, deleteNote, listNotes, updateNote } from "../api/notes";
 import { errorMessage } from "../api/errorMessage";
 import type { Customer, OrgNote } from "../api/types";
+import CardHead from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
 import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
@@ -50,8 +51,8 @@ export default function NotesPage() {
 
       <ErrorText message={error} />
 
-      <div className="card">
-        {adding ? (
+      {adding ? (
+        <div className="card form-card">
           <NoteForm
             customers={customers}
             initialCustomerId={preselectCustomerId}
@@ -61,25 +62,24 @@ export default function NotesPage() {
               load();
             }}
           />
-        ) : (
-          <button type="button" className="icon-btn btn-ghost" onClick={() => setAdding(true)}>
+        </div>
+      ) : (
+        <div className="page-actions">
+          <button type="button" className="btn-primary" onClick={() => setAdding(true)}>
             <Plus size={15} /> New note
           </button>
-        )}
-      </div>
-
-      {notes.length > 0 && (
-        <div className="toolbar">
-          <div className="search-wrap">
-            <Search size={16} className="search-icon" aria-hidden="true" />
-            <input
-              aria-label="Search notes"
-              className="search-input"
-              placeholder="Search title, content, customer…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+          {notes.length > 0 && (
+            <div className="search-wrap" style={{ flex: 1, minWidth: 200, maxWidth: 420 }}>
+              <Search size={15} className="search-icon" aria-hidden="true" />
+              <input
+                aria-label="Search notes"
+                className="search-input"
+                placeholder="Search title, content, customer…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -90,7 +90,11 @@ export default function NotesPage() {
       ) : filtered.length === 0 ? (
         <p className="muted small page-note">No notes match "{search}".</p>
       ) : (
-        filtered.map((n) => <NoteCard key={n.id} note={n} customers={customers} onChanged={load} />)
+        <div className="card-grid">
+          {filtered.map((n) => (
+            <NoteCard key={n.id} note={n} customers={customers} onChanged={load} />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -174,7 +178,6 @@ function NoteForm({
 
 function NoteCard({ note, customers, onChanged }: { note: OrgNote; customers: Customer[]; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
-  const [armedDelete, setArmedDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -192,10 +195,6 @@ function NoteCard({ note, customers, onChanged }: { note: OrgNote; customers: Cu
   }
 
   async function remove() {
-    if (!armedDelete) {
-      setArmedDelete(true);
-      return;
-    }
     setBusy(true);
     try {
       await deleteNote(note.id);
@@ -208,7 +207,7 @@ function NoteCard({ note, customers, onChanged }: { note: OrgNote; customers: Cu
 
   if (editing) {
     return (
-      <div className="card note-card">
+      <div className="card note-card span-all form-card">
         <NoteForm customers={customers} initialNote={note} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged(); }} />
       </div>
     );
@@ -216,20 +215,20 @@ function NoteCard({ note, customers, onChanged }: { note: OrgNote; customers: Cu
 
   return (
     <div className="card note-card">
-      <button type="button" className="info-row" onClick={() => setEditing(true)} style={{ borderBottom: "none", padding: 0 }}>
-        <div className="info-row-text">
-          <div className="row" style={{ marginBottom: 4 }}>
-            <span className="info-row-label" style={{ marginBottom: 0, fontWeight: 600, fontSize: 14, color: "var(--text)" }}>
-              {note.title}
-            </span>
-            {note.is_pending_review && <span className="badge badge-lead">Needs review</span>}
-            {note.created_by_agent && <span className="muted small">from Assistant</span>}
-          </div>
-          <div className="info-row-value muted" style={{ fontWeight: 400 }}>
-            {note.content}
-          </div>
-        </div>
-        <ChevronRight size={16} className="muted" />
+      <CardHead
+        icon={<StickyNote />}
+        tone="amber"
+        title={note.title}
+        subtitle={note.created_by_agent ? "from Assistant" : undefined}
+        badges={note.is_pending_review ? <span className="badge badge-lead">Needs review</span> : undefined}
+        items={[
+          { key: "edit", label: "Edit", icon: <Pencil />, onSelect: () => setEditing(true) },
+          { key: "div", divider: true },
+          { key: "delete", label: "Delete note", icon: <Trash2 />, danger: true, confirm: "Really delete?", disabled: busy, onSelect: remove },
+        ]}
+      />
+      <button type="button" className="card-body" onClick={() => setEditing(true)}>
+        {note.content}
       </button>
 
       {note.customers.length > 0 && (
@@ -243,16 +242,13 @@ function NoteCard({ note, customers, onChanged }: { note: OrgNote; customers: Cu
       )}
 
       <ErrorText message={error} />
-      <div className="row" style={{ marginTop: 10 }}>
-        {note.is_pending_review && (
+      {note.is_pending_review && (
+        <div className="card-actions">
           <button type="button" className="btn-primary" onClick={markReviewed} disabled={busy}>
-            Mark reviewed
+            <CheckCheck size={14} /> Mark reviewed
           </button>
-        )}
-        <button type="button" className="btn-danger" onClick={remove} disabled={busy} style={{ marginLeft: "auto" }}>
-          <Trash2 size={15} /> {armedDelete ? "Confirm?" : "Delete"}
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

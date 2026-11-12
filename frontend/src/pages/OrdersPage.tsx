@@ -8,6 +8,7 @@ import type { InterestRollup } from "../api/types";
 import ErrorText from "../components/ErrorText";
 import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
+import { avatarStyle, initials } from "../utils/avatar";
 
 function itemsToText(items: OrderWithCustomer["items"]): string {
   return items.map((i) => (i.qty && i.qty !== 1 ? `${i.name} x${i.qty}` : i.name)).join(", ") || "(no items)";
@@ -31,12 +32,12 @@ export default function OrdersPage() {
     <div>
       <TopBar title="Orders" backTo="/dashboard" />
 
-      <div className="card">
-        <div className="row">
-          <button type="button" className={!pending ? "btn-primary" : ""} onClick={() => setSearchParams({}, { replace: true })}>
+      <div className="page-actions">
+        <div className="segmented" role="tablist" aria-label="Filter orders">
+          <button type="button" role="tab" aria-selected={!pending} className={!pending ? "active" : ""} onClick={() => setSearchParams({}, { replace: true })}>
             All orders
           </button>
-          <button type="button" className={pending ? "btn-primary" : ""} onClick={() => setSearchParams({ pending: "true" }, { replace: true })}>
+          <button type="button" role="tab" aria-selected={pending} className={pending ? "active" : ""} onClick={() => setSearchParams({ pending: "true" }, { replace: true })}>
             Awaiting delivery
           </button>
         </div>
@@ -46,27 +47,31 @@ export default function OrdersPage() {
       {!orders ? (
         <Spinner />
       ) : (
-        <div className="card">
-          {orders.length === 0 ? (
-            <p className="muted small">{pending ? "No orders awaiting delivery." : "No orders yet."}</p>
-          ) : (
-            orders.map((o) => (
-              <Link key={o.id} to={`/customers/${o.customer_id}?tab=orders`} className="info-row">
-                <div className="info-row-text">
-                  <div className="info-row-label">
-                    {o.customer_name} · {itemsToText(o.items)}
+        orders.length === 0 ? (
+          <p className="muted small page-note">{pending ? "No orders awaiting delivery." : "No orders yet."}</p>
+        ) : (
+          <div className="card-grid">
+            {orders.map((o) => (
+              <Link key={o.id} to={`/customers/${o.customer_id}?tab=orders`} className="card order-card">
+                <div className="card-head" style={{ marginBottom: 6 }}>
+                  <span className="avatar sm" style={avatarStyle(o.customer_name)} aria-hidden="true">
+                    {initials(o.customer_name)}
+                  </span>
+                  <div className="card-head-text">
+                    <div className="card-title">{o.customer_name}</div>
+                    <div className="card-sub">{itemsToText(o.items) || "(no items)"}</div>
                   </div>
-                  <div className="info-row-value muted">
-                    Ordered {o.order_date}
-                    {o.delivery_date ? ` · due ${o.delivery_date}` : ""}
-                    {" · "}
-                    {o.paid ? "Paid" : "Unpaid"} · {o.delivered ? "Delivered" : "Pending delivery"}
-                  </div>
+                  <span className={`badge ${o.delivered ? "badge-customer" : "badge-lead"}`}>{o.delivered ? "Delivered" : "Pending"}</span>
+                </div>
+                <div className="order-meta">
+                  <span>Ordered {o.order_date}</span>
+                  {o.delivery_date && <span>Due {o.delivery_date}</span>}
+                  <span className={`badge ${o.paid ? "badge-customer" : "badge-inactive"}`}>{o.paid ? "Paid" : "Unpaid"}</span>
                 </div>
               </Link>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )
       )}
 
       <InterestedInSection />

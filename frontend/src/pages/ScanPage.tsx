@@ -110,7 +110,8 @@ export default function ScanPage() {
           <p>No scans yet.</p>
         </div>
       ) : (
-        scans.map((s) => {
+        <div className="card-grid">
+          {scans.map((s) => {
           const { label, className, Icon } = STATUS[s.status] ?? STATUS.failed;
           return (
             <div key={s.id} className="card scan-card">
@@ -148,7 +149,8 @@ export default function ScanPage() {
               {s.status === "failed" && <p className="small muted" style={{ margin: "6px 0 0" }}>{s.error || "Try a clearer, closer photo."}</p>}
             </div>
           );
-        })
+          })}
+        </div>
       )}
     </div>
   );

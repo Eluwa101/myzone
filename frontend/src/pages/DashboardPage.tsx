@@ -1,4 +1,4 @@
-import { Download, Heart, MessageCircleQuestion, PackageSearch, RefreshCw, Trash2, Trophy, Users, Wallet } from "lucide-react";
+import { BarChart3, Download, Heart, MessageCircleQuestion, PackageSearch, RefreshCw, Trash2, Trophy, Users, UsersRound, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { askData } from "../api/agent";
@@ -16,6 +16,10 @@ import { useRangeParams } from "../hooks/useRangeParams";
 import { downloadCsv } from "../utils/exportCsv";
 import { presetLabel } from "../utils/dateRange";
 
+function sumValues(m: Record<string, number>): number {
+  return Object.values(m).reduce((a, b) => a + b, 0);
+}
+
 function fmtCurrencyMap(m: Record<string, number>): string {
   const entries = Object.entries(m);
   if (!entries.length) return "0.00";
@@ -26,6 +30,13 @@ export default function DashboardPage() {
   const { preset, customFrom, customTo, setPreset, setCustomFrom, setCustomTo, range, queryString } = useRangeParams();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<OrderWithCustomer[] | null>(null);
+
+  useEffect(() => {
+    listAllOrders({ pending: true })
+      .then(setPending)
+      .catch(() => setPending([]));
+  }, []);
 
   useEffect(() => {
     setSummary(null);
@@ -63,166 +74,213 @@ export default function DashboardPage() {
           )
         }
       />
-      <Link to="/ask" className="card ask-data-link">
-        <MessageCircleQuestion size={18} />
-        <div>
-          <b>Ask your data</b>
-          <div className="muted small">Read-only questions about your customers and sales</div>
-        </div>
-      </Link>
-
-      <PendingOrdersWidget />
-
-      <DashboardRangeFilter
-        preset={preset}
-        customFrom={customFrom}
-        customTo={customTo}
-        onPresetChange={setPreset}
-        onCustomFromChange={setCustomFrom}
-        onCustomToChange={setCustomTo}
-      />
+      <div className="dash-toolbar">
+        <DashboardRangeFilter
+          preset={preset}
+          customFrom={customFrom}
+          customTo={customTo}
+          onPresetChange={setPreset}
+          onCustomFromChange={setCustomFrom}
+          onCustomToChange={setCustomTo}
+        />
+        <Link to="/ask" className="pill-link ask-pill">
+          <MessageCircleQuestion size={15} /> Ask your data
+        </Link>
+      </div>
 
       <ErrorText message={error} />
       {!summary ? (
         <Spinner />
       ) : (
-        <>
-          <div className="stat-grid">
-            <Link to={`/customers?${queryString}`} className="card stat-card">
-              <div className="stat-icon">
-                <Users size={18} />
-              </div>
-              <div className="stat-value">{summary.total_customers}</div>
-              <div className="stat-label">
-                customers · {label}
-                {summary.without_consent > 0 && ` · ${summary.without_consent} w/o consent`}
+        <div className="dash">
+          <div className="dash-kpis">
+            <Link to={`/customers?${queryString}`} className="card kpi">
+              <span className="card-icon tone-blue" aria-hidden="true">
+                <Users />
+              </span>
+              <div>
+                <div className="kpi-value">{summary.total_customers}</div>
+                <div className="kpi-label">
+                  customers · {label}
+                  {summary.without_consent > 0 && ` · ${summary.without_consent} w/o consent`}
+                </div>
               </div>
             </Link>
-            <div className="card stat-card">
-              <div className="stat-icon stat-icon-secondary">
-                <Wallet size={18} />
+            <div className="card kpi">
+              <span className="card-icon tone-teal" aria-hidden="true">
+                <Wallet />
+              </span>
+              <div>
+                <div className="kpi-value kpi-money">{fmtCurrencyMap(summary.all_time_by_currency)}</div>
+                <div className="kpi-label">sales · {label}</div>
               </div>
-              <div className="stat-value stat-value-money">{fmtCurrencyMap(summary.all_time_by_currency)}</div>
-              <div className="stat-label">sales · {label}</div>
             </div>
-          </div>
-
-          {Object.entries(summary.status_counts).length > 0 && (
-            <div className="card">
-              <h3>Customers by status · {label}</h3>
-              {Object.entries(summary.status_counts).map(([status, count]) => (
-                <Link key={status} to={`/customers?status=${status}`} className="row-between">
-                  <span className="muted small" style={{ textTransform: "capitalize" }}>
-                    {status}
-                  </span>
-                  <span>{count}</span>
-                </Link>
-              ))}
-            </div>
-          )}
-
-          <div className="card">
-            <div className="row-between" style={{ borderBottom: "none", paddingBottom: 4 }}>
-              <h3 style={{ margin: 0 }}>Monthly breakdown</h3>
-              <Link to={`/dashboard/monthly?${queryString}`} className="muted small">
-                View full →
-              </Link>
-            </div>
-            {summary.last_6_months.map((m) => (
-              <div key={m.month} className="row-between">
-                <span className="muted small">{m.month}</span>
-                <span>{fmtCurrencyMap(m.totals)}</span>
+            <Link to="/orders?pending=true" className="card kpi">
+              <span className="card-icon tone-amber" aria-hidden="true">
+                <PackageSearch />
+              </span>
+              <div>
+                <div className="kpi-value">{pending ? pending.length : "–"}</div>
+                <div className="kpi-label">orders awaiting delivery</div>
               </div>
-            ))}
-          </div>
-
-          <div className="card">
-            <div className="row-between" style={{ borderBottom: "none", paddingBottom: 4 }}>
-              <h3 style={{ margin: 0 }}>
-                <Trophy size={15} className="h3-icon" /> Top customers
-              </h3>
-              <Link to={`/dashboard/top-customers?${queryString}`} className="muted small">
-                View all →
-              </Link>
-            </div>
-            {summary.top_customers.length === 0 ? (
-              <p className="muted small">No transactions yet.</p>
-            ) : (
-              summary.top_customers.map((c, i) => (
-                <Link key={`${c.customer_id}-${i}`} to={`/customers/${c.customer_id}?tab=transactions`} className="row-between">
-                  <span>{c.name}</span>
-                  <span>
-                    {c.currency} {c.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </span>
-                </Link>
-              ))
-            )}
-          </div>
-
-          <div className="card">
-            <div className="row-between" style={{ borderBottom: "none", paddingBottom: 4 }}>
-              <h3 style={{ margin: 0 }}>
-                <Heart size={15} className="h3-icon" /> Interested in
-              </h3>
-              <Link to={`/dashboard/interests?${queryString}`} className="muted small">
-                View all →
-              </Link>
-            </div>
-            {summary.interests.length === 0 ? (
-              <p className="muted small">No interests recorded.</p>
-            ) : (
-              summary.interests.slice(0, 5).map((i) => (
-                <div key={i.interest} className="row-between" style={{ alignItems: "flex-start" }}>
-                  <b>{i.interest}</b>
-                  <span className="muted small" style={{ textAlign: "right" }}>
-                    ({i.customers.length}){" "}
-                    {i.customers.map((c, idx) => (
-                      <span key={c.id}>
-                        {idx > 0 && ", "}
-                        <Link to={`/customers/${c.id}`}>{c.name}</Link>
-                      </span>
-                    ))}
-                  </span>
+            </Link>
+            <div className="card kpi">
+              <span className="card-icon tone-violet" aria-hidden="true">
+                <UsersRound />
+              </span>
+              <div className="kpi-status">
+                <div className="kpi-label" style={{ marginBottom: 5 }}>
+                  customers by status
                 </div>
-              ))
-            )}
+                <div className="kpi-pills">
+                  {Object.entries(summary.status_counts).length === 0 && <span className="muted small">None yet</span>}
+                  {Object.entries(summary.status_counts).map(([status, count]) => (
+                    <Link key={status} to={`/customers?status=${status}`} className={`badge badge-${status}`}>
+                      {status} {count}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="dash-main">
+            <div className="card">
+              <div className="card-head">
+                <span className="card-icon tone-blue" aria-hidden="true">
+                  <BarChart3 />
+                </span>
+                <div className="card-head-text">
+                  <div className="card-title">Monthly breakdown</div>
+                  <div className="card-sub">sales per month</div>
+                </div>
+                <Link to={`/dashboard/monthly?${queryString}`} className="muted small">
+                  View full →
+                </Link>
+              </div>
+              {summary.last_6_months.length === 0 ? (
+                <p className="muted small">No sales yet.</p>
+              ) : (
+                <div className="month-bars">
+                  {(() => {
+                    const max = Math.max(1, ...summary.last_6_months.map((m) => sumValues(m.totals)));
+                    return summary.last_6_months.map((m) => (
+                      <div key={m.month} className="month-row">
+                        <span className="month-label">{m.month}</span>
+                        <div className="bar-track">
+                          <div className="bar-fill" style={{ width: `${Math.max(2, (sumValues(m.totals) / max) * 100)}%` }} />
+                        </div>
+                        <span className="month-amt">{fmtCurrencyMap(m.totals)}</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
+            </div>
+            <PendingOrdersCard orders={pending} />
+          </div>
+
+          <div className="dash-lists">
+            <div className="card">
+              <div className="card-head">
+                <span className="card-icon tone-amber" aria-hidden="true">
+                  <Trophy />
+                </span>
+                <div className="card-head-text">
+                  <div className="card-title">Top customers</div>
+                </div>
+                <Link to={`/dashboard/top-customers?${queryString}`} className="muted small">
+                  View all →
+                </Link>
+              </div>
+              {summary.top_customers.length === 0 ? (
+                <p className="muted small">No transactions yet.</p>
+              ) : (
+                summary.top_customers.map((c, i) => (
+                  <Link key={`${c.customer_id}-${i}`} to={`/customers/${c.customer_id}?tab=transactions`} className="row-between">
+                    <span>{c.name}</span>
+                    <span className="small">
+                      {c.currency} {c.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                  </Link>
+                ))
+              )}
+            </div>
+
+            <div className="card">
+              <div className="card-head">
+                <span className="card-icon tone-rose" aria-hidden="true">
+                  <Heart />
+                </span>
+                <div className="card-head-text">
+                  <div className="card-title">Interested in</div>
+                </div>
+                <Link to={`/dashboard/interests?${queryString}`} className="muted small">
+                  View all →
+                </Link>
+              </div>
+              {summary.interests.length === 0 ? (
+                <p className="muted small">No interests recorded.</p>
+              ) : (
+                summary.interests.slice(0, 5).map((i) => (
+                  <div key={i.interest} className="row-between" style={{ alignItems: "flex-start" }}>
+                    <b>{i.interest}</b>
+                    <span className="muted small" style={{ textAlign: "right" }}>
+                      ({i.customers.length}){" "}
+                      {i.customers.map((c, idx) => (
+                        <span key={c.id}>
+                          {idx > 0 && ", "}
+                          <Link to={`/customers/${c.id}`}>{c.name}</Link>
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
 
           <SavedWidgets />
-        </>
+        </div>
       )}
     </div>
   );
 }
 
-function PendingOrdersWidget() {
-  const [pending, setPending] = useState<OrderWithCustomer[] | null>(null);
-
-  useEffect(() => {
-    listAllOrders({ pending: true })
-      .then(setPending)
-      .catch(() => setPending([]));
-  }, []);
-
-  if (!pending || pending.length === 0) return null;
-
+function PendingOrdersCard({ orders }: { orders: OrderWithCustomer[] | null }) {
+  const today = new Date().toISOString().slice(0, 10);
   return (
     <div className="card">
-      <div className="row-between" style={{ borderBottom: "none", paddingBottom: 4 }}>
-        <h3 style={{ margin: 0 }}>
-          <PackageSearch size={15} className="h3-icon" /> Orders awaiting delivery ({pending.length})
-        </h3>
+      <div className="card-head">
+        <span className="card-icon tone-amber" aria-hidden="true">
+          <PackageSearch />
+        </span>
+        <div className="card-head-text">
+          <div className="card-title">Orders awaiting delivery</div>
+          <div className="card-sub">{orders ? `${orders.length} open` : "loading…"}</div>
+        </div>
         <Link to="/orders?pending=true" className="muted small">
           View all →
         </Link>
       </div>
-      {pending.slice(0, 5).map((order) => (
-        <Link key={order.id} to={`/customers/${order.customer_id}?tab=orders`} className="row-between">
-          <span>{order.customer_name}</span>
-          <span className="muted small">{order.order_date}</span>
-        </Link>
-      ))}
-      {pending.length > 5 && <p className="muted small page-note">and {pending.length - 5} more…</p>}
+      {orders && orders.length === 0 && <p className="muted small">Nothing is waiting for delivery.</p>}
+      {(orders ?? []).slice(0, 6).map((order) => {
+        const due = order.delivery_date;
+        const overdue = !!due && due < today;
+        return (
+          <Link key={order.id} to={`/customers/${order.customer_id}?tab=orders`} className="row-between">
+            <span>{order.customer_name}</span>
+            <span className={`small ${overdue ? "overdue" : "muted"}`}>
+              {due ? `${overdue ? "Overdue · " : "Due "}${due}` : `Ordered ${order.order_date}`}
+            </span>
+          </Link>
+        );
+      })}
+      {orders && orders.length > 6 && (
+        <p className="muted small" style={{ margin: "6px 0 0" }}>
+          and {orders.length - 6} more…
+        </p>
+      )}
     </div>
   );
 }

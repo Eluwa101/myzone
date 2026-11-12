@@ -1,4 +1,4 @@
-import { Check, Copy, Plug, RefreshCw, Trash2, X } from "lucide-react";
+import { Check, Copy, History, KeyRound, Pencil, Plug, Power, PowerOff, RefreshCw, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   createSubscription,
@@ -11,6 +11,7 @@ import {
 } from "../api/webhooks";
 import { errorMessage } from "../api/errorMessage";
 import type { WebhookDelivery, WebhookSubscription } from "../api/types";
+import CardHead from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
 import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
@@ -46,12 +47,8 @@ export default function WebhooksPage() {
       </p>
       <ErrorText message={error} />
 
-      <div className="card">
-        {!creating ? (
-          <button type="button" className="icon-btn btn-ghost" onClick={() => setCreating(true)}>
-            + New webhook
-          </button>
-        ) : (
+      {creating ? (
+        <div className="card form-card">
           <SubscriptionForm
             eventTypes={eventTypes}
             onCancel={() => setCreating(false)}
@@ -60,15 +57,25 @@ export default function WebhooksPage() {
               load();
             }}
           />
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="page-actions">
+          <button type="button" className="btn-primary" onClick={() => setCreating(true)}>
+            + New webhook
+          </button>
+        </div>
+      )}
 
       {!subs ? (
         <Spinner />
       ) : subs.length === 0 ? (
         <p className="muted small page-note">No webhooks yet.</p>
       ) : (
-        subs.map((s) => <SubscriptionCard key={s.id} sub={s} eventTypes={eventTypes} onChanged={load} />)
+        <div className="card-grid">
+          {subs.map((s) => (
+            <SubscriptionCard key={s.id} sub={s} eventTypes={eventTypes} onChanged={load} />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -164,7 +171,7 @@ function SubscriptionForm({
 function SubscriptionCard({ sub, eventTypes, onChanged }: { sub: WebhookSubscription; eventTypes: string[]; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
   const [showDeliveries, setShowDeliveries] = useState(false);
-  const [armedDelete, setArmedDelete] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -196,10 +203,6 @@ function SubscriptionCard({ sub, eventTypes, onChanged }: { sub: WebhookSubscrip
   }
 
   async function remove() {
-    if (!armedDelete) {
-      setArmedDelete(true);
-      return;
-    }
     try {
       await deleteSubscription(sub.id);
       onChanged();
@@ -210,7 +213,7 @@ function SubscriptionCard({ sub, eventTypes, onChanged }: { sub: WebhookSubscrip
 
   if (editing) {
     return (
-      <div className="card note-card">
+      <div className="card note-card span-all form-card">
         <SubscriptionForm
           initial={sub}
           eventTypes={eventTypes}
@@ -226,11 +229,27 @@ function SubscriptionCard({ sub, eventTypes, onChanged }: { sub: WebhookSubscrip
 
   return (
     <div className="card note-card">
-      <div className="row-between" style={{ borderBottom: "none" }}>
-        <b style={{ wordBreak: "break-all" }}>{sub.target_url}</b>
-        {!sub.is_active && <span className="badge badge-inactive">Inactive</span>}
-      </div>
-      <div className="row" style={{ flexWrap: "wrap" }}>
+      <CardHead
+        icon={<Plug />}
+        tone="blue"
+        title={sub.target_url}
+        subtitle={`${sub.event_types.length} event${sub.event_types.length === 1 ? "" : "s"}`}
+        badges={!sub.is_active ? <span className="badge badge-inactive">Inactive</span> : undefined}
+        items={[
+          { key: "edit", label: "Edit", icon: <Pencil />, onSelect: () => setEditing(true) },
+          {
+            key: "active",
+            label: sub.is_active ? "Deactivate" : "Activate",
+            icon: sub.is_active ? <PowerOff /> : <Power />,
+            onSelect: toggleActive,
+          },
+          { key: "deliveries", label: showDeliveries ? "Hide deliveries" : "Deliveries", icon: <History />, onSelect: () => setShowDeliveries((v) => !v) },
+          { key: "secret", label: showSecret ? "Hide signing secret" : "Signing secret", icon: <KeyRound />, onSelect: () => setShowSecret((v) => !v) },
+          { key: "div", divider: true },
+          { key: "delete", label: "Delete webhook", icon: <Trash2 />, danger: true, confirm: "Really delete?", onSelect: remove },
+        ]}
+      />
+      <div className="row" style={{ flexWrap: "wrap", gap: 4 }}>
         {sub.event_types.map((et) => (
           <span key={et} className="chip">
             {et}
@@ -238,42 +257,29 @@ function SubscriptionCard({ sub, eventTypes, onChanged }: { sub: WebhookSubscrip
         ))}
       </div>
 
-      <label className="muted small" style={{ marginTop: 8, display: "block" }}>
-        Signing secret
-      </label>
-      <div className="row" style={{ alignItems: "center" }}>
-        <code className="small" style={{ wordBreak: "break-all" }}>
-          {sub.secret}
-        </code>
-        <button type="button" onClick={copySecret}>
-          <Copy size={13} />
-        </button>
-        <button type="button" onClick={regenerateSecret} title="Invalidates the current secret">
-          <RefreshCw size={13} /> New secret
-        </button>
-      </div>
-      <p className="muted small">Every delivery includes an X-MyShop-Signature header: HMAC-SHA256 of the JSON body using this secret.</p>
-      {copyStatus && <p className="muted small">{copyStatus}</p>}
+      {showSecret && (
+        <div className="secret-panel">
+          <div className="muted small">Signing secret</div>
+          <div className="row" style={{ alignItems: "center", flexWrap: "nowrap" }}>
+            <code className="small" style={{ wordBreak: "break-all", flex: 1 }}>
+              {sub.secret}
+            </code>
+            <button type="button" onClick={copySecret} aria-label="Copy secret">
+              <Copy size={13} />
+            </button>
+            <button type="button" onClick={regenerateSecret} title="Invalidates the current secret">
+              <RefreshCw size={13} /> New
+            </button>
+          </div>
+          <p className="muted small" style={{ margin: "6px 0 0" }}>
+            Every delivery includes an X-MyShop-Signature header: HMAC-SHA256 of the JSON body using this secret.
+          </p>
+          {copyStatus && <p className="muted small" style={{ margin: "4px 0 0" }}>{copyStatus}</p>}
+        </div>
+      )}
 
-      <div className="row" style={{ marginTop: 4 }}>
-        <button type="button" onClick={() => setShowDeliveries((v) => !v)}>
-          Deliveries
-        </button>
-      </div>
       {showDeliveries && <DeliveriesList subscriptionId={sub.id} />}
-
       <ErrorText message={error} />
-      <div className="row" style={{ marginTop: 10 }}>
-        <button type="button" onClick={() => setEditing(true)}>
-          Edit
-        </button>
-        <button type="button" onClick={toggleActive}>
-          {sub.is_active ? "Deactivate" : "Activate"}
-        </button>
-        <button type="button" className="btn-danger" onClick={remove} style={{ marginLeft: "auto" }}>
-          <Trash2 size={15} /> {armedDelete ? "Confirm?" : "Delete"}
-        </button>
-      </div>
     </div>
   );
 }

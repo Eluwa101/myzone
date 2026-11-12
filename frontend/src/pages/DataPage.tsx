@@ -1,14 +1,32 @@
-import { ClipboardList, Download, Mail, Plug, StickyNote, Upload, Users } from "lucide-react";
-import { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { ClipboardList, Download, Mail, Plug, ScanLine, StickyNote, Upload, UsersRound } from "lucide-react";
+import { useRef, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { exportCsv, importCsv } from "../api/customers";
 import { errorMessage } from "../api/errorMessage";
 import type { ImportResult } from "../api/types";
+import type { CardTone } from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
 import TopBar from "../components/TopBar";
 
+const TILES: { to: string; title: string; text: string; icon: ReactNode; tone: CardTone }[] = [
+  { to: "/segments", title: "Segments", text: "Group customers by filters, then email or WhatsApp everyone in the group at once.", icon: <UsersRound />, tone: "violet" },
+  { to: "/messages", title: "Messages", text: "Email customers directly, with merge tags and reusable templates.", icon: <Mail />, tone: "teal" },
+  { to: "/scan", title: "Scan documents", text: "Photograph receipts and notes with a customer ID - recorded automatically.", icon: <ScanLine />, tone: "blue" },
+  { to: "/forms", title: "Forms", text: "A custom intake form you can share, or use as a webhook target for Zapier or Google Forms.", icon: <ClipboardList />, tone: "rose" },
+  { to: "/webhooks", title: "Webhooks", text: "Get notified in real time when customers, orders, transactions or notes change.", icon: <Plug />, tone: "blue" },
+  { to: "/notes", title: "Notes", text: "Creditors, VIPs, anything to flag - attachable to one or many customers.", icon: <StickyNote />, tone: "amber" },
+];
+
+function SectionHead({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="section-head">
+      <h2>{title}</h2>
+      <p className="muted small">{text}</p>
+    </div>
+  );
+}
+
 export default function DataPage() {
-  const navigate = useNavigate();
   const [importText, setImportText] = useState("");
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -57,68 +75,23 @@ export default function DataPage() {
   return (
     <div>
       <TopBar title="Data" />
-      <p className="muted small page-note">Query, share, and move customer data in and out of MyShop.</p>
-
-      <h2 className="settings-section-heading">Automation &amp; integrations</h2>
-      <div className="card settings-automation-card">
-        <div className="settings-automation-row">
-          <div>
-            <h3>
-              <Users size={15} className="h3-icon" /> Segments
-            </h3>
-            <p className="muted small">Group customers by filters, then email or WhatsApp everyone in the group at once.</p>
-          </div>
-          <button type="button" className="btn-primary" onClick={() => navigate("/segments")}>
-            Open
-          </button>
-        </div>
-        <div className="settings-automation-row">
-          <div>
-            <h3>
-              <Mail size={15} className="h3-icon" /> Messages
-            </h3>
-            <p className="muted small">Email customers directly from the app, with merge tags and reusable templates.</p>
-          </div>
-          <button type="button" className="btn-primary" onClick={() => navigate("/messages")}>
-            Open
-          </button>
-        </div>
-        <div className="settings-automation-row">
-          <div>
-            <h3>
-              <ClipboardList size={15} className="h3-icon" /> Forms
-            </h3>
-            <p className="muted small">A custom intake form you can share, or use as a webhook target for Zapier, Google Forms, etc.</p>
-          </div>
-          <button type="button" className="btn-primary" onClick={() => navigate("/forms")}>
-            Open
-          </button>
-        </div>
-        <div className="settings-automation-row">
-          <div>
-            <h3>
-              <Plug size={15} className="h3-icon" /> Webhooks
-            </h3>
-            <p className="muted small">Get notified in real time when customers, orders, transactions, or notes change.</p>
-          </div>
-          <button type="button" className="btn-primary" onClick={() => navigate("/webhooks")}>
-            Open
-          </button>
-        </div>
-        <div className="settings-automation-row">
-          <div>
-            <h3>
-              <StickyNote size={15} className="h3-icon" /> Notes
-            </h3>
-            <p className="muted small">Org-wide notes - creditors, VIPs, anything to flag - attachable to one or many customers.</p>
-          </div>
-          <button type="button" className="btn-primary" onClick={() => navigate("/notes")}>
-            Open
-          </button>
-        </div>
+      <SectionHead title="Automation & integrations" text="Reach your customers, collect their details, and connect other tools." />
+      <div className="card-grid">
+        {TILES.map((t) => (
+          <Link key={t.to} to={t.to} className="card hub-tile">
+            <span className={`card-icon tone-${t.tone}`} aria-hidden="true">
+              {t.icon}
+            </span>
+            <span className="hub-tile-text">
+              <b>{t.title}</b>
+              <span className="muted small">{t.text}</span>
+            </span>
+          </Link>
+        ))}
       </div>
 
-      <h2 className="settings-section-heading">Import &amp; export</h2>
+      <SectionHead title="Import & export" text="Move your customer list in and out of MyShop as a CSV file." />
+      <div className="card-grid">
       <div className="card">
         <h3>
           <Download size={15} className="h3-icon" /> Export customers
@@ -159,6 +132,7 @@ export default function DataPage() {
             )}
           </p>
         )}
+      </div>
       </div>
     </div>
   );

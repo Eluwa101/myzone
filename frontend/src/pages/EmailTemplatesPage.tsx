@@ -1,4 +1,4 @@
-import { Check, Mail, Plus, Trash2, X } from "lucide-react";
+import { Check, Eye, EyeOff, Mail, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { errorMessage } from "../api/errorMessage";
@@ -9,6 +9,7 @@ import {
   updateEmailTemplate,
   type EmailTemplate,
 } from "../api/messaging";
+import CardHead from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
 import MergeTagPicker from "../components/MergeTagPicker";
 import EmailBodyEditor, { type EmailBodyEditorHandle } from "../components/EmailBodyEditor";
@@ -37,8 +38,8 @@ export default function EmailTemplatesPage() {
       </p>
       <ErrorText message={error} />
 
-      <div className="card">
-        {adding ? (
+      {adding ? (
+        <div className="card form-card">
           <TemplateEditor
             onCancel={() => setAdding(false)}
             onSaved={() => {
@@ -46,12 +47,14 @@ export default function EmailTemplatesPage() {
               load();
             }}
           />
-        ) : (
-          <button type="button" className="icon-btn btn-ghost" onClick={() => setAdding(true)}>
+        </div>
+      ) : (
+        <div className="page-actions">
+          <button type="button" className="btn-primary" onClick={() => setAdding(true)}>
             <Plus size={15} /> New template
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {templates === null ? (
         <Spinner />
@@ -61,7 +64,11 @@ export default function EmailTemplatesPage() {
           <p>No templates yet.</p>
         </div>
       ) : (
-        templates.map((t) => <TemplateCard key={t.id} template={t} onChanged={load} />)
+        <div className="card-grid">
+          {templates.map((t) => (
+            <TemplateCard key={t.id} template={t} onChanged={load} />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -127,14 +134,9 @@ function TemplateEditor({
 function TemplateCard({ template, onChanged }: { template: EmailTemplate; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
   const [showDesign, setShowDesign] = useState(false);
-  const [armedDelete, setArmedDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function remove() {
-    if (!armedDelete) {
-      setArmedDelete(true);
-      return;
-    }
     try {
       await deleteEmailTemplate(template.id);
       onChanged();
@@ -145,7 +147,7 @@ function TemplateCard({ template, onChanged }: { template: EmailTemplate; onChan
 
   if (editing) {
     return (
-      <div className="card note-card">
+      <div className="card note-card span-all form-card">
         <TemplateEditor template={template} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged(); }} />
       </div>
     );
@@ -153,23 +155,29 @@ function TemplateCard({ template, onChanged }: { template: EmailTemplate; onChan
 
   return (
     <div className="card note-card">
-      <div className="row-between" style={{ borderBottom: "none" }}>
-        <b>{template.name}</b>
-      </div>
-      <p className="muted small">{template.subject}</p>
+      <CardHead
+        icon={<Mail />}
+        tone="teal"
+        title={template.name}
+        subtitle={template.subject}
+        items={[
+          { key: "edit", label: "Edit", icon: <Pencil />, onSelect: () => setEditing(true) },
+          {
+            key: "design",
+            label: showDesign ? "Hide design" : "View design",
+            icon: showDesign ? <EyeOff /> : <Eye />,
+            onSelect: () => setShowDesign((v) => !v),
+          },
+          { key: "div", divider: true },
+          { key: "delete", label: "Delete template", icon: <Trash2 />, danger: true, confirm: "Really delete?", onSelect: remove },
+        ]}
+      />
       {showDesign && <HtmlPreviewFrame html={template.body_html} title={`${template.name} design`} />}
       <ErrorText message={error} />
-      <div className="row" style={{ marginTop: 8 }}>
-        <button type="button" onClick={() => setEditing(true)}>
-          Edit
-        </button>
-        <button type="button" onClick={() => setShowDesign((v) => !v)}>
-          {showDesign ? "Hide" : "View"} design
-        </button>
-        <Link to={`/messages/compose?template_id=${template.id}`}>Use this template</Link>
-        <button type="button" className="btn-danger" onClick={remove} style={{ marginLeft: "auto" }}>
-          <Trash2 size={15} /> {armedDelete ? "Confirm?" : "Delete"}
-        </button>
+      <div className="card-actions">
+        <Link to={`/messages/compose?template_id=${template.id}`} className="btn-primary">
+          <Send size={13} /> Use this template
+        </Link>
       </div>
     </div>
   );

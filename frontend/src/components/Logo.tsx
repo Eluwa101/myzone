@@ -1,0 +1,34 @@
+/** The MyShop mark: a little shop with a striped awning and a heart sign.
+ * The same drawing is public/favicon.svg. `uid` keeps the gradient id
+ * unique when the logo appears more than once on a page. */
+import { useId } from "react";
+
+export default function Logo({ size = 32, className }: { size?: number; className?: string }) {
+  const uid = useId().replace(/:/g, "");
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width={size} height={size} className={className} role="img" aria-label="MyShop">
+      <defs>
+        <linearGradient id={uid} x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#2563eb" />
+          <stop offset="1" stopColor="#0f766e" />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="60" height="60" rx="17" fill={`url(#${uid})`} />
+      <rect x="21.5" y="8" width="21" height="12" rx="4" fill="#fff" />
+      <path transform="translate(32 14.2) scale(.56)" d="M0 5C-6 1-8-1.5-8-3.5C-8-5.5-6.5-6.5-5-6.5C-3-6.5-1-5.5 0-3.5C1-5.5 3-6.5 5-6.5C6.5-6.5 8-5.5 8-3.5C8-1.5 6 1 0 5Z" fill="#f4727c" />
+      <rect x="31.2" y="19.5" width="1.6" height="4" fill="#fff" />
+      <rect x="14" y="30" width="36" height="25" rx="3.5" fill="#eafaf7" />
+      <path d="M10.00 23H17.33V30.5A3.67 3.67 0 0 1 10.00 30.5Z" fill="#ffd166"/>
+      <path d="M17.33 23H24.67V30.5A3.67 3.67 0 0 1 17.33 30.5Z" fill="#f4727c"/>
+      <path d="M24.67 23H32.00V30.5A3.67 3.67 0 0 1 24.67 30.5Z" fill="#ffd166"/>
+      <path d="M32.00 23H39.33V30.5A3.67 3.67 0 0 1 32.00 30.5Z" fill="#f4727c"/>
+      <path d="M39.33 23H46.67V30.5A3.67 3.67 0 0 1 39.33 30.5Z" fill="#ffd166"/>
+      <path d="M46.67 23H54.00V30.5A3.67 3.67 0 0 1 46.67 30.5Z" fill="#f4727c"/>
+      <rect x="9" y="21" width="46" height="3" rx="1.5" fill="#fff" />
+      <rect x="18" y="39" width="14" height="11" rx="3" fill="#7dd3fc" />
+      <path d="M20.6 42.2H24" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity=".8" />
+      <path d="M36 55V45a4 4 0 0 1 8 0V55Z" fill="#0f766e" />
+      <circle cx="41.6" cy="50" r=".9" fill="#ffd166" />
+    </svg>
+  );
+}

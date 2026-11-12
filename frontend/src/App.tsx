@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import ProtectedLayout from "./components/ProtectedLayout";
+import ScrollToTop from "./components/ScrollToTop";
 import ServerWakingBanner from "./components/ServerWakingBanner";
 import Spinner from "./components/Spinner";
 
@@ -41,6 +42,7 @@ const WebhooksPage = lazy(() => import("./pages/WebhooksPage"));
 export default function App() {
   return (
     <>
+      <ScrollToTop />
       <ServerWakingBanner />
       <Suspense fallback={<Spinner label="Loading…" />}>
         <Routes>

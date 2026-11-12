@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
+import BackToTop from "../components/BackToTop";
 import { LAST_UPDATED, LEGAL_DRAFT, PRIVACY_POLICY, TERMS_OF_SERVICE } from "../legal/content";
 
 /** /privacy and /terms - public, no login needed, readable from the
@@ -69,6 +70,7 @@ export default function LegalPage({ doc }: { doc: "privacy" | "terms" }) {
         ))}
       </article>
 
+      <BackToTop plain />
       <footer className="legal-footer small muted">
         <Link to="/developers">Developers</Link> · <Link to="/privacy">Privacy Policy</Link> · <Link to="/terms">Terms of Service</Link>
       </footer>

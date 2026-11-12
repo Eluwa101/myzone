@@ -1,11 +1,9 @@
-import { Sparkles } from "lucide-react";
+import Logo from "./Logo";
 
 export default function AuthBrand() {
   return (
     <div className="auth-brand">
-      <span className="auth-brand-mark" aria-hidden="true">
-        <Sparkles size={18} strokeWidth={2.25} />
-      </span>
+      <Logo size={40} className="auth-brand-logo" />
       <h1>MyShop</h1>
     </div>
   );

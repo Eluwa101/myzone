@@ -34,15 +34,13 @@ export default function MessagesPage() {
       <TopBar title="Messages" backTo="/data" />
       <p className="muted small page-note">Email customers directly, with merge tags filled in per recipient.</p>
 
-      <div className="card">
-        <div className="row">
-          <Link to="/messages/compose" className="btn-primary">
-            <Plus size={15} /> Compose email
-          </Link>
-          <Link to="/messages/templates">
-            <FileText size={15} /> Manage templates
-          </Link>
-        </div>
+      <div className="page-actions">
+        <Link to="/messages/compose" className="btn-primary pill-link">
+          <Plus size={15} /> Compose email
+        </Link>
+        <Link to="/messages/templates" className="pill-link">
+          <FileText size={15} /> Manage templates
+        </Link>
       </div>
 
       <h2 className="settings-section-heading">Recent activity</h2>
