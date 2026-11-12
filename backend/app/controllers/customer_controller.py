@@ -203,7 +203,11 @@ def list_customers(
             )
         )
     total = q.count()
-    items = q.order_by(Customer.name).offset((page - 1) * page_size).limit(page_size).all()
+    # id as a tie-breaker: without it two customers with the same name can
+    # swap places between requests, and one shows on two pages while the
+    # other shows on none
+    page, page_size = max(1, page), min(max(1, page_size), 200)
+    items = q.order_by(func.lower(Customer.name), Customer.id).offset((page - 1) * page_size).limit(page_size).all()
     return items, total
 
 

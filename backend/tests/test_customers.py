@@ -213,3 +213,21 @@ def test_csv_export_then_import_round_trips_without_duplicating(client, auth_hea
 
     listing = client.get("/api/customers", headers=auth_headers).json()
     assert listing["total"] == 1
+
+
+def test_paging_covers_every_customer_exactly_once(client, auth_headers):
+    # same names on purpose: ties must not make customers repeat or vanish across pages
+    for i in range(23):
+        client.post("/api/customers", json={"name": f"Ada {'Obi' if i % 3 else 'obi'}", "phone": f"0800{i:04d}"}, headers=auth_headers, params={"force": "true"})
+    seen = []
+    for page in (1, 2, 3):
+        body = client.get("/api/customers", params={"page": page, "page_size": 10}, headers=auth_headers).json()
+        assert body["total"] == 23
+        seen += [c["id"] for c in body["items"]]
+    assert len(seen) == 23 and len(set(seen)) == 23
+    assert client.get("/api/customers", params={"page": 4, "page_size": 10}, headers=auth_headers).json()["items"] == []
+
+
+def test_page_size_is_capped(client, auth_headers):
+    body = client.get("/api/customers", params={"page_size": 100000, "page": 0}, headers=auth_headers)
+    assert body.status_code == 200 and body.json()["total"] == 0
