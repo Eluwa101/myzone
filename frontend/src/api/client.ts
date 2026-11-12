@@ -95,7 +95,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const body = isJson ? await res.json() : await res.text();
 
   if (!res.ok) {
-    if (res.status === 401) setToken(null);
+    if (res.status === 401) {
+      // an expired admin session drops back to the admin's own login,
+      // rather than logging them out entirely
+      const own = localStorage.getItem("myshop_admin_return_token");
+      if (own) {
+        localStorage.removeItem("myshop_admin_return_token");
+        localStorage.removeItem("myshop_admin_session");
+        setToken(own);
+        window.location.assign("/customers");
+      } else {
+        setToken(null);
+      }
+    }
     const detail = isJson && body && typeof body === "object" && "detail" in body ? body.detail : body;
     throw new ApiError(res.status, detail);
   }

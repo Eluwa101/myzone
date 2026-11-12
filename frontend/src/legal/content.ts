@@ -159,7 +159,7 @@ export const PRIVACY_POLICY: LegalDocument = {
       id: "security",
       heading: "10. Security",
       body: [
-        "We use encrypted connections (HTTPS) everywhere, store passwords only as salted hashes, keep each business's data separated from every other business's, and give staff access only where needed. Custom SQL segments run on a private, read-only copy of your own data, never directly on our database. No system is perfectly secure; if we learn of a breach affecting your information, we will tell you and, where required, the authorities, without undue delay.",
+        "We use encrypted connections (HTTPS) everywhere, store passwords only as salted hashes, keep each business's data separated from every other business's, and give staff access only where needed. If you need help with your account, a MyShop administrator may open it to assist you: that access is time-limited, you are notified in the app when it happens, and every change made is permanently logged. Custom SQL segments run on a private, read-only copy of your own data, never directly on our database. No system is perfectly secure; if we learn of a breach affecting your information, we will tell you and, where required, the authorities, without undue delay.",
       ],
     },
     {

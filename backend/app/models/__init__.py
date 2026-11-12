@@ -20,8 +20,10 @@ from app.models.email_template import EmailTemplate
 from app.models.outbound_message import OutboundMessage, MessageChannel, MessageStatus
 from app.models.api_key import ApiKey
 from app.models.document_scan import DocumentScan
+from app.models.admin_access_log import AdminAccessLog
 
 __all__ = [
+    "AdminAccessLog",
     "ApiKey",
     "DocumentScan",
     "Organization",

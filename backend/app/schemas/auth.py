@@ -35,6 +35,9 @@ class UserOut(BaseModel):
     email: EmailStr
     role: UserRole
     email_verified: bool
+    is_platform_admin: bool = False
+    # true while an admin is inside another business's account
+    admin_session: bool = False
 
     model_config = {"from_attributes": True}
 

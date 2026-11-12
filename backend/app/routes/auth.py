@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.controllers import auth_controller
@@ -85,5 +85,11 @@ def google_auth(data: GoogleAuthRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserOut)
-def me(current_user: User = Depends(get_current_user)):
-    return current_user
+def me(request: Request, current_user: User = Depends(get_current_user)):
+    from app.core.security import is_platform_admin
+
+    return UserOut(
+        **UserOut.model_validate(current_user).model_dump(exclude={"is_platform_admin", "admin_session"}),
+        is_platform_admin=is_platform_admin(current_user),
+        admin_session=bool(getattr(request.state, "admin_session", False)),
+    )

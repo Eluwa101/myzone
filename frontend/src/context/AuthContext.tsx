@@ -68,6 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
+    // leaving an admin session by logging out mustn't leave the admin's own login lying around
+    localStorage.removeItem("myshop_admin_return_token");
+    localStorage.removeItem("myshop_admin_session");
     authApi.logout();
     setUser(null);
   }

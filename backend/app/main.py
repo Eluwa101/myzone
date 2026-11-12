@@ -9,7 +9,7 @@ from app.agent.checkpointer import close_checkpointer
 from app.core.config import settings as app_settings
 from app.core.idempotency import IdempotencyMiddleware
 from app.controllers.account_closure_controller import start_scheduler as start_closure_scheduler
-from app.routes import account, agent, api_keys, auth, customers, scans, unsubscribe, forms, messaging, notes, notifications, orders, public_forms, saved_widgets, segments, settings, summary, transactions, webhooks
+from app.routes import account, admin, agent, api_keys, auth, customers, scans, unsubscribe, forms, messaging, notes, notifications, orders, public_forms, saved_widgets, segments, settings, summary, transactions, webhooks
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,7 @@ app.include_router(api_keys.router)
 app.include_router(unsubscribe.router)
 app.include_router(account.router)
 app.include_router(scans.router)
+app.include_router(admin.router)
 
 
 @app.exception_handler(Exception)

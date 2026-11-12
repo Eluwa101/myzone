@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.controllers import account_closure_controller as closure
 from app.core.database import get_db
-from app.core.security import get_session_user
+from app.core.security import get_current_user, get_session_user
 from app.models.user import User
 
 # A signed-in owner only - never an API key - can close or reopen an account.
@@ -28,7 +28,9 @@ class ClosureRequest(BaseModel):
 
 
 @router.get("/closure", response_model=ClosureStatus)
-def get_closure(db: Session = Depends(get_db), current_user: User = Depends(get_session_user)):
+def get_closure(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # reading the status is harmless, so admins helping a business (and API
+    # keys) can see it too - only requesting or cancelling needs a real owner
     return closure.status(db, current_user.org_id)
 
 

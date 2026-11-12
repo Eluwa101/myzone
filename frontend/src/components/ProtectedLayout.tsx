@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import AdminSessionBanner from "./AdminSessionBanner";
 import BottomNav from "./BottomNav";
 import ClosureBanner from "./ClosureBanner";
 import QuickCreateFab from "./QuickCreateFab";
@@ -17,6 +18,7 @@ export default function ProtectedLayout() {
   return (
     <div className="app-shell">
       <main className="app-content">
+        <AdminSessionBanner />
         <ClosureBanner />
         <Outlet />
       </main>

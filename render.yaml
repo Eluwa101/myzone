@@ -26,6 +26,8 @@ services:
         sync: false
       - key: API_PUBLIC_URL
         sync: false
+      - key: PLATFORM_ADMIN_EMAILS
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM

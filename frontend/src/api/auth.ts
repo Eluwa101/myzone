@@ -6,6 +6,9 @@ export interface User {
   email: string;
   role: string;
   email_verified: boolean;
+  is_platform_admin?: boolean;
+  /** true while an admin is inside another business's account */
+  admin_session?: boolean;
 }
 
 export async function signup(orgName: string, email: string, password: string): Promise<{ status: string; email: string }> {

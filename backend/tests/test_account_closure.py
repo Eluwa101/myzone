@@ -12,6 +12,7 @@ from app.models.agent_action import AgentAction
 from app.models.chat_message import ChatMessage
 from app.models.chat_thread import ChatThread
 from app.models.document_scan import DocumentScan
+from app.models.admin_access_log import AdminAccessLog
 from app.models.organization import Organization
 from app.models.pending_action import PendingAction
 from app.models.saved_widget import SavedWidget
@@ -167,6 +168,7 @@ def _fill_with_data(client, headers, db, org_email):
             AgentAction(org_id=user.org_id, user_id=user.id, tool_name="create_customer", payload={}, result={}),
             SavedWidget(org_id=user.org_id, user_id=user.id, question="q", title="t"),
             DocumentScan(org_id=user.org_id, user_id=user.id, image_hash=org_email, status="done", extracted={}, actions=[]),
+            AdminAccessLog(org_id=user.org_id, admin_user_id=user.id, admin_email="admin@example.com", kind="switch"),
             WebhookDelivery(org_id=user.org_id, subscription_id=sub.id, event_type="customer.created", payload={}, status="success"),
         ]
     )

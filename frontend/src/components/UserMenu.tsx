@@ -1,4 +1,6 @@
-import { LogOut } from "lucide-react";
+import { Building2, LogOut, Undo2 } from "lucide-react";
+import { leaveBusiness } from "../api/admin";
+import AdminBusinessPicker from "./AdminBusinessPicker";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
@@ -12,6 +14,7 @@ function initialsFor(email: string): string {
 export default function UserMenu() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
+  const [picking, setPicking] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,13 +35,32 @@ export default function UserMenu() {
       {open && (
         <div className="user-menu-dropdown">
           <div className="user-menu-email">{user.email}</div>
-          <div className="user-menu-role">{user.role}</div>
+          <div className="user-menu-role">{user.admin_session ? "Admin session" : user.role}</div>
+          {user.is_platform_admin && (
+            <button
+              className="btn-ghost user-menu-logout"
+              onClick={() => {
+                setOpen(false);
+                setPicking(true);
+              }}
+            >
+              <Building2 size={15} />
+              Switch business (admin)
+            </button>
+          )}
+          {user.admin_session && (
+            <button className="btn-ghost user-menu-logout" onClick={() => leaveBusiness()}>
+              <Undo2 size={15} />
+              Back to my account
+            </button>
+          )}
           <button className="btn-ghost user-menu-logout" onClick={logout}>
             <LogOut size={15} />
             Log out
           </button>
         </div>
       )}
+      {picking && <AdminBusinessPicker currentOrgId={user.org_id} onClose={() => setPicking(false)} />}
     </div>
   );
 }

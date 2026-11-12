@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # this API's own public address (e.g. https://api.myshopp.cc) - used
     # for the one-click unsubscribe header mail apps POST to
     api_public_url: str | None = None
+    # comma-separated logins allowed to open any business's account to
+    # help (see routes/admin.py) - deliberately config, not a DB flag
+    platform_admin_emails: str = ""
 
     resend_api_key: str | None = None
     # Resend's shared test sender - works without verifying a domain, but
