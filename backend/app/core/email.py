@@ -116,3 +116,43 @@ def send_google_only_account_notice(to: str, from_name: str | None = None, reply
         from_name=from_name,
         reply_to=reply_to,
     )
+
+
+def _date(when) -> str:
+    return when.strftime("%d %B %Y")
+
+
+def send_account_closure_scheduled(to: str, business: str, scheduled_for, requested_by: str) -> None:
+    import html as _html
+
+    _send(
+        to,
+        f"Your MyShop account for {business} will be closed",
+        f"<p>{_html.escape(requested_by)} asked to close the MyShop account for <b>{_html.escape(business)}</b>.</p>"
+        f"<p>On <b>{_date(scheduled_for)}</b> all of its data - customers, sales, orders, notes, messages and everything else - "
+        "will be permanently deleted. Until then the account is read-only: you can still sign in and export your data "
+        "(Data &rarr; Export customers).</p>"
+        f'<p>Changed your mind? An owner can cancel in <a href="{settings.frontend_url}/settings">Settings</a> any time before then.</p>',
+    )
+
+
+def send_account_closure_cancelled(to: str, business: str, cancelled_by: str) -> None:
+    import html as _html
+
+    _send(
+        to,
+        f"Your MyShop account for {business} is staying open",
+        f"<p>{_html.escape(cancelled_by)} cancelled the closure of <b>{_html.escape(business)}</b>. Nothing will be deleted, "
+        "and the account can be changed again as normal.</p>",
+    )
+
+
+def send_account_deleted(to: str, business: str) -> None:
+    import html as _html
+
+    _send(
+        to,
+        f"Your MyShop account for {business} has been deleted",
+        f"<p>As requested, the MyShop account for <b>{_html.escape(business)}</b> has been closed and all of its data permanently "
+        "deleted. Thank you for using MyShop.</p>",
+    )

@@ -8,13 +8,15 @@ from fastapi.responses import JSONResponse
 from app.agent.checkpointer import close_checkpointer
 from app.core.config import settings as app_settings
 from app.core.idempotency import IdempotencyMiddleware
-from app.routes import agent, api_keys, auth, customers, unsubscribe, forms, messaging, notes, notifications, orders, public_forms, saved_widgets, segments, settings, summary, transactions, webhooks
+from app.controllers.account_closure_controller import start_scheduler as start_closure_scheduler
+from app.routes import account, agent, api_keys, auth, customers, unsubscribe, forms, messaging, notes, notifications, orders, public_forms, saved_widgets, segments, settings, summary, transactions, webhooks
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    start_closure_scheduler()
     yield
     close_checkpointer()
 
@@ -48,6 +50,7 @@ app.include_router(webhooks.router)
 app.include_router(messaging.router)
 app.include_router(api_keys.router)
 app.include_router(unsubscribe.router)
+app.include_router(account.router)
 
 
 @app.exception_handler(Exception)

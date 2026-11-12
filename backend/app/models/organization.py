@@ -16,6 +16,11 @@ class Organization(Base):
     # far in this org - see customer_controller._next_display_id
     customer_seq: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # account closure (see account_closure_controller): while scheduled_for
+    # is set the account is read-only, and on that date it's deleted
+    closure_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closure_scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closure_requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
 
     users = relationship("User", back_populates="organization", cascade="all, delete-orphan")
     customers = relationship("Customer", back_populates="organization", cascade="all, delete-orphan")

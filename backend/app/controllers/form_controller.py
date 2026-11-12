@@ -90,6 +90,11 @@ def get_public_form(db: Session, token: str) -> CustomForm:
     form = db.query(CustomForm).filter(CustomForm.public_token == token).first()
     if not form or not form.is_active:
         raise FormNotFoundError()
+    from app.models.organization import Organization
+
+    org = db.get(Organization, form.org_id)
+    if org is None or org.closure_scheduled_for is not None:
+        raise FormNotFoundError()  # a closing account takes no new entries
     return form
 
 

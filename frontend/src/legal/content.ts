@@ -8,8 +8,9 @@
 export const LEGAL_DRAFT = true;
 export const LAST_UPDATED = "12 November 2026";
 
-const COMPANY = "[Company legal name]";
-const CONTACT = "[privacy contact email]";
+const COMPANY = "Eluwa Prime Global Services LTD (CAC registration no. 8996524)";
+const CONTACT = "privacy@myshopp.cc";
+const ADDRESS = "12 Adams Estate, Osogbo, Osun State, Nigeria";
 
 /** a string is a paragraph; a string[] is a bulleted list */
 export type LegalBlock = string | string[];
@@ -89,9 +90,9 @@ export const PRIVACY_POLICY: LegalDocument = {
     },
     {
       id: "improve",
-      heading: "5. Using a limited sample of data to improve accuracy",
+      heading: "5. Using a sample of data to improve accuracy",
       body: [
-        "To make the assistant more accurate (for example, better at reading receipts or understanding requests), we may review and use a limited sample - no more than [10]% - of AI interactions and related records.",
+        "To make the assistant more accurate (for example, better at reading receipts or understanding requests), we may review and use a sample of AI interactions and related records - no more than 70% of them.",
         [
           "Before use, the sample is de-identified: names, phone numbers, email addresses and other direct identifiers are removed or replaced with irreversible hashes.",
           "The sample is used only to evaluate and improve MyShop's own features. It is not sold, and is not used to train models offered to other companies.",
@@ -135,8 +136,8 @@ export const PRIVACY_POLICY: LegalDocument = {
       body: [
         [
           "Account and customer records are kept for as long as your account is open.",
-          "Records you delete are removed from the live database straight away and from backups within [30] days.",
-          "Technical logs are kept for up to [90] days unless needed to investigate a security issue.",
+          "Records you delete are removed from the live database straight away and from backups within 90 days.",
+          "Technical logs are kept for up to 90 days unless needed to investigate a security issue.",
           "Email delivery records are kept for as long as your account is open, so you can see what was sent.",
         ],
       ],
@@ -147,8 +148,8 @@ export const PRIVACY_POLICY: LegalDocument = {
       body: [
         "When your account is closed - by you, or when our agreement ends - we will:",
         [
-          "Give you [30] days to export your data.",
-          "Then permanently delete your account, your business profile and all your customer records, notes, transactions, orders, templates, messages, segments, forms and assistant conversations from our live systems, and from backups within a further [30] days.",
+          "Give you 90 days to export your data. During that time the account is read-only, and you can cancel the closure.",
+          "Then permanently delete your account, your business profile and all your customer records, notes, transactions, orders, templates, messages, segments, forms and assistant conversations from our live systems, and from backups within a further 90 days.",
           "Irreversibly hash and anonymize any personal information from your account that was included in the accuracy sample described in section 5, so that it can no longer be linked to you or your customers.",
         ],
         "We may keep a minimal record that an account existed, and anything we are legally required to keep, for as long as the law requires.",
@@ -186,7 +187,7 @@ export const PRIVACY_POLICY: LegalDocument = {
     {
       id: "contact",
       heading: "14. Contact",
-      body: [`${COMPANY}, [registered address]. Email: ${CONTACT}.`],
+      body: [`${COMPANY}, ${ADDRESS}. Email: ${CONTACT}.`],
     },
   ],
 };
@@ -209,7 +210,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
         [
           "You must give accurate information when you sign up and keep it up to date.",
           "You are responsible for keeping your login details secure and for everything done through your account, including by people you share access with.",
-          "Tell us straight away at [support email] if you think someone has accessed your account without permission.",
+          "Tell us straight away at ${CONTACT} if you think someone has accessed your account without permission.",
           "You must be at least 18 years old.",
         ],
       ],
@@ -218,7 +219,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       id: "your-data",
       heading: "3. Your data",
       body: [
-        "You own the data you put into MyShop. You give us permission to store, process and display it only as needed to provide and improve the service as described in our Privacy Policy - including the limited, de-identified accuracy sample described there.",
+        "You own the data you put into MyShop. You give us permission to store, process and display it only as needed to provide and improve the service as described in our Privacy Policy - including the de-identified accuracy sample described there.",
         "You are responsible for having the right to collect and use your customers' information, including any consent the law requires, and for telling your customers how you use their information. MyShop gives you tools (such as recording consent dates) but cannot decide this for you.",
       ],
     },
@@ -260,7 +261,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       id: "fees",
       heading: "7. Fees",
       body: [
-        "[MyShop is currently free to use.] If we introduce paid plans, we will tell you the price and terms in advance, and you will not be charged unless you choose a paid plan.",
+        "MyShop offers a free tier and paid tiers. The features and limits of each tier, and the price and billing terms of a paid tier, are set out in what we agree with you. You will not be charged unless you agree to a paid tier, and we will tell you before any change to the price of a tier you are on takes effect.",
       ],
     },
     {
@@ -277,7 +278,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
         [
           "You can stop using MyShop and ask us to close your account at any time.",
           "We may suspend or close an account that breaks these terms, puts other users or the service at risk, or where the law requires it. Where reasonable, we will warn you first and give you a chance to fix the problem.",
-          "When an account is closed, you will have [30] days to export your data. After that, all of your customer data is permanently deleted, and any personal information from your account used for improving accuracy is irreversibly hashed and anonymized, as set out in section 9 of our Privacy Policy.",
+          "When an account is closed, you will have 90 days to export your data (and can cancel the closure in that time). After that, all of your customer data is permanently deleted, and any personal information from your account used for improving accuracy is irreversibly hashed and anonymized, as set out in section 9 of our Privacy Policy.",
         ],
       ],
     },
@@ -292,7 +293,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       id: "liability",
       heading: "11. Limits on liability",
       body: [
-        "To the extent the law allows, we are not liable for indirect or consequential losses (such as lost profits, revenue or goodwill), and our total liability for any claim relating to MyShop is limited to the greater of the amount you paid us in the 12 months before the claim and [amount]. Nothing in these terms limits liability that cannot be limited by law, such as for fraud.",
+        "To the extent the law allows, we are not liable for indirect or consequential losses (such as lost profits, revenue or goodwill), and our total liability for any claim relating to MyShop is limited to the greater of the amount you paid us in the 12 months before the claim and ₦20,000. Nothing in these terms limits liability that cannot be limited by law, such as for fraud.",
       ],
     },
     {
@@ -306,20 +307,20 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       id: "changes",
       heading: "13. Changes to these terms",
       body: [
-        "We may update these terms. We will post the new version here and update the date at the top; for significant changes we will notify you by email or in the app at least [14] days before they take effect. If you keep using MyShop after that, you accept the new terms.",
+        "We may update these terms. We will post the new version here and update the date at the top; for significant changes we will notify you by email or in the app at least 15 days before they take effect. If you keep using MyShop after that, you accept the new terms.",
       ],
     },
     {
       id: "law",
       heading: "14. Governing law",
       body: [
-        "These terms are governed by the laws of [country/state], and disputes will be handled by the courts of [place], unless the law where you live gives you the right to bring a claim locally.",
+        "These terms are governed by the laws of the Federal Republic of Nigeria, and disputes will be handled by the courts of Osun State, Nigeria, unless the law where you live gives you the right to bring a claim locally.",
       ],
     },
     {
       id: "contact",
       heading: "15. Contact",
-      body: [`${COMPANY}, [registered address]. Email: [support email].`],
+      body: [`${COMPANY}, ${ADDRESS}. Email: ${CONTACT}.`],
     },
   ],
 };

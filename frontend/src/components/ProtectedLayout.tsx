@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import BottomNav from "./BottomNav";
+import ClosureBanner from "./ClosureBanner";
 import QuickCreateFab from "./QuickCreateFab";
 import Spinner from "./Spinner";
 
@@ -16,6 +17,7 @@ export default function ProtectedLayout() {
   return (
     <div className="app-shell">
       <main className="app-content">
+        <ClosureBanner />
         <Outlet />
       </main>
       {!QUICK_CREATE_HIDDEN_ON.includes(location.pathname) && <QuickCreateFab />}

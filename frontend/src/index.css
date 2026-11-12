@@ -2253,3 +2253,37 @@ textarea.html-source {
   background: rgba(234, 179, 8, 0.12);
   border: 1px solid rgba(234, 179, 8, 0.4);
 }
+
+/* --- account closure ---------------------------------------------------- */
+
+.danger-card {
+  border-color: rgba(220, 38, 38, 0.35);
+}
+
+.close-account-steps {
+  padding-left: 18px;
+  margin: 8px 0 12px;
+}
+
+.close-account-steps li {
+  margin-bottom: 4px;
+}
+
+.closure-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.closure-banner svg {
+  flex: none;
+  margin-top: 2px;
+  color: #dc2626;
+}
