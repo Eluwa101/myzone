@@ -5,7 +5,7 @@
  * fill in (legal entity, address, governing law, retention periods). While
  * any remain, LEGAL_DRAFT stays true and the pages show a draft notice. */
 
-export const LEGAL_DRAFT = true;
+export const LEGAL_DRAFT = false;
 export const LAST_UPDATED = "12 November 2026";
 
 const COMPANY = "Eluwa Prime Global Services LTD (CAC registration no. 8996524)";
@@ -84,7 +84,7 @@ export const PRIVACY_POLICY: LegalDocument = {
       heading: "4. The AI assistant and other AI features",
       body: [
         "Several features use AI language models: the chat assistant, reading photos and documents you share with it, turning a description into segment filters or SQL, \"Ask your data\", and writing emails. To answer a request, we send the relevant part of your data (for example the customers or purchases the request is about) to an AI provider and receive its answer back.",
-        "Current AI providers: Groq, Google (Gemini) and OpenRouter (which routes requests to models run by other companies). Each provider processes requests under its own terms. Depending on the provider and plan, a provider may keep requests for a limited time for abuse monitoring, and some free plans permit the provider to use requests to improve its models. [Review each provider's current data-use terms and list the retention period here, or switch to plans with zero data retention.]",
+        "Current AI providers: requests go to Groq first; if it is busy or unavailable, to OpenRouter (which routes them to free models run by other companies), and then to Google (Gemini). Photos and documents may be read by OpenRouter or Google. Each provider processes requests under its own terms. We currently use free plans of these services: depending on the provider, requests may be kept for a limited time (for example, for abuse monitoring), and some free models' providers are allowed to use requests to improve their models. We send only the data a request needs, and we will update this section if we change providers or plans.",
         "AI output can be wrong. Actions that reach real people or cannot be undone - sending email, deleting or merging customers - always wait for a person to confirm them.",
       ],
     },
@@ -127,7 +127,7 @@ export const PRIVACY_POLICY: LegalDocument = {
       id: "transfers",
       heading: "7. Where information is stored",
       body: [
-        "Our providers operate in several countries, so information may be stored or processed outside the country where you or your customers live, including in [the United States / the European Union - confirm the Supabase region and providers' locations]. Where the law requires it, we rely on appropriate safeguards for these transfers.",
+        "Our providers operate in several countries, so information may be stored or processed outside the country where you or your customers live, including in the United Kingdom (where our database is hosted) and the United States (where our servers and AI providers operate). Where the law requires it, we rely on appropriate safeguards for these transfers.",
       ],
     },
     {
