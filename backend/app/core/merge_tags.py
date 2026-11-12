@@ -3,11 +3,29 @@ one customer, at send time - never client-side, so what's actually in the
 customer's inbox always reflects live data, not whatever was true when the
 template was drafted.
 
+Alongside the plain data fields (a customer's name, a business's phone
+number, ...), this also computes arithmetic/date tags - lifetime spend,
+days since last purchase, age, days until a delivery is due, and so on -
+from the same underlying data, so a template can say "it's been {{stats.
+days_since_last_purchase}} days" without the business having to compute
+that themselves. These are plain Python functions, not a user-authorable
+formula language: letting template text itself define arbitrary
+expressions would be a code-execution surface, so for now new computed
+tags are added here deliberately rather than self-served.
+
+Money fields that sum across a customer's transactions/orders (lifetime
+spend, unpaid total, ...) add up `amount` regardless of currency - fine for
+the common case of one business trading in one currency, but a customer
+who has been invoiced in more than one currency will get a number that
+mixes them. Same simplification segment_controller's total_spent field
+already makes.
+
 The catalog (`available_merge_tags`) is the single source of truth the
 frontend's tag picker renders from, so the picker can never drift out of
 sync with what the resolver actually understands."""
 import re
 from dataclasses import dataclass
+from datetime import date
 from typing import Callable
 from uuid import UUID
 
@@ -49,6 +67,83 @@ def _tx_items_text(tx: Transaction | None) -> str | None:
     return ", ".join(f"{i['item']} x{i['qty']}" if i.get("qty", 1) != 1 else i["item"] for i in tx.items)
 
 
+def _money(value: float) -> str:
+    return f"{value:,.2f}"
+
+
+def _age_years(c: Customer) -> int | None:
+    if not c.birthday:
+        return None
+    today = date.today()
+    b = c.birthday
+    return today.year - b.year - ((today.month, today.day) < (b.month, b.day))
+
+
+def _days_until_birthday(c: Customer) -> int | None:
+    if not c.birthday:
+        return None
+    today = date.today()
+    b = c.birthday
+    for year in (today.year, today.year + 1):
+        try:
+            occurrence = b.replace(year=year)
+        except ValueError:
+            occurrence = date(year, 2, 28)  # the birthday is Feb 29 and `year` isn't a leap year
+        if occurrence >= today:
+            return (occurrence - today).days
+    return None  # unreachable - the loop always finds this year's or next year's occurrence
+
+
+def _days_as_customer(c: Customer) -> int:
+    return (date.today() - c.created_at.date()).days
+
+
+def _lifetime_spend(c: Customer) -> float:
+    return sum(float(t.amount or 0) for t in c.transactions)
+
+
+def _average_transaction(c: Customer) -> float | None:
+    if not c.transactions:
+        return None
+    return _lifetime_spend(c) / len(c.transactions)
+
+
+def _purchase_dates(c: Customer) -> list[date]:
+    return [t.date for t in c.transactions] + [o.order_date for o in c.orders]
+
+
+def _days_since_last_purchase(c: Customer) -> int | None:
+    dates = _purchase_dates(c)
+    return (date.today() - max(dates)).days if dates else None
+
+
+def _first_purchase_date(c: Customer) -> str | None:
+    dates = _purchase_dates(c)
+    return min(dates).isoformat() if dates else None
+
+
+def _unpaid_order_total(c: Customer) -> float:
+    return sum(float(o.amount or 0) for o in c.orders if not o.paid and o.amount is not None)
+
+
+def _days_since_ordered(o: Order | None) -> int | None:
+    return (date.today() - o.order_date).days if o else None
+
+
+def _days_until_delivery(o: Order | None) -> int | None:
+    return (o.delivery_date - date.today()).days if o and o.delivery_date else None
+
+
+def _order_overdue(o: Order | None) -> str | None:
+    if not o or not o.delivery_date:
+        return None
+    return "Yes" if (not o.delivered and date.today() > o.delivery_date) else "No"
+
+
+def _days_since_transaction(t: Transaction | None) -> int | None:
+    return (date.today() - t.date).days if t else None
+
+
 _CUSTOMER_FIELDS: dict[str, tuple[str, Callable[[Customer], object]]] = {
     "name": ("Full name", lambda c: c.name),
     "first_name": ("First name", lambda c: c.first_name),
@@ -59,6 +154,9 @@ _CUSTOMER_FIELDS: dict[str, tuple[str, Callable[[Customer], object]]] = {
     "pet": ("Pet", lambda c: c.pet),
     "address": ("Address", lambda c: c.address),
     "birthday": ("Birthday", lambda c: c.birthday.isoformat() if c.birthday else None),
+    "age": ("Age (years)", _age_years),
+    "days_until_birthday": ("Days until next birthday", _days_until_birthday),
+    "days_as_customer": ("Days as a customer", _days_as_customer),
     "interests": ("Interested in", lambda c: c.interests),
     "display_id": ("Customer ID", lambda c: c.display_id),
     "status": ("Status", lambda c: c.status.value if c.status else None),
@@ -79,6 +177,9 @@ _LATEST_ORDER_FIELDS: dict[str, tuple[str, Callable[[Order | None], object]]] = 
     "amount": ("Amount", lambda o: o.amount if o else None),
     "currency": ("Currency", lambda o: o.currency if o else None),
     "delivered": ("Delivered?", lambda o: ("Yes" if o.delivered else "No") if o else None),
+    "days_since_ordered": ("Days since ordered", _days_since_ordered),
+    "days_until_delivery": ("Days until delivery due", _days_until_delivery),
+    "overdue": ("Delivery overdue?", _order_overdue),
 }
 
 _LATEST_TRANSACTION_FIELDS: dict[str, tuple[str, Callable[[Transaction | None], object]]] = {
@@ -86,6 +187,23 @@ _LATEST_TRANSACTION_FIELDS: dict[str, tuple[str, Callable[[Transaction | None], 
     "items": ("Items", lambda t: _tx_items_text(t)),
     "amount": ("Amount", lambda t: t.amount if t else None),
     "currency": ("Currency", lambda t: t.currency if t else None),
+    "days_since": ("Days since", _days_since_transaction),
+}
+
+_STATS_FIELDS: dict[str, tuple[str, Callable[[Customer], object]]] = {
+    "lifetime_spend": ("Lifetime spend", lambda c: _money(_lifetime_spend(c))),
+    "transaction_count": ("Number of transactions", lambda c: len(c.transactions)),
+    "order_count": ("Number of orders", lambda c: len(c.orders)),
+    "average_transaction": ("Average transaction", lambda c: (_money(_average_transaction(c)) if _average_transaction(c) is not None else None)),
+    "days_since_last_purchase": ("Days since last purchase", _days_since_last_purchase),
+    "first_purchase_date": ("First purchase date", _first_purchase_date),
+    "pending_order_count": ("Orders awaiting delivery", lambda c: sum(1 for o in c.orders if not o.delivered)),
+    "unpaid_order_total": ("Unpaid orders total", lambda c: _money(_unpaid_order_total(c))),
+}
+
+_SYSTEM_FIELDS: dict[str, tuple[str, Callable[[], object]]] = {
+    "today": ("Today's date", lambda: date.today().isoformat()),
+    "year": ("Current year", lambda: date.today().year),
 }
 
 _CATEGORIES = [
@@ -93,6 +211,8 @@ _CATEGORIES = [
     ("business", "Business", _BUSINESS_FIELDS),
     ("latest_order", "Latest order", _LATEST_ORDER_FIELDS),
     ("latest_transaction", "Latest transaction", _LATEST_TRANSACTION_FIELDS),
+    ("stats", "Purchase stats", _STATS_FIELDS),
+    ("system", "Date", _SYSTEM_FIELDS),
 ]
 
 
@@ -147,6 +267,10 @@ def resolve_merge_tags(text: str, ctx: MergeTagContext) -> str:
             value = _LATEST_ORDER_FIELDS[key][1](latest_order)
         elif category == "latest_transaction" and key in _LATEST_TRANSACTION_FIELDS:
             value = _LATEST_TRANSACTION_FIELDS[key][1](latest_tx)
+        elif category == "stats" and key in _STATS_FIELDS:
+            value = _STATS_FIELDS[key][1](ctx.customer)
+        elif category == "system" and key in _SYSTEM_FIELDS:
+            value = _SYSTEM_FIELDS[key][1]()
         elif category == "extra":
             value = next((v for k, v in (ctx.customer.extra or {}).items() if _slugify(k) == key), None)
         else:

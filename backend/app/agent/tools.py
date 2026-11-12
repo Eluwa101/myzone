@@ -610,7 +610,10 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         own subject and body_html (an HTML string) directly.
         body_html may use merge tags that get filled in per-recipient at
         send time, e.g. {{customer.first_name}}, {{customer.display_id}},
-        {{business.name}}, {{latest_order.amount}}, {{latest_transaction.items}}.
+        {{business.name}}, {{latest_order.amount}}, {{latest_transaction.items}},
+        plus computed ones like {{customer.age}}, {{customer.days_until_birthday}},
+        {{stats.lifetime_spend}}, {{stats.days_since_last_purchase}},
+        {{latest_order.days_until_delivery}}, {{system.today}}.
         Any custom field this org has set on a customer (via
         set_customer_custom_field or CSV import) is also available, as
         {{extra.<field_name>}} with the name lowercased and spaces turned
