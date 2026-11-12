@@ -1,3 +1,4 @@
+from typing import Literal
 from datetime import datetime
 from uuid import UUID
 
@@ -44,6 +45,10 @@ class MessagePreviewRequest(BaseModel):
 class MessagePreviewOut(BaseModel):
     subject: str
     body_html: str
+    # merge tags that won't resolve (typos, unknown fields, unclosed blocks)
+    problems: list[str] = []
+    # fill-in-the-blanks like [discount] still in the text
+    placeholders: list[str] = []
 
 
 class SendEmailRequest(BaseModel):
@@ -70,3 +75,25 @@ class OutboundMessageOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class SuggestedMergeTagOut(BaseModel):
+    label: str
+    tag: str
+    reason: str
+
+
+class EmailDraftRequest(BaseModel):
+    description: str = Field(min_length=1, max_length=2000)
+    segment_id: UUID | None = None
+    format: Literal["simple", "designed"] = "simple"
+    # when given, the assistant edits this email instead of starting over
+    current_subject: str | None = Field(default=None, max_length=500)
+    current_body: str | None = Field(default=None, max_length=100_000)
+
+
+class EmailDraftOut(BaseModel):
+    subject: str
+    body_html: str
+    problems: list[str] = []
+    placeholders: list[str] = []

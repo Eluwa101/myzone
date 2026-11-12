@@ -230,6 +230,8 @@ export interface Segment {
   id: string;
   name: string;
   filters: SegmentFilters;
+  /** when set, the segment is defined by this SQL and `filters` is ignored */
+  sql?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -21,7 +21,10 @@ from uuid import UUID
 from langchain.tools import tool
 from sqlalchemy.orm import Session
 
-from app.controllers import agent_controller, customer_controller, messaging_controller, note_controller, order_controller, settings_controller, transaction_controller
+from app.controllers import agent_controller, customer_controller, messaging_controller, note_controller, order_controller, segment_controller, settings_controller, transaction_controller
+from app.controllers.merge_tag_suggestions import suggest_for_segment
+from app.controllers.segment_sql import SegmentSQLError
+from app.core.merge_tags import MERGE_TAG_GUIDE, TAG_PATTERN, available_merge_tags, find_placeholders, merge_tag_problems
 from app.models.customer import CustomerStatus
 from app.schemas.customer import CustomerCreate, CustomerUpdate
 from app.schemas.note import NoteCreate, NoteUpdate
@@ -597,34 +600,84 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         templates = messaging_controller.list_templates(db, org_id)
         return {"templates": [{"id": str(t.id), "name": t.name, "subject": t.subject} for t in templates]}
 
+    def _find_segment(name: str):
+        wanted = name.strip().lower()
+        return next((s for s in segment_controller.list_segments(db, org_id) if s.name.strip().lower() == wanted), None)
+
     @tool
-    def send_customer_email(customer_ids: str, template_name: str = "", subject: str = "", body_html: str = "") -> dict:
+    def list_segments() -> dict:
+        """List this org's saved customer segments (name, member count, and
+        whether it's defined by filters or custom SQL) - use a segment's name
+        with send_customer_email to email everyone in it."""
+        out = []
+        for s in segment_controller.list_segments(db, org_id):
+            try:
+                count = len(segment_controller.resolve_segment(db, s))
+            except SegmentSQLError:
+                count = None
+            out.append({"name": s.name, "members": count, "defined_by": "sql" if s.sql else "filters"})
+        return {"segments": out}
+
+    @tool
+    def get_merge_tag_guide(segment_name: str = "") -> dict:
+        """How merge tags work - single values, {{#each}} lists of a
+        customer's purchases/orders with filters, {{#if}} conditions,
+        totals like {{count ...}} / {{sum ...}} - plus every single-value
+        tag this org has. Call this before writing an email body that needs
+        anything beyond a plain greeting. Pass segment_name to also get the
+        tags that fit that segment particularly well."""
+        result: dict = {
+            "guide": MERGE_TAG_GUIDE,
+            "tags": [t["tag"] for t in available_merge_tags(db, org_id) if TAG_PATTERN.fullmatch(t["tag"])],
+        }
+        if segment_name.strip():
+            segment = _find_segment(segment_name)
+            if not segment:
+                return {"status": "error", "message": f"No segment named {segment_name!r} - check list_segments."}
+            result["suggested_for_segment"] = suggest_for_segment(db, org_id, segment)
+        return result
+
+    @tool
+    def send_customer_email(
+        customer_ids: str = "", template_name: str = "", subject: str = "", body_html: str = "", segment_name: str = ""
+    ) -> dict:
         """Request sending an email to one or more customers. Reaches real
         people, so this never sends immediately - it creates a pending
         confirmation a human must approve first (same pattern as
         delete_customer/merge_customers).
-        customer_ids is a comma-separated list of customer ids - look them
-        up with search_customers or find_customer_by_id first, not names.
-        Either pass template_name (an existing saved template - check
-        list_email_templates first) to use its subject/body, or write your
-        own subject and body_html (an HTML string) directly.
-        body_html may use merge tags that get filled in per-recipient at
-        send time, e.g. {{customer.first_name}}, {{customer.display_id}},
-        {{business.name}}, {{latest_order.amount}}, {{latest_transaction.items}},
-        plus computed ones like {{customer.age}}, {{customer.days_until_birthday}},
-        {{stats.lifetime_spend}}, {{stats.days_since_last_purchase}},
-        {{latest_order.days_until_delivery}}, {{system.today}}.
-        Any custom field this org has set on a customer (via
-        set_customer_custom_field or CSV import) is also available, as
-        {{extra.<field_name>}} with the name lowercased and spaces turned
-        to underscores (e.g. a "Favorite Color" field is {{extra.favorite_color}})."""
-        ids = [cid.strip() for cid in customer_ids.split(",") if cid.strip()]
-        if not ids:
-            return {"status": "error", "message": "customer_ids is required - look up the customer(s) first."}
-        try:
-            parsed_ids = [str(UUID(cid)) for cid in ids]
-        except ValueError:
-            return {"status": "error", "message": "customer_ids must be valid customer ids, not names - look them up first."}
+        Recipients: either customer_ids (comma-separated customer ids - look
+        them up with search_customers or find_customer_by_id first, not
+        names) or segment_name (a saved segment - see list_segments; everyone
+        in it right now).
+        Content: either template_name (an existing saved template - check
+        list_email_templates first) or your own subject and body_html (HTML).
+        body_html can use merge tags filled in per recipient - call
+        get_merge_tag_guide first for anything beyond {{customer.first_name}}
+        / {{business.name}}. Never invent prices, discounts or links: ask the
+        user. The request is refused if a merge tag won't work or a
+        [placeholder] is left in - fix it (or ask the user for the value)
+        and call again."""
+        if segment_name.strip() and customer_ids.strip():
+            return {"status": "error", "message": "Pass either customer_ids or segment_name, not both."}
+        segment = None
+        if segment_name.strip():
+            segment = _find_segment(segment_name)
+            if not segment:
+                return {"status": "error", "message": f"No segment named {segment_name!r} - check list_segments."}
+            try:
+                parsed_ids = [str(c.id) for c in segment_controller.resolve_segment(db, segment)]
+            except SegmentSQLError as e:
+                return {"status": "error", "message": f"That segment's SQL doesn't run: {e}"}
+            if not parsed_ids:
+                return {"status": "error", "message": f"The segment {segment.name!r} has no members right now."}
+        else:
+            ids = [cid.strip() for cid in customer_ids.split(",") if cid.strip()]
+            if not ids:
+                return {"status": "error", "message": "customer_ids or segment_name is required - look up the customer(s) first."}
+            try:
+                parsed_ids = [str(UUID(cid)) for cid in ids]
+            except ValueError:
+                return {"status": "error", "message": "customer_ids must be valid customer ids, not names - look them up first."}
 
         template_id = None
         resolved_subject, resolved_body = subject.strip(), body_html.strip()
@@ -642,7 +695,19 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         if not resolved_subject or not resolved_body:
             return {"status": "error", "message": "Provide subject and body_html, or a template_name to use."}
 
-        description = f"Send email to {len(parsed_ids)} customer(s): {resolved_subject}"
+        problems = merge_tag_problems(db, org_id, resolved_subject, resolved_body)
+        if problems:
+            return {"status": "error", "message": "Some merge tags won't work - fix them and try again.", "problems": problems}
+        placeholders = find_placeholders(resolved_subject, resolved_body)
+        if placeholders:
+            return {
+                "status": "error",
+                "message": "The email still has placeholders - ask the user what to put there, then try again.",
+                "placeholders": placeholders,
+            }
+
+        audience = f"everyone in segment '{segment.name}' ({len(parsed_ids)} customer(s))" if segment else f"{len(parsed_ids)} customer(s)"
+        description = f"Send email to {audience}: {resolved_subject}"
         payload = {"customer_ids": parsed_ids, "subject": resolved_subject, "body_html": resolved_body, "template_id": template_id}
         pending = agent_controller.create_pending_action(db, org_id, user_id, "send_customer_email", payload, description)
         return {"status": "confirm_required", "action_id": str(pending.id), "description": pending.description}
@@ -670,5 +735,7 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         delete_customer,
         merge_customers,
         list_email_templates,
+        list_segments,
+        get_merge_tag_guide,
         send_customer_email,
     ]

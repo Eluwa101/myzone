@@ -89,6 +89,9 @@ export default function LoginPage() {
         <p className="muted">
           No account yet? <Link to="/signup">Create one</Link>
         </p>
+        <p className="muted small legal-consent">
+          <Link to="/privacy">Privacy</Link> · <Link to="/terms">Terms</Link>
+        </p>
       </div>
     </div>
   );

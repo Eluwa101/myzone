@@ -62,6 +62,10 @@ export default function SignupPage() {
           </button>
         </form>
         <GoogleSignInButton onCredential={onGoogle} text="signup_with" />
+        <p className="muted small legal-consent">
+          By creating an account you agree to our <Link to="/terms">Terms of Service</Link> and{" "}
+          <Link to="/privacy">Privacy Policy</Link>.
+        </p>
         <p className="muted">
           Already have an account? <Link to="/login">Log in</Link>
         </p>

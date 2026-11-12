@@ -1,13 +1,27 @@
-import { Bot, Check, Copy, ExternalLink, Mail, MessageCircle, Sparkles, Trash2, X } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { Bot, Check, Code2, Copy, ExternalLink, ListFilter, Mail, MessageCircle, Sparkles, Trash2, X } from "lucide-react";
+import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { createSegment, deleteSegment, getSegmentFields, getSegmentMembers, listSegments, previewSegment, suggestSegmentFilters, updateSegment } from "../api/segments";
+import {
+  createSegment,
+  deleteSegment,
+  getSegmentFields,
+  getSegmentMembers,
+  listSegments,
+  previewSegment,
+  previewSqlSegment,
+  suggestSegmentFilters,
+  updateSegment,
+} from "../api/segments";
 import { errorMessage } from "../api/errorMessage";
 import type { Segment, SegmentFieldsCatalog, SegmentFilters, SegmentMember, SegmentNode, SegmentResult } from "../api/types";
 import ErrorText from "../components/ErrorText";
 import SegmentQueryBuilder, { emptyGroup, OPERATOR_LABELS } from "../components/SegmentQueryBuilder";
+import SqlSegmentEditor from "../components/SqlSegmentEditor";
 import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
+
+// pulls in the rich-text editor, so only load it once someone opens "Reach segment"
+const EmailComposer = lazy(() => import("../components/EmailComposer"));
 
 const EMAIL_BATCH_SIZE = 40;
 
@@ -101,6 +115,9 @@ function SegmentBuilder({
   const [suggesting, setSuggesting] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
   const [appliedSummary, setAppliedSummary] = useState<string | null>(null);
+  const [mode, setMode] = useState<"builder" | "sql">(initial?.sql ? "sql" : "builder");
+  const [sql, setSql] = useState(initial?.sql ?? "");
+  const [sqlError, setSqlError] = useState<string | null>(null);
 
   useEffect(() => {
     getSegmentFields()
@@ -125,6 +142,7 @@ function SegmentBuilder({
   }
 
   useEffect(() => {
+    if (mode !== "builder") return;
     const handle = setTimeout(() => {
       previewSegment(filters)
         .then(setPreview)
@@ -132,16 +150,39 @@ function SegmentBuilder({
     }, 300);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(filters)]);
+  }, [JSON.stringify(filters), mode]);
+
+  useEffect(() => {
+    if (mode !== "sql") return;
+    setPreview(null);
+    setSqlError(null);
+    if (!sql.trim()) return;
+    let cancelled = false;
+    const handle = setTimeout(() => {
+      previewSqlSegment(sql)
+        .then((r) => !cancelled && setPreview(r))
+        .catch((err) => !cancelled && setSqlError(errorMessage(err)));
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [sql, mode]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+    if (mode === "sql" && !sql.trim()) {
+      setError("Write a query first, or switch back to Builder.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      if (initial) await updateSegment(initial.id, { name: name.trim(), filters });
-      else await createSegment({ name: name.trim(), filters });
+      // saving in Builder mode clears any SQL, so the filters take over again
+      const payload = { name: name.trim(), filters, sql: mode === "sql" ? sql : "" };
+      if (initial) await updateSegment(initial.id, payload);
+      else await createSegment(payload);
       onSaved();
     } catch (err) {
       setError(errorMessage(err));
@@ -155,6 +196,19 @@ function SegmentBuilder({
       <label htmlFor="seg-name">Segment name</label>
       <input id="seg-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Generator leads" autoFocus />
 
+      <div className="editor-mode-tabs" role="tablist" aria-label="Segment type" style={{ marginTop: 10 }}>
+        <button type="button" role="tab" aria-selected={mode === "builder"} className={mode === "builder" ? "active" : ""} onClick={() => setMode("builder")}>
+          <ListFilter size={13} /> Builder
+        </button>
+        <button type="button" role="tab" aria-selected={mode === "sql"} className={mode === "sql" ? "active" : ""} onClick={() => setMode("sql")}>
+          <Code2 size={13} /> SQL
+        </button>
+      </div>
+
+      {mode === "sql" ? (
+        <SqlSegmentEditor sql={sql} onChange={setSql} />
+      ) : (
+        <>
       <div className="card assistant-suggest-card">
         <label htmlFor="seg-describe">
           <Bot size={13} className="h3-icon" /> Describe who you want, and let the assistant set the filters
@@ -176,11 +230,23 @@ function SegmentBuilder({
       </div>
 
       {catalog ? <SegmentQueryBuilder group={filters} catalog={catalog} onChange={setFilters} /> : <Spinner />}
+        </>
+      )}
 
       <div className="card" style={{ marginTop: 10 }}>
-        <p className="small" style={{ margin: 0 }}>
-          {preview ? `${preview.total} matching customer${preview.total === 1 ? "" : "s"}` : "Calculating…"}
-        </p>
+        {mode === "sql" && sqlError ? (
+          <p className="small error-text" style={{ margin: 0 }}>
+            {sqlError}
+          </p>
+        ) : (
+          <p className="small" style={{ margin: 0 }}>
+            {mode === "sql" && !sql.trim()
+              ? "Matching customers will show here as you write."
+              : preview
+                ? `${preview.total} matching customer${preview.total === 1 ? "" : "s"}`
+                : "Calculating…"}
+          </p>
+        )}
         {preview && preview.total > 0 && (
           <p className="muted small" style={{ margin: "4px 0 0" }}>
             {preview.members
@@ -210,7 +276,6 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
   const [members, setMembers] = useState<SegmentResult | null>(null);
   const [showMembers, setShowMembers] = useState(false);
   const [showReach, setShowReach] = useState(false);
-  const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [armedDelete, setArmedDelete] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
@@ -250,11 +315,7 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
   for (let i = 0; i < emails.length; i += EMAIL_BATCH_SIZE) emailBatches.push(emails.slice(i, i + EMAIL_BATCH_SIZE));
 
   function mailtoHref(batch: string[]): string {
-    const params = new URLSearchParams();
-    if (subject) params.set("subject", subject);
-    if (message) params.set("body", message);
-    params.set("bcc", batch.join(","));
-    return `mailto:?${params.toString()}`;
+    return `mailto:?bcc=${encodeURIComponent(batch.join(","))}`;
   }
 
   async function copyNumbers() {
@@ -272,7 +333,16 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
         <b>{segment.name}</b>
         <span className="muted small">{members ? `${members.total} customer${members.total === 1 ? "" : "s"}` : "…"}</span>
       </div>
-      <p className="muted small">{describeFilters(segment.filters)}</p>
+      {segment.sql ? (
+        <details className="sql-reference">
+          <summary className="muted small">
+            <Code2 size={12} className="h3-icon" /> Custom SQL
+          </summary>
+          <pre className="sql-snippet">{segment.sql}</pre>
+        </details>
+      ) : (
+        <p className="muted small">{describeFilters(segment.filters)}</p>
+      )}
 
       <div className="row">
         <button type="button" onClick={() => setShowMembers((v) => !v)}>
@@ -303,46 +373,45 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
 
       {showReach && members && (
         <div className="card" style={{ marginTop: 8 }}>
-          <label htmlFor={`seg-subject-${segment.id}`}>Subject</label>
-          <input id={`seg-subject-${segment.id}`} value={subject} onChange={(e) => setSubject(e.target.value)} />
-          <label htmlFor={`seg-message-${segment.id}`}>Message</label>
-          <textarea id={`seg-message-${segment.id}`} rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />
-          <p className="muted small" style={{ marginTop: -6 }}>
-            Use <code>{"{first_name}"}</code> to personalize each message.
+          <p className="small" style={{ margin: "0 0 6px" }}>
+            <Mail size={13} className="h3-icon" /> <b>Email</b> - {emails.length} of {members.total} have an address. Each
+            person gets their own copy, with merge tags filled in for them.
           </p>
-
-          <div style={{ marginTop: 10 }}>
-            <p className="small" style={{ margin: "0 0 6px" }}>
-              <Mail size={13} className="h3-icon" /> Email ({emails.length} with an address - BCC'd, so no one sees the
-              others)
-            </p>
-            <Link to={`/messages/compose?segment_id=${segment.id}`} className="btn-primary" style={{ marginBottom: 8, display: "inline-flex" }}>
-              <Mail size={14} /> Message this segment
-            </Link>
-            <p className="muted small" style={{ marginTop: 0 }}>
-              Sends from inside the app with real merge tags per recipient, instead of opening your own email client below.
-            </p>
-            {emails.length === 0 ? (
-              <p className="muted small">No one in this segment has an email on file.</p>
-            ) : (
-              <div className="row">
+          {members.total === 0 ? (
+            <p className="muted small">No one is in this segment yet.</p>
+          ) : (
+            <Suspense fallback={<Spinner />}>
+              <EmailComposer embedded segmentId={segment.id} recipients={members.members.map((m) => ({ id: m.id, name: m.name, email: m.email }))} />
+            </Suspense>
+          )}
+          {emails.length > 0 && (
+            <details className="small" style={{ marginTop: 10 }}>
+              <summary className="muted">Or write it in your own email app (BCC, no merge tags)</summary>
+              <div className="row" style={{ marginTop: 8 }}>
                 {emailBatches.map((batch, i) => (
-                  <a key={i} href={mailtoHref(batch)} className="btn-primary">
+                  <a key={i} href={mailtoHref(batch)} className="btn-ghost">
                     Open email{emailBatches.length > 1 ? ` (batch ${i + 1}/${emailBatches.length}, ${batch.length})` : ` (${batch.length})`}
                   </a>
                 ))}
               </div>
-            )}
-          </div>
+            </details>
+          )}
 
-          <div style={{ marginTop: 12 }}>
+          <hr className="section-divider" />
+
+          <div>
             <p className="small" style={{ margin: "0 0 6px" }}>
-              <MessageCircle size={13} className="h3-icon" /> WhatsApp ({phones.length} with a number)
+              <MessageCircle size={13} className="h3-icon" /> <b>WhatsApp</b> - {phones.length} with a number
             </p>
             {phones.length === 0 ? (
               <p className="muted small">No one in this segment has a phone number on file.</p>
             ) : (
               <>
+                <label htmlFor={`seg-message-${segment.id}`}>Message</label>
+                <textarea id={`seg-message-${segment.id}`} rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />
+                <p className="muted small" style={{ marginTop: -6 }}>
+                  Use <code>{"{first_name}"}</code> to personalize each chat link below.
+                </p>
                 <p className="muted small">
                   WhatsApp doesn't support one link for many recipients at once - copy these numbers and the message above
                   into a broadcast list in your WhatsApp app.

@@ -4,6 +4,13 @@ import type { Segment, SegmentFieldsCatalog, SegmentFilters, SegmentResult } fro
 export interface SegmentInput {
   name: string;
   filters: SegmentFilters;
+  /** "" switches a segment back to its visual filters */
+  sql?: string;
+}
+
+export interface SandboxTable {
+  name: string;
+  columns: { name: string; type: string; description: string }[];
 }
 
 export function listSegments(): Promise<Segment[]> {
@@ -36,4 +43,16 @@ export function suggestSegmentFilters(description: string): Promise<SegmentFilte
 
 export function getSegmentFields(): Promise<SegmentFieldsCatalog> {
   return api.get<SegmentFieldsCatalog>("/api/segments/fields");
+}
+
+export function getSqlSchema(): Promise<SandboxTable[]> {
+  return api.get<SandboxTable[]>("/api/segments/sql/schema");
+}
+
+export function previewSqlSegment(sql: string): Promise<SegmentResult> {
+  return api.post<SegmentResult>("/api/segments/sql/preview", { sql });
+}
+
+export function suggestSegmentSql(description: string, currentSql: string | null): Promise<{ sql: string }> {
+  return api.post<{ sql: string }>("/api/segments/sql/suggest", { description, current_sql: currentSql });
 }

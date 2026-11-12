@@ -79,7 +79,7 @@ def preview(db: Session, org_id: UUID, customer_id: UUID, subject: str, body_htm
     org = db.get(Organization, org_id)
     org_settings = db.get(OrgSettings, org_id)
     ctx = MergeTagContext(customer=customer, org=org, org_settings=org_settings)
-    return resolve_merge_tags(subject, ctx), resolve_merge_tags(body_html, ctx)
+    return resolve_merge_tags(subject, ctx), resolve_merge_tags(body_html, ctx, escape=True)
 
 
 # --- sending --------------------------------------------------------------
@@ -143,7 +143,7 @@ def _send_batch(org_id: UUID, customer_ids: list[UUID], subject: str, body_html:
                 continue
             ctx = MergeTagContext(customer=customer, org=org, org_settings=org_settings)
             resolved_subject = resolve_merge_tags(subject, ctx)
-            resolved_body = resolve_merge_tags(body_html, ctx)
+            resolved_body = resolve_merge_tags(body_html, ctx, escape=True)
             try:
                 message_id = send_raw(
                     customer.email, resolved_subject, resolved_body,

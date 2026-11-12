@@ -101,3 +101,39 @@ def suggest_segment_filters(description: str) -> SegmentFilters:
         return SegmentFilters.model_validate(data)
     except (ValueError, TypeError) as e:
         raise SegmentSuggestionError(str(e)) from e
+
+
+def _strip_fences(text: str) -> str:
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.strip("`").strip()
+        if text.lower().startswith("sql"):
+            text = text[3:]
+    return text.strip()
+
+
+def suggest_segment_sql(description: str, schema_text: str, current_sql: str | None = None) -> str:
+    """Writes (or edits) a SQLite SELECT for a custom SQL segment. The
+    result is validated the same way a hand-written query is, so the
+    assistant can't produce anything a user couldn't type themselves."""
+    from app.controllers.segment_sql import SegmentSQLError, validate_sql
+
+    system = f"""You write one SQLite SELECT query that finds the customers for a marketing segment.
+
+Tables (one business's data only; dates are 'YYYY-MM-DD' text; yes/no flags are 1/0):
+{schema_text}
+
+Rules:
+- Reply with ONLY the SQL - no explanation, no markdown.
+- The query must return customer ids, e.g. SELECT c.id FROM customers c ...
+- One statement, SELECT only (WITH ... SELECT is fine). Use only the tables and columns above.
+- Match text case-insensitively: LOWER(col) LIKE '%word%'.
+- Relative dates: date('now', '-30 days'). Today is {date.today().isoformat()}.
+- "Never bought X" means NOT EXISTS / NOT IN over transaction_items, so customers with no purchases are included."""
+    user = description if not current_sql else f"Current query:\n{current_sql}\n\nChange it so that: {description}"
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    result = call_with_fallback(get_model, lambda model: model.invoke(messages))
+    try:
+        return validate_sql(_strip_fences(extract_text(result.content)))
+    except SegmentSQLError as e:
+        raise SegmentSuggestionError(str(e)) from e

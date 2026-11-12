@@ -1,6 +1,8 @@
 import { Building2, Copy, QrCode } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import ApiKeysCard from "../components/ApiKeysCard";
 import CurrencySelect from "../components/CurrencySelect";
 import ThemeToggle from "../components/ThemeToggle";
 import { errorMessage } from "../api/errorMessage";
@@ -216,6 +218,13 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      <h2 className="settings-section-heading">Developers</h2>
+      <ApiKeysCard />
+
+      <p className="muted small legal-consent" style={{ margin: "16px 0 24px" }}>
+        <Link to="/developers">Developers</Link> · <Link to="/privacy">Privacy Policy</Link> · <Link to="/terms">Terms of Service</Link>
+      </p>
     </div>
   );
 }

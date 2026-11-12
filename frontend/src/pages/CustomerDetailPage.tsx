@@ -15,7 +15,7 @@ import {
 import { getThreadMessages, listPending, sendChat } from "../api/agent";
 import { ApiError } from "../api/client";
 import { errorMessage } from "../api/errorMessage";
-import { createNote, deleteNote, listNotes, updateNote } from "../api/notes";
+import { createNote, listNotes, updateNote } from "../api/notes";
 import { getDefaultCurrency } from "../api/settings";
 import type { Customer, CustomerStatus, Order, OrgNote, PendingAction } from "../api/types";
 import CurrencySelect from "../components/CurrencySelect";
@@ -813,7 +813,7 @@ function CustomerNotesSection({ customerId }: { customerId: string }) {
       {notes === null && <p className="muted small">Loading…</p>}
       {notes !== null && notes.length === 0 && !adding && <p className="muted small">No notes for this customer yet.</p>}
       {notes?.map((n) => (
-        <CustomerNoteRow key={n.id} note={n} onChanged={load} />
+        <CustomerNoteRow key={n.id} note={n} customerId={customerId} onChanged={load} />
       ))}
       {adding ? (
         <CustomerNoteEditor
@@ -884,7 +884,7 @@ function CustomerNoteEditor({
   );
 }
 
-function CustomerNoteRow({ note, onChanged }: { note: OrgNote; onChanged: () => void }) {
+function CustomerNoteRow({ note, customerId, onChanged }: { note: OrgNote; customerId: string; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
   const [armedDelete, setArmedDelete] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -910,7 +910,9 @@ function CustomerNoteRow({ note, onChanged }: { note: OrgNote; onChanged: () => 
     }
     setBusy(true);
     try {
-      await deleteNote(note.id);
+      // detach from this customer only - the note itself (and its links to
+      // any other customers) stays, and is still on the Notes page
+      await updateNote(note.id, { customer_ids: note.customers.map((c) => c.id).filter((id) => id !== customerId) });
       onChanged();
     } catch (err) {
       setError(errorMessage(err));
@@ -945,7 +947,7 @@ function CustomerNoteRow({ note, onChanged }: { note: OrgNote; onChanged: () => 
           </button>
         )}
         <button type="button" className="btn-danger small" onClick={remove} disabled={busy} style={{ marginLeft: "auto" }}>
-          <Trash2 size={13} /> {armedDelete ? "Confirm?" : "Delete"}
+          <X size={13} /> {armedDelete ? "Remove from this customer?" : "Remove"}
         </button>
       </div>
     </div>

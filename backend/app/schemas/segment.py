@@ -65,17 +65,21 @@ class SegmentSuggestRequest(BaseModel):
 class SegmentCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     filters: SegmentFilters = Field(default_factory=SegmentFilters)
+    sql: str | None = Field(default=None, max_length=5000)
 
 
 class SegmentUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     filters: SegmentFilters | None = None
+    # "" switches the segment back to the visual filters
+    sql: str | None = Field(default=None, max_length=5000)
 
 
 class SegmentOut(BaseModel):
     id: UUID
     name: str
     filters: SegmentFilters
+    sql: str | None = None
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
@@ -109,3 +113,28 @@ class SegmentFieldsOut(BaseModel):
     fields: list[SegmentFieldOut]
     operators_by_type: dict[str, list[Operator]]
     custom_fields: list[str]
+
+
+class SegmentSQLRequest(BaseModel):
+    sql: str = Field(min_length=1, max_length=5000)
+
+
+class SegmentSQLSuggestRequest(BaseModel):
+    description: str = Field(min_length=1, max_length=1000)
+    # when given, the assistant edits this query instead of starting over
+    current_sql: str | None = Field(default=None, max_length=5000)
+
+
+class SegmentSQLSuggestion(BaseModel):
+    sql: str
+
+
+class SandboxColumnOut(BaseModel):
+    name: str
+    type: str
+    description: str
+
+
+class SandboxTableOut(BaseModel):
+    name: str
+    columns: list[SandboxColumnOut]

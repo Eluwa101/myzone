@@ -328,3 +328,66 @@ def test_send_customer_email_tool_unknown_template_name(db_session, seeded_org, 
     created = tools["create_customer"].invoke({"name": "Ada Obi", "email": "ada@customer.com"})
     result = tools["send_customer_email"].invoke({"customer_ids": created["id"], "template_name": "Nope"})
     assert result["status"] == "error"
+
+
+# --- email: segments, merge tag guide, checks ------------------------------
+
+
+def _consented_customer(db_session, org_id, tools, name, email):
+    created = tools["create_customer"].invoke({"name": name, "email": email})
+    customer_controller.update_customer(db_session, org_id, UUID(created["id"]), CustomerUpdate(consent_date=date(2026, 1, 1)))
+    return created
+
+
+def test_list_segments_and_email_a_segment(db_session, seeded_org, tools):
+    from app.controllers import segment_controller
+    from app.schemas.segment import SegmentCreate
+
+    org_id, user_id = seeded_org
+    _consented_customer(db_session, org_id, tools, "Ada Obi", "ada@c.com")
+    _consented_customer(db_session, org_id, tools, "Bo Chen", "bo@c.com")
+    segment_controller.create_segment(db_session, org_id, SegmentCreate(name="Everyone"))
+    segment_controller.create_segment(db_session, org_id, SegmentCreate(name="Ada only", sql="SELECT id FROM customers WHERE name = 'Ada Obi'"))
+
+    listed = {s["name"]: s for s in tools["list_segments"].invoke({})["segments"]}
+    assert listed["Everyone"]["members"] == 2 and listed["Everyone"]["defined_by"] == "filters"
+    assert listed["Ada only"]["members"] == 1 and listed["Ada only"]["defined_by"] == "sql"
+
+    result = tools["send_customer_email"].invoke(
+        {"segment_name": "ada ONLY", "subject": "Hi {{customer.first_name}}", "body_html": "<p>{{count transactions}} purchases</p>"}
+    )
+    assert result["status"] == "confirm_required"
+    assert "segment 'Ada only' (1 customer(s))" in result["description"]
+    pending = db_session.query(PendingAction).filter(PendingAction.org_id == org_id).one()
+    assert len(pending.payload["customer_ids"]) == 1
+
+    assert tools["send_customer_email"].invoke({"segment_name": "Nope", "subject": "x", "body_html": "x"})["status"] == "error"
+    both = tools["send_customer_email"].invoke({"segment_name": "Everyone", "customer_ids": "x", "subject": "x", "body_html": "x"})
+    assert both["status"] == "error"
+
+
+def test_send_email_refuses_broken_tags_and_placeholders(db_session, seeded_org, tools):
+    org_id, _ = seeded_org
+    ada = _consented_customer(db_session, org_id, tools, "Ada Obi", "ada@c.com")
+
+    bad = tools["send_customer_email"].invoke({"customer_ids": ada["id"], "subject": "Hi", "body_html": "<p>{{customer.firstname}}</p>"})
+    assert bad["status"] == "error" and bad["problems"] == ["Unknown tag {{customer.firstname}}."]
+
+    blank = tools["send_customer_email"].invoke({"customer_ids": ada["id"], "subject": "Hi", "body_html": "<p>Get [discount] off</p>"})
+    assert blank["status"] == "error" and blank["placeholders"] == ["[discount]"]
+    assert db_session.query(PendingAction).filter(PendingAction.org_id == org_id).count() == 0
+
+
+def test_get_merge_tag_guide(db_session, seeded_org, tools):
+    from app.controllers import segment_controller
+    from app.schemas.segment import SegmentCreate
+
+    org_id, _ = seeded_org
+    segment_controller.create_segment(
+        db_session, org_id, SegmentCreate(name="Lighters", sql="SELECT customer_id FROM transaction_items WHERE item LIKE '%lighter%'")
+    )
+    guide = tools["get_merge_tag_guide"].invoke({})
+    assert "{{#each" in guide["guide"] and "{{#if" in guide["guide"]
+    assert "{{customer.first_name}}" in guide["tags"]
+    with_segment = tools["get_merge_tag_guide"].invoke({"segment_name": "Lighters"})
+    assert any('"lighter"' in s["tag"] for s in with_segment["suggested_for_segment"])

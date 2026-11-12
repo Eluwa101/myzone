@@ -18,8 +18,10 @@ from app.models.notification import Notification
 from app.models.auth_token import AuthToken, AuthTokenPurpose
 from app.models.email_template import EmailTemplate
 from app.models.outbound_message import OutboundMessage, MessageChannel, MessageStatus
+from app.models.api_key import ApiKey
 
 __all__ = [
+    "ApiKey",
     "Organization",
     "User",
     "Customer",

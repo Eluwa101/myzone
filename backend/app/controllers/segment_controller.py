@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
 
 from app.controllers.segment_fields import field_type
+from app.controllers.segment_sql import run_sql_segment, validate_sql
 from app.models.customer import Customer
 from app.models.segment import Segment
 from app.schemas.segment import SegmentCondition, SegmentCreate, SegmentFilters, SegmentGroup, SegmentUpdate
@@ -13,8 +14,14 @@ class SegmentNotFoundError(Exception):
     pass
 
 
+def _clean_sql(sql: str | None) -> str | None:
+    """Blank means "no SQL" (use the visual filters); anything else must
+    pass validation before it's saved - raises SegmentSQLError."""
+    return validate_sql(sql) if sql and sql.strip() else None
+
+
 def create_segment(db: Session, org_id: UUID, data: SegmentCreate) -> Segment:
-    segment = Segment(org_id=org_id, name=data.name, filters=data.filters.model_dump(mode="json"))
+    segment = Segment(org_id=org_id, name=data.name, filters=data.filters.model_dump(mode="json"), sql=_clean_sql(data.sql))
     db.add(segment)
     db.commit()
     db.refresh(segment)
@@ -38,6 +45,8 @@ def update_segment(db: Session, org_id: UUID, segment_id: UUID, data: SegmentUpd
         segment.name = data.name
     if data.filters is not None:
         segment.filters = data.filters.model_dump(mode="json")
+    if data.sql is not None:
+        segment.sql = _clean_sql(data.sql)
     db.commit()
     db.refresh(segment)
     return segment
@@ -180,3 +189,12 @@ def resolve_members(db: Session, org_id: UUID, filters: SegmentFilters) -> list[
         .all()
     )
     return [c for c in customers if _evaluate(filters, c)]
+
+
+def resolve_segment(db: Session, segment: Segment) -> list[Customer]:
+    """A saved segment's members - by its SQL when it has one, otherwise by
+    its visual filters. Raises SegmentSQLError if saved SQL no longer runs
+    (e.g. it names a custom field that has since been removed)."""
+    if segment.sql:
+        return run_sql_segment(db, segment.org_id, segment.sql)
+    return resolve_members(db, segment.org_id, SegmentFilters(**segment.filters))

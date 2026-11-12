@@ -11,7 +11,8 @@ import {
 } from "../api/messaging";
 import ErrorText from "../components/ErrorText";
 import MergeTagPicker from "../components/MergeTagPicker";
-import RichTextEditor, { type RichTextEditorHandle } from "../components/RichTextEditor";
+import EmailBodyEditor, { type EmailBodyEditorHandle } from "../components/EmailBodyEditor";
+import HtmlPreviewFrame from "../components/HtmlPreviewFrame";
 import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
 
@@ -32,6 +33,7 @@ export default function EmailTemplatesPage() {
       <TopBar title="Email templates" backTo="/messages" />
       <p className="muted small page-note">
         Reusable email content with merge tags - pick one from the compose screen instead of writing from scratch each time.
+        Switch the body to HTML to design with tables, colours and images.
       </p>
       <ErrorText message={error} />
 
@@ -79,7 +81,7 @@ function TemplateEditor({
   const [bodyHtml, setBodyHtml] = useState(template?.body_html ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const editorRef = useRef<RichTextEditorHandle>(null);
+  const editorRef = useRef<EmailBodyEditorHandle>(null);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -105,7 +107,7 @@ function TemplateEditor({
       <label htmlFor="tpl-subject">Subject</label>
       <input id="tpl-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
       <label>Body</label>
-      <RichTextEditor ref={editorRef} value={bodyHtml} onChange={setBodyHtml} placeholder="Write your template…" />
+      <EmailBodyEditor ref={editorRef} value={bodyHtml} onChange={setBodyHtml} placeholder="Write your template…" />
       <div className="row" style={{ marginTop: 10 }}>
         <MergeTagPicker onInsert={(tag) => editorRef.current?.insertTextAtCursor(tag)} />
       </div>
@@ -124,6 +126,7 @@ function TemplateEditor({
 
 function TemplateCard({ template, onChanged }: { template: EmailTemplate; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
+  const [showDesign, setShowDesign] = useState(false);
   const [armedDelete, setArmedDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -154,10 +157,14 @@ function TemplateCard({ template, onChanged }: { template: EmailTemplate; onChan
         <b>{template.name}</b>
       </div>
       <p className="muted small">{template.subject}</p>
+      {showDesign && <HtmlPreviewFrame html={template.body_html} title={`${template.name} design`} />}
       <ErrorText message={error} />
       <div className="row" style={{ marginTop: 8 }}>
         <button type="button" onClick={() => setEditing(true)}>
           Edit
+        </button>
+        <button type="button" onClick={() => setShowDesign((v) => !v)}>
+          {showDesign ? "Hide" : "View"} design
         </button>
         <Link to={`/messages/compose?template_id=${template.id}`}>Use this template</Link>
         <button type="button" className="btn-danger" onClick={remove} style={{ marginLeft: "auto" }}>

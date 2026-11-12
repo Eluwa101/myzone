@@ -17,9 +17,11 @@ const DashboardInterestsPage = lazy(() => import("./pages/DashboardInterestsPage
 const DashboardMonthlyPage = lazy(() => import("./pages/DashboardMonthlyPage"));
 const DashboardTopCustomersPage = lazy(() => import("./pages/DashboardTopCustomersPage"));
 const DataPage = lazy(() => import("./pages/DataPage"));
+const DevelopersPage = lazy(() => import("./pages/DevelopersPage"));
 const EmailTemplatesPage = lazy(() => import("./pages/EmailTemplatesPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const FormsPage = lazy(() => import("./pages/FormsPage"));
+const LegalPage = lazy(() => import("./pages/LegalPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const MessageComposePage = lazy(() => import("./pages/MessageComposePage"));
 const MessagesPage = lazy(() => import("./pages/MessagesPage"));
@@ -47,6 +49,9 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/f/:token" element={<PublicFormPage />} />
+          <Route path="/privacy" element={<LegalPage doc="privacy" />} />
+          <Route path="/terms" element={<LegalPage doc="terms" />} />
+          <Route path="/developers" element={<DevelopersPage />} />
 
           <Route element={<ProtectedLayout />}>
             <Route path="/onboarding" element={<OnboardingPage />} />

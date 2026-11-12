@@ -67,8 +67,15 @@ export function deleteEmailTemplate(id: string): Promise<void> {
   return api.delete<void>(`/api/messages/templates/${id}`);
 }
 
-export function previewMessage(customerId: string, subject: string, bodyHtml: string): Promise<{ subject: string; body_html: string }> {
-  return api.post<{ subject: string; body_html: string }>("/api/messages/preview", {
+export interface MessagePreview {
+  subject: string;
+  body_html: string;
+  /** merge tags that won't resolve - typos, unknown fields, unclosed blocks */
+  problems?: string[];
+}
+
+export function previewMessage(customerId: string, subject: string, bodyHtml: string): Promise<MessagePreview> {
+  return api.post<MessagePreview>("/api/messages/preview", {
     customer_id: customerId,
     subject,
     body_html: bodyHtml,
@@ -82,4 +89,26 @@ export function sendEmail(data: SendEmailInput): Promise<SendEmailResult> {
 export function listMessageHistory(customerId?: string): Promise<OutboundMessage[]> {
   const qs = customerId ? `?customer_id=${customerId}` : "";
   return api.get<OutboundMessage[]>(`/api/messages/history${qs}`);
+}
+
+export interface SuggestedMergeTag {
+  label: string;
+  tag: string;
+  reason: string;
+}
+
+export function listSuggestedMergeTags(segmentId: string): Promise<SuggestedMergeTag[]> {
+  return api.get<SuggestedMergeTag[]>(`/api/messages/merge-tags/suggested?segment_id=${segmentId}`);
+}
+
+export interface EmailDraftInput {
+  description: string;
+  segment_id?: string | null;
+  format: "simple" | "designed";
+  current_subject?: string | null;
+  current_body?: string | null;
+}
+
+export function draftEmail(data: EmailDraftInput): Promise<MessagePreview> {
+  return api.post<MessagePreview>("/api/messages/draft", data);
 }

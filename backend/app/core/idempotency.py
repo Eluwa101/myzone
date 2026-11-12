@@ -20,6 +20,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+from app.core.api_keys import find_active_key, is_api_key
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.idempotency import IdempotencyKey
@@ -36,6 +37,16 @@ def _org_id_from_request(request: Request) -> UUID | None:
     if not auth.lower().startswith("bearer "):
         return None
     token = auth[7:]
+    if is_api_key(token):
+        db = SessionLocal()
+        try:
+            api_key = find_active_key(db, token)
+            return api_key.org_id if api_key else None
+        except Exception:
+            logger.exception("API key lookup for idempotency failed")
+            return None
+        finally:
+            db.close()
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         org_id = payload.get("org_id")
