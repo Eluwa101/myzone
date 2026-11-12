@@ -2230,3 +2230,26 @@ textarea.html-source {
   border-radius: var(--radius-full);
   background: var(--surface-hover);
 }
+
+/* --- unsubscribe -------------------------------------------------------- */
+
+.unsubscribe-card {
+  text-align: center;
+}
+
+.unsubscribe-card h1 {
+  font-size: 22px;
+  margin: 8px 0;
+}
+
+.unsubscribe-icon {
+  color: var(--accent);
+}
+
+.unsubscribed-note {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.4);
+}

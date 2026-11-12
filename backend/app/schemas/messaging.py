@@ -63,6 +63,7 @@ class SendEmailResult(BaseModel):
     queued: int
     skipped_no_email: int
     skipped_no_consent: int
+    skipped_unsubscribed: int = 0
 
 
 class OutboundMessageOut(BaseModel):

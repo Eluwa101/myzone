@@ -34,6 +34,19 @@ messaging_controller.SessionLocal = TestingSessionLocal
 
 
 @pytest.fixture(autouse=True)
+def _no_real_email(monkeypatch):
+    """Tests must never reach Resend. Without this, every signup sent a
+    real verification email using whatever RESEND_API_KEY backend/.env
+    has, and an email sent from a background thread could outlive its
+    test and write into the next test's fresh database. Tests that check
+    what gets sent replace send_raw themselves."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "resend_api_key", None)
+    monkeypatch.setattr(messaging_controller, "_start_in_background", lambda target, *args: target(*args))
+
+
+@pytest.fixture(autouse=True)
 def _fresh_schema():
     Base.metadata.create_all(engine)
     yield

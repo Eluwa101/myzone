@@ -66,6 +66,7 @@ class CustomerOut(CustomerBase):
     display_id: str
     status: CustomerStatus
     status_auto: bool
+    email_unsubscribed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     transactions: list[TransactionOut] = []

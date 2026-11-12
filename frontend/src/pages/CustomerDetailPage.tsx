@@ -336,6 +336,12 @@ function InfoTab({
           onSave={(v) => onSaveField("consent_date", v, true)}
           onDelete={() => onSaveField("consent_date", "", true)}
         />
+        {customer.email_unsubscribed_at && (
+          <p className="small unsubscribed-note">
+            Unsubscribed from your emails on {new Date(customer.email_unsubscribed_at).toLocaleDateString()} - they won't be sent any.
+            Only they can resubscribe, from the link in an earlier email.
+          </p>
+        )}
         <InfoFieldRow label="Notes" value={customer.notes} type="textarea" onSave={(v) => onSaveField("notes", v)} onDelete={() => onSaveField("notes", "")} />
       </div>
 

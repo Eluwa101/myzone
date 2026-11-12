@@ -8,6 +8,7 @@ from app.controllers import notification_controller
 from app.core.branding import customer_sender_for
 from app.core.database import SessionLocal
 from app.core.email import send_raw
+from app.core import unsubscribe
 from app.core.merge_tags import MergeTagContext, resolve_merge_tags
 from app.models.customer import Customer
 from app.models.email_template import EmailTemplate
@@ -91,6 +92,7 @@ def send_email_batch(db: Session, org_id: UUID, data: SendEmailRequest) -> SendE
     eligible_ids: list[UUID] = []
     skipped_no_email = 0
     skipped_no_consent = 0
+    skipped_unsubscribed = 0
 
     for c in customers:
         if not c.email:
@@ -99,6 +101,16 @@ def send_email_batch(db: Session, org_id: UUID, data: SendEmailRequest) -> SendE
                 OutboundMessage(
                     org_id=org_id, customer_id=c.id, template_id=data.template_id, channel=MessageChannel.email,
                     status=MessageStatus.skipped, subject=data.subject, body="", error="No email on file",
+                )
+            )
+            continue
+        if c.email_unsubscribed_at is not None:
+            # never overridable - they asked not to be emailed
+            skipped_unsubscribed += 1
+            db.add(
+                OutboundMessage(
+                    org_id=org_id, customer_id=c.id, template_id=data.template_id, channel=MessageChannel.email,
+                    status=MessageStatus.skipped, subject=data.subject, body="", error="Unsubscribed",
                 )
             )
             continue
@@ -116,13 +128,20 @@ def send_email_batch(db: Session, org_id: UUID, data: SendEmailRequest) -> SendE
     db.commit()
 
     if eligible_ids:
-        threading.Thread(
-            target=_send_batch,
-            args=(org_id, eligible_ids, data.subject, data.body_html, data.template_id),
-            daemon=True,
-        ).start()
+        _start_in_background(_send_batch, org_id, eligible_ids, data.subject, data.body_html, data.template_id)
 
-    return SendEmailResult(queued=len(eligible_ids), skipped_no_email=skipped_no_email, skipped_no_consent=skipped_no_consent)
+    return SendEmailResult(
+        queued=len(eligible_ids),
+        skipped_no_email=skipped_no_email,
+        skipped_no_consent=skipped_no_consent,
+        skipped_unsubscribed=skipped_unsubscribed,
+    )
+
+
+def _start_in_background(target, *args) -> None:
+    """One place that starts the send thread - the test suite swaps it for
+    an inline call, so no send can outlive the test that started it."""
+    threading.Thread(target=target, args=args, daemon=True).start()
 
 
 def _send_batch(org_id: UUID, customer_ids: list[UUID], subject: str, body_html: str, template_id: UUID | None) -> None:
@@ -139,15 +158,17 @@ def _send_batch(org_id: UUID, customer_ids: list[UUID], subject: str, body_html:
 
         for customer_id in customer_ids:
             customer = _load_customer_for_merge(db, org_id, customer_id)
-            if not customer or not customer.email:
-                continue
+            if not customer or not customer.email or customer.email_unsubscribed_at is not None:
+                continue  # an unsubscribe can land between queueing and sending
             ctx = MergeTagContext(customer=customer, org=org, org_settings=org_settings)
             resolved_subject = resolve_merge_tags(subject, ctx)
-            resolved_body = resolve_merge_tags(body_html, ctx, escape=True)
+            token = unsubscribe.make_token(customer.id)
+            resolved_body = unsubscribe.add_footer(resolve_merge_tags(body_html, ctx, escape=True), token, from_name)
             try:
                 message_id = send_raw(
                     customer.email, resolved_subject, resolved_body,
                     from_name=from_name, reply_to=reply_to, from_address=from_address,
+                    headers=unsubscribe.headers_for(token),
                 )
                 status_, error = MessageStatus.sent, None
                 sent += 1

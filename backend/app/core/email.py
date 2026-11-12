@@ -46,6 +46,7 @@ def send_raw(
     from_name: str | None = None,
     reply_to: str | None = None,
     from_address: str | None = None,
+    headers: dict[str, str] | None = None,
 ) -> str | None:
     """Actually calls Resend - raises on any failure (including no API key
     configured) and returns the provider's message id on success. Used by
@@ -64,6 +65,8 @@ def send_raw(
     payload = {"from": sender, "to": [to], "subject": subject, "html": html}
     if reply_to:
         payload["reply_to"] = reply_to
+    if headers:
+        payload["headers"] = headers
     result = resend.Emails.send(payload)
     return result.get("id") if isinstance(result, dict) else None
 

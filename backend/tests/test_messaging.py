@@ -145,8 +145,11 @@ def test_send_email_batch_resolves_tags_and_logs_sent(client, auth_headers, monk
         headers=auth_headers,
     )
     assert resp.status_code == 200
-    assert resp.json() == {"queued": 1, "skipped_no_email": 0, "skipped_no_consent": 0}
-    assert sent == [("ada@customer.com", "Hi Ada", "<p>Hello!</p>")]
+    assert resp.json() == {"queued": 1, "skipped_no_email": 0, "skipped_no_consent": 0, "skipped_unsubscribed": 0}
+    assert len(sent) == 1
+    to, subject, html = sent[0]
+    assert (to, subject) == ("ada@customer.com", "Hi Ada")
+    assert html.startswith("<p>Hello!</p>") and ">Unsubscribe</a>" in html
 
     history = client.get("/api/messages/history", headers=auth_headers).json()
     assert len(history) == 1
@@ -200,7 +203,7 @@ def test_send_email_batch_skips_customer_without_email(client, auth_headers, mon
         json={"customer_ids": [customer["id"]], "subject": "Hi", "body_html": "<p>x</p>"},
         headers=auth_headers,
     )
-    assert resp.json() == {"queued": 0, "skipped_no_email": 1, "skipped_no_consent": 0}
+    assert resp.json() == {"queued": 0, "skipped_no_email": 1, "skipped_no_consent": 0, "skipped_unsubscribed": 0}
 
     history = client.get("/api/messages/history", headers=auth_headers).json()
     assert history[0]["status"] == "skipped"
@@ -216,7 +219,7 @@ def test_send_email_batch_skips_customer_without_consent_by_default(client, auth
         json={"customer_ids": [customer["id"]], "subject": "Hi", "body_html": "<p>x</p>"},
         headers=auth_headers,
     )
-    assert resp.json() == {"queued": 0, "skipped_no_email": 0, "skipped_no_consent": 1}
+    assert resp.json() == {"queued": 0, "skipped_no_email": 0, "skipped_no_consent": 1, "skipped_unsubscribed": 0}
 
 
 def test_send_email_batch_can_override_consent_check(client, auth_headers, monkeypatch):
@@ -229,7 +232,7 @@ def test_send_email_batch_can_override_consent_check(client, auth_headers, monke
         json={"customer_ids": [customer["id"]], "subject": "Hi", "body_html": "<p>x</p>", "skip_without_consent": False},
         headers=auth_headers,
     )
-    assert resp.json() == {"queued": 1, "skipped_no_email": 0, "skipped_no_consent": 0}
+    assert resp.json() == {"queued": 1, "skipped_no_email": 0, "skipped_no_consent": 0, "skipped_unsubscribed": 0}
 
 
 def test_send_email_batch_records_failure_per_recipient(client, auth_headers, monkeypatch):

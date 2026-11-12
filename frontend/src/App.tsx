@@ -33,6 +33,7 @@ const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const SegmentsPage = lazy(() => import("./pages/SegmentsPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const SignupPage = lazy(() => import("./pages/SignupPage"));
+const UnsubscribePage = lazy(() => import("./pages/UnsubscribePage"));
 const VerifyEmailPage = lazy(() => import("./pages/VerifyEmailPage"));
 const WebhooksPage = lazy(() => import("./pages/WebhooksPage"));
 
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/f/:token" element={<PublicFormPage />} />
+          <Route path="/unsubscribe/:token" element={<UnsubscribePage />} />
           <Route path="/privacy" element={<LegalPage doc="privacy" />} />
           <Route path="/terms" element={<LegalPage doc="terms" />} />
           <Route path="/developers" element={<DevelopersPage />} />

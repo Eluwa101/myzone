@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # first entry of cors_origins by default, but settable independently in
     # case the CORS list ever has more than one real frontend
     frontend_url: str = "http://localhost:5173"
+    # this API's own public address (e.g. https://api.myshopp.cc) - used
+    # for the one-click unsubscribe header mail apps POST to
+    api_public_url: str | None = None
 
     resend_api_key: str | None = None
     # Resend's shared test sender - works without verifying a domain, but

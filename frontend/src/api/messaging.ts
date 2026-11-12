@@ -35,6 +35,7 @@ export interface SendEmailResult {
   queued: number;
   skipped_no_email: number;
   skipped_no_consent: number;
+  skipped_unsubscribed?: number;
 }
 
 export interface OutboundMessage {

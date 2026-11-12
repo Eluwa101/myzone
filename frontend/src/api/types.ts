@@ -69,6 +69,8 @@ export interface Customer {
   status: CustomerStatus;
   status_auto: boolean;
   consent_date?: string | null;
+  /** set when the customer clicked Unsubscribe in one of your emails */
+  email_unsubscribed_at?: string | null;
   extra: Record<string, string>;
   created_at: string;
   updated_at: string;

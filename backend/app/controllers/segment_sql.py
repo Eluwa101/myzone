@@ -88,6 +88,7 @@ _BASE_COLUMNS: dict[str, list[tuple[str, str, str]]] = {
         ("interests", "TEXT", ""),
         ("notes", "TEXT", ""),
         ("consent_date", "TEXT", "YYYY-MM-DD, empty if no recorded consent"),
+        ("email_unsubscribed", "INTEGER", "1 = unsubscribed from your emails"),
         ("created_at", "TEXT", "Date added, YYYY-MM-DD"),
     ],
     "transactions": [
@@ -261,7 +262,7 @@ def _build_sandbox(db: Session, org_id: UUID) -> tuple[sqlite3.Connection, set[s
             (
                 cid, c.display_id, c.name, c.first_name, c.last_name, c.email, c.phone,
                 c.status.value if c.status else None, c.job, c.nationality, c.pet, _iso(c.birthday), c.address,
-                c.interests, c.notes, _iso(c.consent_date), _iso(c.created_at),
+                c.interests, c.notes, _iso(c.consent_date), int(c.email_unsubscribed_at is not None), _iso(c.created_at),
                 *(None if extra.get(key) is None else str(extra.get(key)) for _, key in custom),
             )
         )

@@ -40,6 +40,9 @@ class Customer(Base):
     status: Mapped[CustomerStatus] = mapped_column(Enum(CustomerStatus), default=CustomerStatus.lead)
     status_auto: Mapped[bool] = mapped_column(default=True)
     consent_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # set when the customer clicks Unsubscribe in an email; cleared only by
+    # the customer themselves (resubscribe on the same page)
+    email_unsubscribed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     extra: Mapped[dict] = mapped_column(JSON, default=dict)
 

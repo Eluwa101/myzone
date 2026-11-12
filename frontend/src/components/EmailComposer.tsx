@@ -203,6 +203,7 @@ export default function EmailComposer({
       const parts = [`Sending to ${res.queued} customer${res.queued === 1 ? "" : "s"}.`];
       if (res.skipped_no_email) parts.push(`${res.skipped_no_email} skipped (no email on file).`);
       if (res.skipped_no_consent) parts.push(`${res.skipped_no_consent} skipped (no recorded consent).`);
+      if (res.skipped_unsubscribed) parts.push(`${res.skipped_unsubscribed} skipped (unsubscribed).`);
       setResult(parts.join(" "));
     } catch (err) {
       setError(errorMessage(err));
@@ -279,6 +280,9 @@ export default function EmailComposer({
           <input type="checkbox" checked={skipWithoutConsent} onChange={(e) => setSkipWithoutConsent(e.target.checked)} />
           Skip customers with no recorded consent
         </label>
+        <p className="muted small" style={{ margin: "4px 0 0" }}>
+          An unsubscribe link is added to the bottom of every email, and anyone who unsubscribes is always skipped.
+        </p>
       </div>
 
       {previewFor && previewRecipient && (
