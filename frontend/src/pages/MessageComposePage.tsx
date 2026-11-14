@@ -21,11 +21,11 @@ export default function MessageComposePage() {
   useEffect(() => {
     if (customerId) {
       getCustomer(customerId)
-        .then((c: Customer) => setRecipients([{ id: c.id, name: c.name, email: c.email ?? null }]))
+        .then((c: Customer) => setRecipients([{ id: c.id, name: c.name, email: c.email ?? null, phone: c.phone ?? null }]))
         .catch((err) => setError(errorMessage(err)));
     } else if (segmentId) {
       getSegmentMembers(segmentId)
-        .then((r) => setRecipients(r.members.map((m) => ({ id: m.id, name: m.name, email: m.email }))))
+        .then((r) => setRecipients(r.members.map((m) => ({ id: m.id, name: m.name, email: m.email, phone: m.phone }))))
         .catch((err) => setError(errorMessage(err)));
     } else {
       setRecipients([]);
@@ -76,7 +76,7 @@ function RecipientPicker({ selected, onChange }: { selected: Recipient[]; onChan
 
   function add(c: Customer) {
     if (selected.some((r) => r.id === c.id)) return;
-    onChange([...selected, { id: c.id, name: c.name, email: c.email ?? null }]);
+    onChange([...selected, { id: c.id, name: c.name, email: c.email ?? null, phone: c.phone ?? null }]);
   }
 
   function remove(id: string) {

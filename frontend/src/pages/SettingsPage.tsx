@@ -63,8 +63,8 @@ export default function SettingsPage() {
 
   async function onSaveQr() {
     const digits = number.replace(/\D/g, "");
-    if (!digits) {
-      setQrStatus("Enter your WhatsApp number first.");
+    if (digits.length < 8 || digits.length > 15 || digits.startsWith("0")) {
+      setQrStatus("Enter a valid international number with country code, e.g. +234 801 234 5678.");
       return;
     }
     setSavingQr(true);
@@ -196,8 +196,9 @@ export default function SettingsPage() {
         </h3>
         <label htmlFor="set-biz">Business name (shown on the sign)</label>
         <input id="set-biz" value={bizName} onChange={(e) => setBizName(e.target.value)} placeholder="e.g. Ada's Store" />
-        <label htmlFor="set-number">WhatsApp number (country code first, digits only)</label>
-        <input id="set-number" value={number} onChange={(e) => setNumber(e.target.value)} placeholder="2348012345678" inputMode="tel" />
+        <label htmlFor="set-number">WhatsApp number</label>
+        <input id="set-number" type="tel" value={number} onChange={(e) => setNumber(e.target.value)} placeholder="+234 801 234 5678" inputMode="tel" />
+        <p className="muted small">Include the country code. This number opens your WhatsApp chat from the QR code.</p>
         <label htmlFor="set-message">Message customers will send (they can edit it)</label>
         <textarea id="set-message" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />
         <div className="row" style={{ marginTop: 12 }}>

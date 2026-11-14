@@ -1,4 +1,4 @@
-import { AlertTriangle, Send, Sparkles } from "lucide-react";
+import { AlertTriangle, MessageCircle, Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { errorMessage } from "../api/errorMessage";
 import {
@@ -35,6 +35,20 @@ export interface Recipient {
   id: string;
   name: string;
   email: string | null;
+  phone?: string | null;
+}
+
+function whatsappNumber(phone: string): string | null {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length >= 8 && digits.length <= 15 && !digits.startsWith("0") ? digits : null;
+}
+
+function htmlToPlainText(html: string): string {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("script, style, head, noscript").forEach((node) => node.remove());
+  doc.querySelectorAll("br").forEach((node) => node.replaceWith(doc.createTextNode("\n")));
+  doc.querySelectorAll("p, div, li, tr, h1, h2, h3, h4, blockquote").forEach((node) => node.append(doc.createTextNode("\n")));
+  return (doc.body.textContent ?? "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 /** Everything about writing and sending one email to a set of customers -
@@ -75,6 +89,11 @@ export default function EmailComposer({
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeField, setActiveField] = useState<"subject" | "body">("body");
+  const [showWhatsapp, setShowWhatsapp] = useState(false);
+  const [whatsappIndex, setWhatsappIndex] = useState(0);
+  const [whatsappPreview, setWhatsappPreview] = useState<MessagePreview | null>(null);
+  const [whatsappLoading, setWhatsappLoading] = useState(false);
+  const [whatsappError, setWhatsappError] = useState<string | null>(null);
 
   const subjectRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<EmailBodyEditorHandle>(null);
@@ -161,6 +180,9 @@ export default function EmailComposer({
   }
 
   const count = recipients?.length ?? 0;
+  const whatsappRecipients = (recipients ?? []).filter((recipient) => recipient.phone && whatsappNumber(recipient.phone));
+  const invalidPhoneCount = (recipients ?? []).filter((recipient) => recipient.phone && !whatsappNumber(recipient.phone)).length;
+  const whatsappRecipient = whatsappRecipients[whatsappIndex] ?? null;
   const previewRecipient = recipients && count > 0 ? recipients[Math.min(previewIndex, count - 1)] : null;
 
   async function onPreview(index = previewIndex) {
@@ -177,6 +199,40 @@ export default function EmailComposer({
       setPreviewLoading(false);
     }
   }
+
+  async function loadWhatsappPreview(index: number) {
+    const target = whatsappRecipients[index];
+    if (!target) return;
+    setWhatsappIndex(index);
+    setWhatsappLoading(true);
+    setWhatsappError(null);
+    try {
+      setWhatsappPreview(await previewMessage(target.id, subject, bodyHtml));
+    } catch (err) {
+      setWhatsappError(errorMessage(err));
+    } finally {
+      setWhatsappLoading(false);
+    }
+  }
+
+  function openWhatsapp() {
+    if (whatsappLoading || !whatsappRecipient || !whatsappPreview) return;
+    const phone = whatsappNumber(whatsappRecipient.phone ?? "");
+    const message = htmlToPlainText(whatsappPreview.body_html);
+    if (!phone || !message) {
+      setWhatsappError("This customer does not have a usable phone number or message.");
+      return;
+    }
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  }
+
+  useEffect(() => {
+    if (!showWhatsapp) return;
+    setWhatsappPreview(null);
+    setWhatsappIndex(0);
+    if (whatsappRecipients.length) void loadWhatsappPreview(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showWhatsapp, subject, bodyHtml, recipients]);
 
   const placeholders = findPlaceholders(subject, bodyHtml);
   const [armedSend, setArmedSend] = useState(false);
@@ -350,7 +406,40 @@ export default function EmailComposer({
           <Send size={15} />{" "}
           {sending ? "Sending…" : armedSend ? `Send with ${placeholders.join(", ")} in it?` : `Send${count > 1 ? ` to ${count}` : ""}`}
         </button>
+        <button type="button" onClick={() => setShowWhatsapp((open) => !open)} disabled={whatsappRecipients.length === 0 || !bodyHtml.trim()}>
+          <MessageCircle size={15} /> WhatsApp{whatsappRecipients.length > 0 ? ` (${whatsappRecipients.length})` : ""}
+        </button>
       </div>
+
+      {showWhatsapp && (
+        <div className={section}>
+          <h3>Open a WhatsApp chat</h3>
+          <p className="muted small">The message uses this draft with merge tags filled in for each customer. Review and send it in WhatsApp.</p>
+          <p className="muted small">
+            {whatsappRecipients.length} of {count} customers have a usable international phone number
+            {invalidPhoneCount ? `; ${invalidPhoneCount} saved number${invalidPhoneCount === 1 ? " is" : "s are"} not in international format` : ""}.
+          </p>
+          {whatsappRecipient && (
+            <div className="row" style={{ alignItems: "center", flexWrap: "wrap" }}>
+              <label htmlFor="whatsapp-recipient">Customer</label>
+              <select id="whatsapp-recipient" value={whatsappIndex} onChange={(event) => void loadWhatsappPreview(Number(event.target.value))}>
+                {whatsappRecipients.map((recipient, index) => (
+                  <option key={recipient.id} value={index}>{recipient.name} · {recipient.phone}</option>
+                ))}
+              </select>
+              {whatsappRecipients.length > 1 && <span className="muted small">{whatsappIndex + 1} of {whatsappRecipients.length}</span>}
+              <button type="button" className="btn-primary" onClick={openWhatsapp} disabled={whatsappLoading || !whatsappPreview}>
+                <MessageCircle size={15} /> Open WhatsApp
+              </button>
+            </div>
+          )}
+          {whatsappLoading && <p className="muted small">Preparing personalized message…</p>}
+          {whatsappPreview && whatsappRecipient && <pre className="small" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{htmlToPlainText(whatsappPreview.body_html)}</pre>}
+          {whatsappError && <ErrorText message={whatsappError} />}
+          {whatsappPreview?.problems?.length ? <p className="tag-problems small">Some merge tags could not be filled: {whatsappPreview.problems.join(", ")}</p> : null}
+          {placeholders.length > 0 && <p className="tag-problems small">Fill these placeholders before opening chats: {placeholders.join(", ")}</p>}
+        </div>
+      )}
     </div>
   );
 }

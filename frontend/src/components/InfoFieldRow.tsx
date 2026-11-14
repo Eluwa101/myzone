@@ -9,7 +9,7 @@ export interface SelectOption {
 interface InfoFieldRowProps {
   label: string;
   value: string | null | undefined;
-  type?: "text" | "date" | "textarea" | "select";
+  type?: "text" | "tel" | "date" | "textarea" | "select";
   options?: SelectOption[];
   allowBlank?: boolean;
   placeholder?: string;
@@ -80,6 +80,7 @@ export default function InfoFieldRow({
   return (
     <div className="info-row-editing">
       <label className="info-row-label">{label}</label>
+      {type === "tel" && <p className="muted small">Include the country code to use WhatsApp links, e.g. +234 801 234 5678.</p>}
       {type === "textarea" ? (
         <textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={placeholder} autoFocus />
       ) : type === "select" ? (

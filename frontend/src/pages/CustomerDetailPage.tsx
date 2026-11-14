@@ -166,7 +166,8 @@ export default function CustomerDetailPage() {
           <label htmlFor="cf-last-name">Last name</label>
           <input id="cf-last-name" value={form.last_name ?? ""} onChange={(e) => set("last_name", e.target.value)} />
           <label htmlFor="cf-phone">Phone / WhatsApp</label>
-          <input id="cf-phone" value={form.phone ?? ""} onChange={(e) => set("phone", e.target.value)} />
+          <input id="cf-phone" type="tel" inputMode="tel" pattern="\\+?[1-9][0-9\\s().-]{6,20}" title="Enter the country code, e.g. +234 801 234 5678" placeholder="+234 801 234 5678" value={form.phone ?? ""} onChange={(e) => set("phone", e.target.value)} />
+          <p className="muted small">Include the country code (for example, +234 801 234 5678) to use WhatsApp links.</p>
           <label htmlFor="cf-email">Email</label>
           <input id="cf-email" type="email" value={form.email ?? ""} onChange={(e) => set("email", e.target.value)} />
           <label htmlFor="cf-interests">Interested in</label>
@@ -298,7 +299,7 @@ function InfoTab({
           onSave={(v) => onSaveField("first_name", v)}
         />
         <InfoFieldRow label="Last name" value={customer.last_name} onSave={(v) => onSaveField("last_name", v)} onDelete={() => onSaveField("last_name", "")} />
-        <InfoFieldRow label="Phone / WhatsApp" value={customer.phone} onSave={(v) => onSaveField("phone", v)} onDelete={() => onSaveField("phone", "")} />
+        <InfoFieldRow label="Phone / WhatsApp" value={customer.phone} type="tel" placeholder="+234 801 234 5678" onSave={(v) => onSaveField("phone", v)} onDelete={() => onSaveField("phone", "")} />
         <InfoFieldRow label="Email" value={customer.email} type="text" onSave={(v) => onSaveField("email", v)} onDelete={() => onSaveField("email", "")} />
         <InfoFieldRow label="Job / occupation" value={customer.job} onSave={(v) => onSaveField("job", v)} onDelete={() => onSaveField("job", "")} />
         <InfoFieldRow label="Nationality" value={customer.nationality} onSave={(v) => onSaveField("nationality", v)} onDelete={() => onSaveField("nationality", "")} />

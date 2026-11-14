@@ -71,8 +71,8 @@ export default function SegmentsPage() {
     <div>
       <TopBar title="Segments" backTo="/data" />
       <p className="muted small page-note">
-        Define a group of customers by filters - always resolved live, never a stale snapshot - then email or WhatsApp
-        everyone in it at once.
+        Define a group of customers by filters - always resolved live, never a stale snapshot - then reach them by email
+        or open personalized WhatsApp chats one at a time.
       </p>
       <ErrorText message={error} />
 
@@ -387,7 +387,7 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
             <p className="muted small">No one is in this segment yet.</p>
           ) : (
             <Suspense fallback={<Spinner />}>
-              <EmailComposer embedded segmentId={segment.id} recipients={members.members.map((m) => ({ id: m.id, name: m.name, email: m.email }))} />
+              <EmailComposer embedded segmentId={segment.id} recipients={members.members.map((m) => ({ id: m.id, name: m.name, email: m.email, phone: m.phone }))} />
             </Suspense>
           )}
           {emails.length > 0 && (
