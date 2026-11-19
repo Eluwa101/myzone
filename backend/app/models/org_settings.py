@@ -12,6 +12,7 @@ class OrgSettings(Base):
     org_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id"), primary_key=True)
     biz_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     whatsapp_number: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    default_country_code: Mapped[str | None] = mapped_column(String(3), nullable=True)
     qr_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     industry: Mapped[str | None] = mapped_column(String(100), nullable=True)
     team_size: Mapped[int | None] = mapped_column(Integer, nullable=True)

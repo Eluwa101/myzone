@@ -1,6 +1,8 @@
 import { AlertTriangle, MessageCircle, Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { errorMessage } from "../api/errorMessage";
+import { getDefaultCountryCode } from "../api/settings";
+import { buildWaLink, htmlToPlainText, normalizePhone } from "../utils/whatsapp";
 import {
   draftEmail,
   listEmailTemplates,
@@ -36,19 +38,6 @@ export interface Recipient {
   name: string;
   email: string | null;
   phone?: string | null;
-}
-
-function whatsappNumber(phone: string): string | null {
-  const digits = phone.replace(/\D/g, "");
-  return digits.length >= 8 && digits.length <= 15 && !digits.startsWith("0") ? digits : null;
-}
-
-function htmlToPlainText(html: string): string {
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  doc.querySelectorAll("script, style, head, noscript").forEach((node) => node.remove());
-  doc.querySelectorAll("br").forEach((node) => node.replaceWith(doc.createTextNode("\n")));
-  doc.querySelectorAll("p, div, li, tr, h1, h2, h3, h4, blockquote").forEach((node) => node.append(doc.createTextNode("\n")));
-  return (doc.body.textContent ?? "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 /** Everything about writing and sending one email to a set of customers -
@@ -94,6 +83,17 @@ export default function EmailComposer({
   const [whatsappPreview, setWhatsappPreview] = useState<MessagePreview | null>(null);
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [whatsappError, setWhatsappError] = useState<string | null>(null);
+  const [countryCode, setCountryCode] = useState("");
+  const [whatsappArmed, setWhatsappArmed] = useState(false);
+  // customers whose chat was opened for this exact draft (cleared when it changes)
+  const [whatsappOpened, setWhatsappOpened] = useState<Set<string>>(new Set());
+  // only the latest preview request may write results - a slow response for an
+  // earlier draft or customer must not overwrite a newer one
+  const whatsappRequestRef = useRef(0);
+
+  useEffect(() => {
+    getDefaultCountryCode().then(setCountryCode);
+  }, []);
 
   const subjectRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<EmailBodyEditorHandle>(null);
@@ -180,8 +180,12 @@ export default function EmailComposer({
   }
 
   const count = recipients?.length ?? 0;
-  const whatsappRecipients = (recipients ?? []).filter((recipient) => recipient.phone && whatsappNumber(recipient.phone));
-  const invalidPhoneCount = (recipients ?? []).filter((recipient) => recipient.phone && !whatsappNumber(recipient.phone)).length;
+  const withPhone = (recipients ?? []).filter((recipient) => recipient.phone);
+  const whatsappRecipients = withPhone.flatMap((recipient) => {
+    const result = normalizePhone(recipient.phone, countryCode);
+    return result.ok ? [{ ...recipient, digits: result.digits }] : [];
+  });
+  const invalidPhoneCount = withPhone.length - whatsappRecipients.length;
   const whatsappRecipient = whatsappRecipients[whatsappIndex] ?? null;
   const previewRecipient = recipients && count > 0 ? recipients[Math.min(previewIndex, count - 1)] : null;
 
@@ -203,36 +207,72 @@ export default function EmailComposer({
   async function loadWhatsappPreview(index: number) {
     const target = whatsappRecipients[index];
     if (!target) return;
+    const requestId = ++whatsappRequestRef.current;
     setWhatsappIndex(index);
     setWhatsappLoading(true);
     setWhatsappError(null);
+    setWhatsappArmed(false);
     try {
-      setWhatsappPreview(await previewMessage(target.id, subject, bodyHtml));
+      const preview = await previewMessage(target.id, subject, bodyHtml);
+      if (requestId === whatsappRequestRef.current) setWhatsappPreview(preview);
     } catch (err) {
-      setWhatsappError(errorMessage(err));
+      if (requestId === whatsappRequestRef.current) {
+        setWhatsappPreview(null);
+        setWhatsappError(errorMessage(err));
+      }
     } finally {
-      setWhatsappLoading(false);
+      if (requestId === whatsappRequestRef.current) setWhatsappLoading(false);
     }
   }
+
+  const whatsappText = whatsappPreview ? htmlToPlainText(whatsappPreview.body_html) : "";
+  const whatsappLink = whatsappRecipient && whatsappText ? buildWaLink(whatsappRecipient.digits, whatsappText) : null;
+  // anything that means this message isn't really ready: tags the server
+  // couldn't fill, or [fill-in] placeholders still in the draft
+  const whatsappWarnings = [
+    ...(whatsappPreview?.problems?.length ? [`Merge tags that could not be filled: ${whatsappPreview.problems.join(", ")}`] : []),
+    ...(findPlaceholders(bodyHtml).length ? [`Unfilled placeholders: ${findPlaceholders(bodyHtml).join(", ")}`] : []),
+  ];
 
   function openWhatsapp() {
-    if (whatsappLoading || !whatsappRecipient || !whatsappPreview) return;
-    const phone = whatsappNumber(whatsappRecipient.phone ?? "");
-    const message = htmlToPlainText(whatsappPreview.body_html);
-    if (!phone || !message) {
-      setWhatsappError("This customer does not have a usable phone number or message.");
+    if (whatsappLoading || !whatsappRecipient) return;
+    if (!whatsappLink) {
+      setWhatsappError("There is no message to send yet.");
       return;
     }
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+    if (whatsappLink.tooLong) {
+      setWhatsappError("This message is too long for a WhatsApp chat link - shorten it and try again.");
+      return;
+    }
+    // same two-step confirm as the email Send button: the first click only
+    // arms it if the message still has holes in it
+    if (whatsappWarnings.length > 0 && !whatsappArmed) {
+      setWhatsappArmed(true);
+      return;
+    }
+    setWhatsappArmed(false);
+    window.open(whatsappLink.url, "_blank", "noopener,noreferrer");
+    setWhatsappOpened((prev) => new Set(prev).add(whatsappRecipient.id));
   }
 
+  // WhatsApp only uses the body, so subject edits must not refetch; typing in
+  // the body is debounced so one preview call isn't fired per keystroke
+  // callers often build `recipients` inline, so it's a new array on every
+  // parent render - key on its content instead of its identity
+  const recipientsKey = (recipients ?? []).map((r) => `${r.id}:${r.phone ?? ""}`).join(",");
   useEffect(() => {
     if (!showWhatsapp) return;
+    whatsappRequestRef.current++; // invalidate anything still in flight
+    setWhatsappLoading(false);
     setWhatsappPreview(null);
     setWhatsappIndex(0);
-    if (whatsappRecipients.length) void loadWhatsappPreview(0);
+    setWhatsappOpened(new Set());
+    setWhatsappArmed(false);
+    if (!whatsappRecipients.length || !bodyHtml.trim()) return;
+    const timer = setTimeout(() => void loadWhatsappPreview(0), 400);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showWhatsapp, subject, bodyHtml, recipients]);
+  }, [showWhatsapp, bodyHtml, recipientsKey, countryCode]);
 
   const placeholders = findPlaceholders(subject, bodyHtml);
   const [armedSend, setArmedSend] = useState(false);
@@ -414,30 +454,65 @@ export default function EmailComposer({
       {showWhatsapp && (
         <div className={section}>
           <h3>Open a WhatsApp chat</h3>
-          <p className="muted small">The message uses this draft with merge tags filled in for each customer. Review and send it in WhatsApp.</p>
           <p className="muted small">
-            {whatsappRecipients.length} of {count} customers have a usable international phone number
-            {invalidPhoneCount ? `; ${invalidPhoneCount} saved number${invalidPhoneCount === 1 ? " is" : "s are"} not in international format` : ""}.
+            This opens a chat in WhatsApp with the message already typed in, merge tags filled in for that customer - you
+            review it and press send there. Only the message text is used (no subject, no unsubscribe footer).
+          </p>
+          <p className="muted small">
+            {whatsappRecipients.length} of {count} customers have a usable phone number
+            {invalidPhoneCount
+              ? `; ${invalidPhoneCount} saved number${invalidPhoneCount === 1 ? " is" : "s are"} unusable (no country code, too short, or not a number)${countryCode ? "" : " - set a default country code in Settings to fix local-format numbers like 0801…"}`
+              : ""}
+            .
           </p>
           {whatsappRecipient && (
             <div className="row" style={{ alignItems: "center", flexWrap: "wrap" }}>
               <label htmlFor="whatsapp-recipient">Customer</label>
               <select id="whatsapp-recipient" value={whatsappIndex} onChange={(event) => void loadWhatsappPreview(Number(event.target.value))}>
                 {whatsappRecipients.map((recipient, index) => (
-                  <option key={recipient.id} value={index}>{recipient.name} · {recipient.phone}</option>
+                  <option key={recipient.id} value={index}>
+                    {recipient.name} · +{recipient.digits}
+                    {whatsappOpened.has(recipient.id) ? " · opened" : ""}
+                  </option>
                 ))}
               </select>
               {whatsappRecipients.length > 1 && <span className="muted small">{whatsappIndex + 1} of {whatsappRecipients.length}</span>}
-              <button type="button" className="btn-primary" onClick={openWhatsapp} disabled={whatsappLoading || !whatsappPreview}>
-                <MessageCircle size={15} /> Open WhatsApp
+              <button
+                type="button"
+                className={whatsappArmed ? "btn-danger" : "btn-primary"}
+                onClick={openWhatsapp}
+                disabled={whatsappLoading || !whatsappLink}
+              >
+                <MessageCircle size={15} /> {whatsappArmed ? "Open anyway?" : "Open WhatsApp"}
               </button>
+              {whatsappRecipients.length > 1 && whatsappOpened.has(whatsappRecipient.id) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = whatsappRecipients.findIndex((r, i) => i > whatsappIndex && !whatsappOpened.has(r.id));
+                    const fallback = whatsappRecipients.findIndex((r) => !whatsappOpened.has(r.id));
+                    const target = next !== -1 ? next : fallback;
+                    if (target !== -1) void loadWhatsappPreview(target);
+                  }}
+                  disabled={whatsappRecipients.every((r) => whatsappOpened.has(r.id))}
+                >
+                  Next unopened
+                </button>
+              )}
             </div>
           )}
           {whatsappLoading && <p className="muted small">Preparing personalized message…</p>}
-          {whatsappPreview && whatsappRecipient && <pre className="small" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{htmlToPlainText(whatsappPreview.body_html)}</pre>}
+          {whatsappText && whatsappRecipient && (
+            <pre className="small" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{whatsappText}</pre>
+          )}
+          {whatsappLink?.tooLong && (
+            <p className="tag-problems small">This message is too long to open as a WhatsApp chat link - shorten it.</p>
+          )}
           {whatsappError && <ErrorText message={whatsappError} />}
-          {whatsappPreview?.problems?.length ? <p className="tag-problems small">Some merge tags could not be filled: {whatsappPreview.problems.join(", ")}</p> : null}
-          {placeholders.length > 0 && <p className="tag-problems small">Fill these placeholders before opening chats: {placeholders.join(", ")}</p>}
+          {whatsappWarnings.map((warning) => (
+            <p key={warning} className="tag-problems small">{warning}</p>
+          ))}
+          {whatsappWarnings.length > 0 && <p className="muted small">Click "Open WhatsApp" twice to open the chat with these left in.</p>}
         </div>
       )}
     </div>

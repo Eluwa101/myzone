@@ -13,6 +13,8 @@ import {
   updateSegment,
 } from "../api/segments";
 import { errorMessage } from "../api/errorMessage";
+import { getDefaultCountryCode } from "../api/settings";
+import { buildWaLink, normalizePhone } from "../utils/whatsapp";
 import type { Segment, SegmentFieldsCatalog, SegmentFilters, SegmentMember, SegmentNode, SegmentResult } from "../api/types";
 import CardHead from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
@@ -31,10 +33,6 @@ function personalize(message: string, member: SegmentMember): string {
   return message.replaceAll("{first_name}", firstName);
 }
 
-function waLink(phone: string, message: string): string {
-  const digits = phone.replace(/\D/g, "");
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
-}
 
 function describeNode(node: SegmentNode): string {
   if (node.type === "condition") {
@@ -286,12 +284,21 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
   const [message, setMessage] = useState("");
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [countryCode, setCountryCode] = useState("");
+  // members whose chat link was opened this session, so a long list can be
+  // worked through without losing your place or messaging anyone twice
+  const [opened, setOpened] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     getSegmentMembers(segment.id)
       .then(setMembers)
       .catch((err) => setError(errorMessage(err)));
   }, [segment.id]);
+
+  useEffect(() => {
+    getDefaultCountryCode().then(setCountryCode);
+  }, []);
+
 
   async function remove() {
     try {
@@ -311,7 +318,14 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
   }
 
   const emails = (members?.members ?? []).map((m) => m.email).filter((e): e is string => !!e);
-  const phones = (members?.members ?? []).map((m) => m.phone).filter((p): p is string => !!p);
+  // only numbers wa.me can actually open; the rest are counted, not silently dropped
+  const withPhone = (members?.members ?? []).filter((m) => m.phone);
+  const chatMembers = withPhone.flatMap((m) => {
+    const result = normalizePhone(m.phone, countryCode);
+    return result.ok ? [{ member: m, digits: result.digits }] : [];
+  });
+  const phones = chatMembers.map((c) => `+${c.digits}`);
+  const unusableCount = withPhone.length - chatMembers.length;
 
   const emailBatches: string[][] = [];
   for (let i = 0; i < emails.length; i += EMAIL_BATCH_SIZE) emailBatches.push(emails.slice(i, i + EMAIL_BATCH_SIZE));
@@ -407,16 +421,24 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
 
           <div>
             <p className="small" style={{ margin: "0 0 6px" }}>
-              <MessageCircle size={13} className="h3-icon" /> <b>WhatsApp</b> - {phones.length} with a number
+              <MessageCircle size={13} className="h3-icon" /> <b>WhatsApp</b> - {phones.length} with a usable number
             </p>
+            {unusableCount > 0 && (
+              <p className="muted small">
+                {unusableCount} {unusableCount === 1 ? "person has a number" : "people have numbers"} that can't open a chat
+                (missing country code, too short, or not a number)
+                {countryCode ? "" : " - set a default country code in Settings to fix local-format numbers like 0801…"}.
+              </p>
+            )}
             {phones.length === 0 ? (
-              <p className="muted small">No one in this segment has a phone number on file.</p>
+              <p className="muted small">No one in this segment has a usable phone number on file.</p>
             ) : (
               <>
                 <label htmlFor={`seg-message-${segment.id}`}>Message</label>
-                <textarea id={`seg-message-${segment.id}`} rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />
+                <textarea id={`seg-message-${segment.id}`} rows={3} value={message} onChange={(e) => { setMessage(e.target.value); setOpened(new Set()); }} />
                 <p className="muted small" style={{ marginTop: -6 }}>
-                  Use <code>{"{first_name}"}</code> to personalize each chat link below.
+                  Use <code>{"{first_name}"}</code> to personalize each chat link below. People you've opened are marked, but
+                  that resets if you edit the message or leave the page - WhatsApp itself is the record of what was sent.
                 </p>
                 <p className="muted small">
                   WhatsApp doesn't support one link for many recipients at once - copy these numbers and the message above
@@ -431,22 +453,28 @@ function SegmentCard({ segment, onChanged }: { segment: Segment; onChanged: () =
                   Or open a personalized chat one at a time:
                 </p>
                 <div className="submissions-list">
-                  {(members?.members ?? [])
-                    .filter((m) => m.phone)
-                    .map((m) => (
+                  {chatMembers.map(({ member: m, digits }) => {
+                    const link = buildWaLink(digits, personalize(message, m));
+                    return (
                       <a
                         key={m.id}
-                        href={waLink(m.phone!, personalize(message, m))}
+                        href={link.url}
                         target="_blank"
                         rel="noreferrer"
                         className="row-between"
+                        onClick={() => setOpened((prev) => new Set(prev).add(m.id))}
                       >
-                        <span>{m.name}</span>
+                        <span>
+                          {m.name}
+                          {opened.has(m.id) && <span className="muted small"> · opened</span>}
+                        </span>
                         <span className="muted small">
-                          <ExternalLink size={12} className="h3-icon" /> {m.phone}
+                          {link.tooLong && <span className="tag-problems">message too long · </span>}
+                          <ExternalLink size={12} className="h3-icon" /> +{digits}
                         </span>
                       </a>
-                    ))}
+                    );
+                  })}
                 </div>
               </>
             )}

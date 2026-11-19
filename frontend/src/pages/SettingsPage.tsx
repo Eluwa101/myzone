@@ -9,17 +9,19 @@ import ThemeToggle from "../components/ThemeToggle";
 import { errorMessage } from "../api/errorMessage";
 import { getSettings, updateSettings } from "../api/settings";
 import TopBar from "../components/TopBar";
+import { buildWaLink, normalizePhone } from "../utils/whatsapp";
 
 const DEFAULT_MESSAGE = "Hi! My name is [name] and I'm interested in [product/service]. I agree to my details being saved so you can reply to me.";
 
-function waLink(number: string, message: string): string {
-  const digits = number.replace(/\D/g, "");
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message || DEFAULT_MESSAGE)}`;
+function waLink(number: string, message: string): string | null {
+  const phone = normalizePhone(number);
+  return phone.ok ? buildWaLink(phone.digits, message || DEFAULT_MESSAGE).url : null;
 }
 
 export default function SettingsPage() {
   const [bizName, setBizName] = useState("");
   const [number, setNumber] = useState("");
+  const [countryCode, setCountryCode] = useState("");
   const [message, setMessage] = useState(DEFAULT_MESSAGE);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrStatus, setQrStatus] = useState<string | null>(null);
@@ -55,23 +57,33 @@ export default function SettingsPage() {
       setSupportEmail(s.support_email ?? "");
       setSenderHandle(s.sender_handle ?? "");
       setSenderDomain(s.sender_domain ?? "");
-      if (s.whatsapp_number) {
-        QRCode.toDataURL(waLink(s.whatsapp_number, s.qr_message ?? DEFAULT_MESSAGE), { width: 220 }).then(setQrDataUrl);
-      }
+      setCountryCode(s.default_country_code ?? "");
+      const link = s.whatsapp_number ? waLink(s.whatsapp_number, s.qr_message ?? DEFAULT_MESSAGE) : null;
+      if (link) QRCode.toDataURL(link, { width: 220 }).then(setQrDataUrl);
     });
   }, []);
 
   async function onSaveQr() {
-    const digits = number.replace(/\D/g, "");
-    if (digits.length < 8 || digits.length > 15 || digits.startsWith("0")) {
+    const link = waLink(number, message);
+    if (!link) {
       setQrStatus("Enter a valid international number with country code, e.g. +234 801 234 5678.");
+      return;
+    }
+    const cc = countryCode.replace(/\D/g, "");
+    if (countryCode.trim() && (cc.length < 1 || cc.length > 3 || cc.startsWith("0"))) {
+      setQrStatus("Default country code must be 1-3 digits, e.g. 234.");
       return;
     }
     setSavingQr(true);
     setQrStatus(null);
     try {
-      await updateSettings({ biz_name: bizName, whatsapp_number: number, qr_message: message || DEFAULT_MESSAGE });
-      const dataUrl = await QRCode.toDataURL(waLink(number, message), { width: 220 });
+      await updateSettings({
+        biz_name: bizName,
+        whatsapp_number: number,
+        default_country_code: cc,
+        qr_message: message || DEFAULT_MESSAGE,
+      });
+      const dataUrl = await QRCode.toDataURL(link, { width: 220 });
       setQrDataUrl(dataUrl);
       setQrStatus("Saved.");
     } catch (err) {
@@ -111,7 +123,7 @@ export default function SettingsPage() {
 
   async function onCopyLink() {
     try {
-      await navigator.clipboard.writeText(waLink(number, message));
+      await navigator.clipboard.writeText(waLink(number, message) ?? "");
       setQrStatus("Link copied.");
     } catch {
       setQrStatus("Could not copy. Select the link text.");
@@ -199,6 +211,19 @@ export default function SettingsPage() {
         <label htmlFor="set-number">WhatsApp number</label>
         <input id="set-number" type="tel" value={number} onChange={(e) => setNumber(e.target.value)} placeholder="+234 801 234 5678" inputMode="tel" />
         <p className="muted small">Include the country code. This number opens your WhatsApp chat from the QR code.</p>
+        <label htmlFor="set-country-code">Default country code for your customers</label>
+        <input
+          id="set-country-code"
+          value={countryCode}
+          onChange={(e) => setCountryCode(e.target.value)}
+          placeholder="234"
+          inputMode="numeric"
+          maxLength={4}
+        />
+        <p className="muted small">
+          Customers saved like 0801 234 5678 get this code added when you open their WhatsApp chat (0801… becomes
+          +234 801…). Leave blank if all your numbers already include a country code.
+        </p>
         <label htmlFor="set-message">Message customers will send (they can edit it)</label>
         <textarea id="set-message" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />
         <div className="row" style={{ marginTop: 12 }}>
@@ -213,7 +238,7 @@ export default function SettingsPage() {
             {bizName && <div className="qr-title">{bizName}</div>}
             <p className="muted small">Scan to chat with us on WhatsApp</p>
             <img src={qrDataUrl} alt="WhatsApp QR code" width={180} height={180} />
-            <p className="muted small qr-link">{waLink(number, message)}</p>
+            <p className="muted small qr-link">{waLink(number, message) ?? ""}</p>
             <button onClick={onCopyLink}>
               <Copy size={14} /> Copy link
             </button>

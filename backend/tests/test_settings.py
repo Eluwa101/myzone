@@ -1,6 +1,7 @@
 EMPTY_SETTINGS = {
     "biz_name": None,
     "whatsapp_number": None,
+    "default_country_code": None,
     "qr_message": None,
     "industry": None,
     "team_size": None,
@@ -124,3 +125,29 @@ def test_update_sender_handle_rejects_reserved_short_and_taken(client, auth_head
 def test_reserved_business_name_does_not_get_a_reserved_handle(client):
     headers = _other_org_headers(client, email="s@example.com", org_name="Support")
     assert client.get("/api/settings", headers=headers).json()["sender_handle"] == "supportshop"
+
+
+def test_whatsapp_number_must_be_international(client, auth_headers):
+    for bad in ["0801 234 5678", "12345", "+1 (555) 123-4567-8901-234"]:
+        resp = client.put("/api/settings", json={"whatsapp_number": bad}, headers=auth_headers)
+        assert resp.status_code == 422, bad
+    ok = client.put("/api/settings", json={"whatsapp_number": "+234 801 234 5678"}, headers=auth_headers)
+    assert ok.status_code == 200
+    assert ok.json()["whatsapp_number"] == "+234 801 234 5678"
+
+
+def test_blank_whatsapp_number_clears_it(client, auth_headers):
+    client.put("/api/settings", json={"whatsapp_number": "2348012345678"}, headers=auth_headers)
+    resp = client.put("/api/settings", json={"whatsapp_number": "  "}, headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["whatsapp_number"] is None
+
+
+def test_default_country_code_is_normalized_and_validated(client, auth_headers):
+    resp = client.put("/api/settings", json={"default_country_code": "+234"}, headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["default_country_code"] == "234"
+    assert client.put("/api/settings", json={"default_country_code": "0234"}, headers=auth_headers).status_code == 422
+    assert client.put("/api/settings", json={"default_country_code": "12345"}, headers=auth_headers).status_code == 422
+    cleared = client.put("/api/settings", json={"default_country_code": ""}, headers=auth_headers)
+    assert cleared.json()["default_country_code"] is None
