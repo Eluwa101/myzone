@@ -35,6 +35,7 @@ const PublicFormPage = lazy(() => import("./pages/PublicFormPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const ScanPage = lazy(() => import("./pages/ScanPage"));
 const SegmentsPage = lazy(() => import("./pages/SegmentsPage"));
+const SegmentDetailPage = lazy(() => import("./pages/SegmentDetailPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const SignupPage = lazy(() => import("./pages/SignupPage"));
 const UnsubscribePage = lazy(() => import("./pages/UnsubscribePage"));
@@ -79,6 +80,7 @@ export default function App() {
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/forms" element={<FormsPage />} />
             <Route path="/segments" element={<SegmentsPage />} />
+            <Route path="/segments/:id" element={<SegmentDetailPage />} />
             <Route path="/scan" element={<ScanPage />} />
             <Route path="/webhooks" element={<WebhooksPage />} />
             <Route path="/data" element={<DataPage />} />

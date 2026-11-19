@@ -3330,3 +3330,19 @@ button.card-body {
   overflow: hidden;
   overflow-wrap: anywhere;
 }
+
+/* a segment on the list: the whole card opens the segment's page */
+.segment-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.segment-link:hover {
+  border-color: var(--accent, currentColor);
+}
+.segment-filters {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

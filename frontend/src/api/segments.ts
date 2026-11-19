@@ -17,6 +17,10 @@ export function listSegments(): Promise<Segment[]> {
   return api.get<Segment[]>("/api/segments");
 }
 
+export function getSegment(id: string): Promise<Segment> {
+  return api.get<Segment>(`/api/segments/${id}`);
+}
+
 export function createSegment(data: SegmentInput): Promise<Segment> {
   return api.post<Segment>("/api/segments", data);
 }
