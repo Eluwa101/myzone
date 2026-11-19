@@ -3,9 +3,9 @@ import { useEffect, useState } from "react";
 import {
   createSubscription,
   deleteSubscription,
-  listDeliveries,
   listEventTypes,
-  listSubscriptions,
+  listDeliveriesPaged,
+  listSubscriptionsPaged,
   updateSubscription,
   type WebhookSubscriptionInput,
 } from "../api/webhooks";
@@ -13,7 +13,14 @@ import { errorMessage } from "../api/errorMessage";
 import type { WebhookDelivery, WebhookSubscription } from "../api/types";
 import CardHead from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
+import Pagination from "../components/Pagination";
+import SearchBox from "../components/SearchBox";
 import Spinner from "../components/Spinner";
+import { usePagedList } from "../hooks/usePagedList";
+import { useLocalPagedList } from "../hooks/useLocalPagedList";
+
+const PAGE_SIZE = 20;
+const SUB_PAGE_SIZE = 10;
 import TopBar from "../components/TopBar";
 
 function groupLabel(eventType: string): string {
@@ -22,19 +29,16 @@ function groupLabel(eventType: string): string {
 }
 
 export default function WebhooksPage() {
-  const [subs, setSubs] = useState<WebhookSubscription[] | null>(null);
   const [eventTypes, setEventTypes] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  function load() {
-    listSubscriptions()
-      .then(setSubs)
-      .catch((err) => setError(errorMessage(err)));
-  }
+  const list = usePagedList<WebhookSubscription>({
+    fetcher: ({ search, page, pageSize }) => listSubscriptionsPaged({ search, page, pageSize }),
+    pageSize: PAGE_SIZE,
+  });
+  const { items: subs, error } = list;
+  const load = list.reload;
 
   useEffect(() => {
-    load();
     listEventTypes().then(setEventTypes);
   }, []);
 
@@ -63,13 +67,14 @@ export default function WebhooksPage() {
           <button type="button" className="btn-primary" onClick={() => setCreating(true)}>
             + New webhook
           </button>
+          <SearchBox value={list.search} onChange={list.setSearch} label="Search webhooks" placeholder="Search by URL…" />
         </div>
       )}
 
-      {!subs ? (
+      {list.loading ? (
         <Spinner />
       ) : subs.length === 0 ? (
-        <p className="muted small page-note">No webhooks yet.</p>
+        <p className="muted small page-note">{list.searching ? "No webhooks match that search." : "No webhooks yet."}</p>
       ) : (
         <div className="card-grid">
           {subs.map((s) => (
@@ -77,6 +82,7 @@ export default function WebhooksPage() {
           ))}
         </div>
       )}
+      {!list.loading && <Pagination page={list.page} pageSize={PAGE_SIZE} total={list.total} onChange={list.goToPage} />}
     </div>
   );
 }
@@ -285,11 +291,11 @@ function SubscriptionCard({ sub, eventTypes, onChanged }: { sub: WebhookSubscrip
 }
 
 function DeliveriesList({ subscriptionId }: { subscriptionId: string }) {
-  const [items, setItems] = useState<WebhookDelivery[] | null>(null);
-
-  useEffect(() => {
-    listDeliveries(subscriptionId).then(setItems);
-  }, [subscriptionId]);
+  const { items, total, page, setPage } = useLocalPagedList<WebhookDelivery>(
+    (p, size) => listDeliveriesPaged(subscriptionId, { page: p, pageSize: size }),
+    SUB_PAGE_SIZE,
+    subscriptionId
+  );
 
   if (!items) return <p className="muted small">Loading…</p>;
   if (items.length === 0) return <p className="muted small">No deliveries yet - they'll appear here once a matching event fires.</p>;
@@ -307,6 +313,7 @@ function DeliveriesList({ subscriptionId }: { subscriptionId: string }) {
           </div>
         </div>
       ))}
+      <Pagination page={page} pageSize={SUB_PAGE_SIZE} total={total} onChange={setPage} />
     </div>
   );
 }

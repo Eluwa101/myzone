@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, queryString, type Paged } from "./client";
 import type { OrgNote } from "./types";
 
 export interface NoteInput {
@@ -34,4 +34,12 @@ export function updateNote(id: string, data: Partial<NoteInput> & { is_pending_r
 
 export function deleteNote(id: string): Promise<void> {
   return api.delete<void>(`/api/notes/${id}`);
+}
+
+export function listNotesPaged(params: { search?: string; page: number; pageSize: number }): Promise<Paged<OrgNote>> {
+  return api.getPaged<OrgNote>(`/api/notes${queryString({ search: params.search, page: params.page, page_size: params.pageSize })}`);
+}
+
+export function getNote(id: string): Promise<OrgNote> {
+  return api.get<OrgNote>(`/api/notes/${id}`);
 }

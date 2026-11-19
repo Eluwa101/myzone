@@ -69,13 +69,21 @@ class SendEmailResult(BaseModel):
 class OutboundMessageOut(BaseModel):
     id: UUID
     customer_id: UUID
+    customer_name: str | None = None
     channel: str
     status: str
     subject: str | None
+    # first ~160 characters of the stored body, tags stripped (list + detail)
+    body_preview: str = ""
     error: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class OutboundMessageDetailOut(OutboundMessageOut):
+    # the full stored body - only on the single-message endpoint
+    body: str | None = None
 
 
 class SuggestedMergeTagOut(BaseModel):

@@ -3314,3 +3314,19 @@ button.card-body {
     transition: none;
   }
 }
+
+/* long text shown as a short preview, with a "View full" link when clipped */
+.clamp-text {
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+.clamp-more {
+  display: inline-block;
+}
+.message-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}

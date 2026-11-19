@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.controllers.segment_fields import field_type
 from app.controllers.segment_sql import run_sql_segment, validate_sql
+from app.core.paging import contains_any, like_pattern
 from app.models.customer import Customer
 from app.models.segment import Segment
 from app.schemas.segment import SegmentCondition, SegmentCreate, SegmentFilters, SegmentGroup, SegmentUpdate
@@ -28,8 +29,16 @@ def create_segment(db: Session, org_id: UUID, data: SegmentCreate) -> Segment:
     return segment
 
 
-def list_segments(db: Session, org_id: UUID) -> list[Segment]:
-    return db.query(Segment).filter(Segment.org_id == org_id).order_by(Segment.created_at.desc()).all()
+def query_segments(db: Session, org_id: UUID, search: str | None = None):
+    q = db.query(Segment).filter(Segment.org_id == org_id)
+    pattern = like_pattern(search)
+    if pattern:
+        q = q.filter(contains_any(pattern, Segment.name))
+    return q.order_by(Segment.created_at.desc(), Segment.id)
+
+
+def list_segments(db: Session, org_id: UUID, search: str | None = None) -> list[Segment]:
+    return query_segments(db, org_id, search).all()
 
 
 def get_segment(db: Session, org_id: UUID, segment_id: UUID) -> Segment:

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.controllers import notification_controller
 from app.core.database import SessionLocal
+from app.core.paging import contains_any, like_pattern
 from app.models.webhook import WebhookDelivery, WebhookSubscription, generate_webhook_secret
 from app.schemas.webhook import WebhookSubscriptionCreate, WebhookSubscriptionUpdate
 
@@ -37,8 +38,16 @@ def create_subscription(db: Session, org_id: UUID, data: WebhookSubscriptionCrea
     return sub
 
 
-def list_subscriptions(db: Session, org_id: UUID) -> list[WebhookSubscription]:
-    return db.query(WebhookSubscription).filter(WebhookSubscription.org_id == org_id).order_by(WebhookSubscription.created_at.desc()).all()
+def query_subscriptions(db: Session, org_id: UUID, search: str | None = None):
+    q = db.query(WebhookSubscription).filter(WebhookSubscription.org_id == org_id)
+    pattern = like_pattern(search)
+    if pattern:
+        q = q.filter(contains_any(pattern, WebhookSubscription.target_url))
+    return q.order_by(WebhookSubscription.created_at.desc(), WebhookSubscription.id)
+
+
+def list_subscriptions(db: Session, org_id: UUID, search: str | None = None) -> list[WebhookSubscription]:
+    return query_subscriptions(db, org_id, search).all()
 
 
 def _get_subscription(db: Session, org_id: UUID, subscription_id: UUID) -> WebhookSubscription:
@@ -69,15 +78,18 @@ def delete_subscription(db: Session, org_id: UUID, subscription_id: UUID) -> Non
     db.commit()
 
 
-def list_deliveries(db: Session, org_id: UUID, subscription_id: UUID) -> list[WebhookDelivery]:
+def query_deliveries(db: Session, org_id: UUID, subscription_id: UUID):
     _get_subscription(db, org_id, subscription_id)  # raises if not owned by this org
     return (
         db.query(WebhookDelivery)
         .filter(WebhookDelivery.org_id == org_id, WebhookDelivery.subscription_id == subscription_id)
-        .order_by(WebhookDelivery.created_at.desc())
-        .limit(50)
-        .all()
+        .order_by(WebhookDelivery.created_at.desc(), WebhookDelivery.id)
     )
+
+
+def list_deliveries(db: Session, org_id: UUID, subscription_id: UUID) -> list[WebhookDelivery]:
+    # without ?page= the endpoint keeps its old "latest 50" behaviour
+    return query_deliveries(db, org_id, subscription_id).limit(50).all()
 
 
 # --- dispatch: called from inside the mutating controllers, never raises ---

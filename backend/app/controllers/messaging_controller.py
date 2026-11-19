@@ -2,6 +2,7 @@ import logging
 import threading
 from uuid import UUID
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.controllers import notification_controller
@@ -10,6 +11,7 @@ from app.core.database import SessionLocal
 from app.core.email import send_raw
 from app.core import unsubscribe
 from app.core.merge_tags import MergeTagContext, resolve_merge_tags
+from app.core.paging import contains_any, like_pattern
 from app.models.customer import Customer
 from app.models.email_template import EmailTemplate
 from app.models.organization import Organization
@@ -27,8 +29,64 @@ class EmailTemplateNotFoundError(Exception):
 # --- templates --------------------------------------------------------------
 
 
-def list_templates(db: Session, org_id: UUID) -> list[EmailTemplate]:
-    return db.query(EmailTemplate).filter(EmailTemplate.org_id == org_id).order_by(EmailTemplate.name).all()
+def query_templates(db: Session, org_id: UUID, search: str | None = None):
+    q = db.query(EmailTemplate).filter(EmailTemplate.org_id == org_id)
+    pattern = like_pattern(search)
+    if pattern:
+        q = q.filter(contains_any(pattern, EmailTemplate.name, EmailTemplate.subject))
+    return q.order_by(EmailTemplate.name, EmailTemplate.id)
+
+
+def list_templates(db: Session, org_id: UUID, search: str | None = None) -> list[EmailTemplate]:
+    return query_templates(db, org_id, search).all()
+
+
+def query_history(
+    db: Session,
+    org_id: UUID,
+    customer_id: UUID | None = None,
+    channel: MessageChannel | None = None,
+    status: MessageStatus | None = None,
+    search: str | None = None,
+):
+    q = (
+        db.query(OutboundMessage)
+        .options(joinedload(OutboundMessage.customer))
+        .filter(OutboundMessage.org_id == org_id)
+    )
+    if customer_id:
+        q = q.filter(OutboundMessage.customer_id == customer_id)
+    if channel:
+        q = q.filter(OutboundMessage.channel == channel)
+    if status:
+        q = q.filter(OutboundMessage.status == status)
+    pattern = like_pattern(search)
+    if pattern:
+        q = q.filter(
+            or_(
+                contains_any(pattern, OutboundMessage.subject, OutboundMessage.body),
+                OutboundMessage.customer_id.in_(
+                    db.query(Customer.id).filter(Customer.org_id == org_id, contains_any(pattern, Customer.name))
+                ),
+            )
+        )
+    return q.order_by(OutboundMessage.created_at.desc(), OutboundMessage.id)
+
+
+class OutboundMessageNotFoundError(Exception):
+    pass
+
+
+def get_history_message(db: Session, org_id: UUID, message_id: UUID) -> OutboundMessage:
+    message = (
+        db.query(OutboundMessage)
+        .options(joinedload(OutboundMessage.customer))
+        .filter(OutboundMessage.org_id == org_id, OutboundMessage.id == message_id)
+        .first()
+    )
+    if not message:
+        raise OutboundMessageNotFoundError()
+    return message
 
 
 def get_template(db: Session, org_id: UUID, template_id: UUID) -> EmailTemplate:

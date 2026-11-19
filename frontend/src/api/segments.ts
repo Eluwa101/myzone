@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, queryString, type Paged } from "./client";
 import type { Segment, SegmentFieldsCatalog, SegmentFilters, SegmentResult } from "./types";
 
 export interface SegmentInput {
@@ -55,4 +55,8 @@ export function previewSqlSegment(sql: string): Promise<SegmentResult> {
 
 export function suggestSegmentSql(description: string, currentSql: string | null): Promise<{ sql: string }> {
   return api.post<{ sql: string }>("/api/segments/sql/suggest", { description, current_sql: currentSql });
+}
+
+export function listSegmentsPaged(params: { search?: string; page: number; pageSize: number }): Promise<Paged<Segment>> {
+  return api.getPaged<Segment>(`/api/segments${queryString({ search: params.search, page: params.page, page_size: params.pageSize })}`);
 }

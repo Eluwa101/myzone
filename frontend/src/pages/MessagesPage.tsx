@@ -1,12 +1,15 @@
 import { FileText, Mail, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { errorMessage } from "../api/errorMessage";
-import { listMessageHistory, type OutboundMessage } from "../api/messaging";
+import { listMessageHistoryPaged, type OutboundMessage } from "../api/messaging";
 import ErrorText from "../components/ErrorText";
+import Pagination from "../components/Pagination";
+import SearchBox from "../components/SearchBox";
 import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
+import { usePagedList } from "../hooks/usePagedList";
 
+const PAGE_SIZE = 20;
 const STATUS_LABEL: Record<string, string> = { sent: "Sent", failed: "Failed", skipped: "Skipped" };
 
 function timeAgo(iso: string): string {
@@ -20,14 +23,13 @@ function timeAgo(iso: string): string {
 }
 
 export default function MessagesPage() {
-  const [history, setHistory] = useState<OutboundMessage[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    listMessageHistory()
-      .then(setHistory)
-      .catch((err) => setError(errorMessage(err)));
-  }, []);
+  const [status, setStatus] = useState("");
+  const list = usePagedList<OutboundMessage>({
+    fetcher: ({ search, page, pageSize }) => listMessageHistoryPaged({ status, search, page, pageSize }),
+    pageSize: PAGE_SIZE,
+    filterKey: status,
+  });
+  const { items: history, loading, error } = list;
 
   return (
     <div>
@@ -44,29 +46,42 @@ export default function MessagesPage() {
       </div>
 
       <h2 className="settings-section-heading">Recent activity</h2>
+      <div className="toolbar">
+        <SearchBox value={list.search} onChange={list.setSearch} label="Search messages" placeholder="Search subject, message, customer…" />
+        <select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          <option value="sent">Sent</option>
+          <option value="failed">Failed</option>
+          <option value="skipped">Skipped</option>
+        </select>
+      </div>
       <ErrorText message={error} />
-      {history === null ? (
+      {loading ? (
         <Spinner />
       ) : history.length === 0 ? (
         <div className="empty-state">
           <Mail size={40} className="empty-state-icon" strokeWidth={1.5} />
-          <p>No emails sent yet.</p>
+          <p>{list.searching || status ? "No messages match." : "No emails sent yet."}</p>
         </div>
       ) : (
         <div className="card">
           {history.map((m) => (
-            <Link key={m.id} to={`/customers/${m.customer_id}`} className="info-row">
+            <Link key={m.id} to={`/messages/${m.id}`} className="info-row">
               <div className="info-row-text">
                 <div className="info-row-label">{m.subject || "(no subject)"}</div>
                 <div className="info-row-value muted">
+                  {m.customer_name ? `${m.customer_name} · ` : ""}
                   {STATUS_LABEL[m.status] ?? m.status} · {timeAgo(m.created_at)}
                   {m.error ? ` · ${m.error}` : ""}
                 </div>
+                {m.body_preview && <div className="info-row-value muted small message-preview">{m.body_preview}</div>}
               </div>
             </Link>
           ))}
         </div>
       )}
+
+      {!loading && <Pagination page={list.page} pageSize={PAGE_SIZE} total={list.total} onChange={list.goToPage} />}
     </div>
   );
 }

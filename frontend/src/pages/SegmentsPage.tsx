@@ -6,7 +6,7 @@ import {
   deleteSegment,
   getSegmentFields,
   getSegmentMembers,
-  listSegments,
+  listSegmentsPaged,
   previewSegment,
   previewSqlSegment,
   suggestSegmentFilters,
@@ -18,6 +18,9 @@ import { buildWaLink, normalizePhone } from "../utils/whatsapp";
 import type { Segment, SegmentFieldsCatalog, SegmentFilters, SegmentMember, SegmentNode, SegmentResult } from "../api/types";
 import CardHead from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
+import Pagination from "../components/Pagination";
+import SearchBox from "../components/SearchBox";
+import { usePagedList } from "../hooks/usePagedList";
 import SegmentQueryBuilder, { emptyGroup, OPERATOR_LABELS } from "../components/SegmentQueryBuilder";
 import SqlSegmentEditor from "../components/SqlSegmentEditor";
 import Spinner from "../components/Spinner";
@@ -27,6 +30,7 @@ import TopBar from "../components/TopBar";
 const EmailComposer = lazy(() => import("../components/EmailComposer"));
 
 const EMAIL_BATCH_SIZE = 40;
+const PAGE_SIZE = 10; // each card resolves its members live, so keep a page light
 
 function personalize(message: string, member: SegmentMember): string {
   const firstName = member.first_name || member.name.split(" ")[0] || "";
@@ -53,17 +57,13 @@ function describeFilters(f: SegmentFilters): string {
 }
 
 export default function SegmentsPage() {
-  const [segments, setSegments] = useState<Segment[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-
-  function load() {
-    listSegments()
-      .then(setSegments)
-      .catch((err) => setError(errorMessage(err)));
-  }
-
-  useEffect(load, []);
+  const list = usePagedList<Segment>({
+    fetcher: ({ search, page, pageSize }) => listSegmentsPaged({ search, page, pageSize }),
+    pageSize: PAGE_SIZE,
+  });
+  const { items: segments, error } = list;
+  const load = list.reload;
 
   return (
     <div>
@@ -83,13 +83,14 @@ export default function SegmentsPage() {
           <button type="button" className="btn-primary" onClick={() => setCreating(true)}>
             + New segment
           </button>
+          <SearchBox value={list.search} onChange={list.setSearch} label="Search segments" placeholder="Search segments…" />
         </div>
       )}
 
-      {!segments ? (
+      {list.loading ? (
         <Spinner />
       ) : segments.length === 0 ? (
-        <p className="muted small page-note">No segments yet.</p>
+        <p className="muted small page-note">{list.searching ? "No segments match that search." : "No segments yet."}</p>
       ) : (
         <div className="card-grid">
           {segments.map((s) => (
@@ -97,6 +98,7 @@ export default function SegmentsPage() {
           ))}
         </div>
       )}
+      {!list.loading && <Pagination page={list.page} pageSize={PAGE_SIZE} total={list.total} onChange={list.goToPage} />}
     </div>
   );
 }

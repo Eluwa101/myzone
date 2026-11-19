@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
 
 from app.controllers import customer_controller, notification_controller, order_controller, transaction_controller
+from app.core.paging import contains_any, like_pattern
 from app.models.custom_form import CustomForm, FormSubmission, generate_public_token, generate_webhook_secret
 from app.models.customer import Customer
 from app.models.organization import Organization
@@ -36,8 +37,16 @@ def create_form(db: Session, org_id: UUID, data: FormCreate) -> CustomForm:
     return form
 
 
-def list_forms(db: Session, org_id: UUID) -> list[CustomForm]:
-    return db.query(CustomForm).filter(CustomForm.org_id == org_id).order_by(CustomForm.created_at.desc()).all()
+def query_forms(db: Session, org_id: UUID, search: str | None = None):
+    q = db.query(CustomForm).filter(CustomForm.org_id == org_id)
+    pattern = like_pattern(search)
+    if pattern:
+        q = q.filter(contains_any(pattern, CustomForm.name))
+    return q.order_by(CustomForm.created_at.desc(), CustomForm.id)
+
+
+def list_forms(db: Session, org_id: UUID, search: str | None = None) -> list[CustomForm]:
+    return query_forms(db, org_id, search).all()
 
 
 def get_form(db: Session, org_id: UUID, form_id: UUID) -> CustomForm:
@@ -72,15 +81,18 @@ def delete_form(db: Session, org_id: UUID, form_id: UUID) -> None:
     db.commit()
 
 
-def list_submissions(db: Session, org_id: UUID, form_id: UUID) -> list[FormSubmission]:
+def query_submissions(db: Session, org_id: UUID, form_id: UUID):
     get_form(db, org_id, form_id)  # raises FormNotFoundError if not owned by this org
     return (
         db.query(FormSubmission)
         .options(joinedload(FormSubmission.customer))
         .filter(FormSubmission.org_id == org_id, FormSubmission.form_id == form_id)
-        .order_by(FormSubmission.created_at.desc())
-        .all()
+        .order_by(FormSubmission.created_at.desc(), FormSubmission.id)
     )
+
+
+def list_submissions(db: Session, org_id: UUID, form_id: UUID) -> list[FormSubmission]:
+    return query_submissions(db, org_id, form_id).all()
 
 
 # --- public: no auth, driven entirely by the unguessable public_token -----

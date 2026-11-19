@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, queryString, type Paged } from "./client";
 
 export interface MergeTag {
   category: string;
@@ -43,7 +43,12 @@ export interface OutboundMessage {
   customer_id: string;
   channel: string;
   status: string;
+  customer_name: string | null;
   subject: string | null;
+  /** first ~160 characters, tags stripped - safe to show in a list */
+  body_preview: string;
+  /** the full stored message; only returned by the single-message endpoint */
+  body?: string | null;
   error: string | null;
   created_at: string;
 }
@@ -112,4 +117,32 @@ export interface EmailDraftInput {
 
 export function draftEmail(data: EmailDraftInput): Promise<MessagePreview> {
   return api.post<MessagePreview>("/api/messages/draft", data);
+}
+
+export function listEmailTemplatesPaged(params: { search?: string; page: number; pageSize: number }): Promise<Paged<EmailTemplate>> {
+  return api.getPaged<EmailTemplate>(`/api/messages/templates${queryString({ search: params.search, page: params.page, page_size: params.pageSize })}`);
+}
+
+export function listMessageHistoryPaged(params: {
+  customerId?: string;
+  channel?: string;
+  status?: string;
+  search?: string;
+  page: number;
+  pageSize: number;
+}): Promise<Paged<OutboundMessage>> {
+  return api.getPaged<OutboundMessage>(
+    `/api/messages/history${queryString({
+      customer_id: params.customerId,
+      channel: params.channel,
+      status: params.status,
+      search: params.search,
+      page: params.page,
+      page_size: params.pageSize,
+    })}`
+  );
+}
+
+export function getMessage(id: string): Promise<OutboundMessage> {
+  return api.get<OutboundMessage>(`/api/messages/history/${id}`);
 }

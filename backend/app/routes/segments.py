@@ -8,6 +8,7 @@ from app.controllers import segment_controller
 from app.controllers.segment_fields import FIELD_REGISTRY, OPERATORS_BY_TYPE, list_custom_field_keys
 from app.controllers.segment_sql import SegmentSQLError, run_sql_segment, sandbox_schema, schema_as_text
 from app.core.database import get_db
+from app.core.paging import paginate
 from app.core.security import get_current_user
 from app.models.user import User
 from app.schemas.segment import (
@@ -79,8 +80,15 @@ def suggest_sql(data: SegmentSQLSuggestRequest, db: Session = Depends(get_db), c
 
 
 @router.get("", response_model=list[SegmentOut])
-def list_segments(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return segment_controller.list_segments(db, current_user.org_id)
+def list_segments(
+    response: Response,
+    search: str | None = None,
+    page: int | None = None,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return paginate(segment_controller.query_segments(db, current_user.org_id, search), response, page, page_size)
 
 
 @router.post("", response_model=SegmentOut, status_code=status.HTTP_201_CREATED)

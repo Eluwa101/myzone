@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.controllers import form_controller
 from app.core.database import get_db
+from app.core.paging import paginate
 from app.core.security import get_current_user
 from app.models.user import User
 from app.schemas.form import FormCreate, FormOut, FormSubmissionOut, FormUpdate
@@ -13,8 +14,15 @@ router = APIRouter(prefix="/api/forms", tags=["forms"])
 
 
 @router.get("", response_model=list[FormOut])
-def list_forms(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return form_controller.list_forms(db, current_user.org_id)
+def list_forms(
+    response: Response,
+    search: str | None = None,
+    page: int | None = None,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return paginate(form_controller.query_forms(db, current_user.org_id, search), response, page, page_size)
 
 
 @router.post("", response_model=FormOut, status_code=status.HTTP_201_CREATED)
@@ -53,8 +61,15 @@ def delete_form(form_id: UUID, db: Session = Depends(get_db), current_user: User
 
 
 @router.get("/{form_id}/submissions", response_model=list[FormSubmissionOut])
-def list_submissions(form_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_submissions(
+    form_id: UUID,
+    response: Response,
+    page: int | None = None,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
-        return form_controller.list_submissions(db, current_user.org_id, form_id)
+        return paginate(form_controller.query_submissions(db, current_user.org_id, form_id), response, page, page_size)
     except form_controller.FormNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Form not found.")

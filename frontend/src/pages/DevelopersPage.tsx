@@ -45,7 +45,7 @@ const ENDPOINTS: { group: string; rows: [string, string, string][] }[] = [
   {
     group: "Orders (to be fulfilled)",
     rows: [
-      ["GET", "/api/orders", "All orders across customers"],
+      ["GET", "/api/orders", "All orders across customers - ?pending=true, ?search=, ?page=, ?page_size="],
       ["GET", "/api/customers/{id}/orders", "One customer's orders"],
       ["POST", "/api/customers/{id}/orders", "Create an order"],
       ["PATCH", "/api/customers/{id}/orders/{order_id}", "Update, e.g. mark paid or delivered"],
@@ -55,9 +55,10 @@ const ENDPOINTS: { group: string; rows: [string, string, string][] }[] = [
   {
     group: "Notes, segments and email",
     rows: [
-      ["GET", "/api/notes", "List notes"],
+      ["GET", "/api/notes", "List notes - ?search=, ?page=, ?page_size="],
+      ["GET", "/api/notes/{id}", "One note"],
       ["POST", "/api/notes", "Create a note, optionally attached to customers"],
-      ["GET", "/api/segments", "Saved segments"],
+      ["GET", "/api/segments", "Saved segments - ?search=, ?page=, ?page_size="],
       ["GET", "/api/segments/{id}/members", "Who is in a segment right now"],
       ["POST", "/api/messages/send", "Email customers - merge tags are filled in per person"],
     ],
@@ -175,7 +176,7 @@ export default function DevelopersPage() {
             <li>Requests and responses are JSON. Dates are <code>YYYY-MM-DD</code>; timestamps are ISO 8601 in UTC.</li>
             <li>Currencies are 3-letter codes (<code>NGN</code>, <code>USD</code>). If you leave one out, nothing is assumed for you.</li>
             <li>
-              Lists that can grow are paged with <code>page</code> (from 1) and <code>page_size</code>, and return <code>total</code>.
+              Lists that can grow are paged with <code>page</code> (from 1) and <code>page_size</code>. Customers return <code>total</code> in the body; orders, notes, segments, forms, webhooks, templates and message history keep returning a plain array, with the total match count in the <code>X-Total-Count</code> response header. Leave <code>page</code> out to get every match, as before.
             </li>
             <li>
               <b>Safe retries:</b> add an <code>Idempotency-Key</code> header (any unique string) to a <code>POST</code>,{" "}

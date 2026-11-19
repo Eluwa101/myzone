@@ -1,11 +1,11 @@
 import { Check, Eye, EyeOff, Mail, Pencil, Plus, Send, Trash2, X } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { errorMessage } from "../api/errorMessage";
 import {
   createEmailTemplate,
   deleteEmailTemplate,
-  listEmailTemplates,
+  listEmailTemplatesPaged,
   updateEmailTemplate,
   type EmailTemplate,
 } from "../api/messaging";
@@ -15,19 +15,21 @@ import MergeTagPicker from "../components/MergeTagPicker";
 import EmailBodyEditor, { type EmailBodyEditorHandle } from "../components/EmailBodyEditor";
 import HtmlPreviewFrame from "../components/HtmlPreviewFrame";
 import Spinner from "../components/Spinner";
+import Pagination from "../components/Pagination";
+import SearchBox from "../components/SearchBox";
 import TopBar from "../components/TopBar";
+import { usePagedList } from "../hooks/usePagedList";
+
+const PAGE_SIZE = 20;
 
 export default function EmailTemplatesPage() {
-  const [templates, setTemplates] = useState<EmailTemplate[] | null>(null);
   const [adding, setAdding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  function load() {
-    listEmailTemplates()
-      .then(setTemplates)
-      .catch((err) => setError(errorMessage(err)));
-  }
-  useEffect(load, []);
+  const list = usePagedList<EmailTemplate>({
+    fetcher: ({ search, page, pageSize }) => listEmailTemplatesPaged({ search, page, pageSize }),
+    pageSize: PAGE_SIZE,
+  });
+  const { items: templates, error } = list;
+  const load = list.reload;
 
   return (
     <div>
@@ -56,12 +58,15 @@ export default function EmailTemplatesPage() {
         </div>
       )}
 
-      {templates === null ? (
+      <div className="page-actions">
+        <SearchBox value={list.search} onChange={list.setSearch} label="Search templates" placeholder="Search template name or subject…" />
+      </div>
+      {list.loading ? (
         <Spinner />
       ) : templates.length === 0 ? (
         <div className="empty-state">
           <Mail size={40} className="empty-state-icon" strokeWidth={1.5} />
-          <p>No templates yet.</p>
+          <p>{list.searching ? "No templates match that search." : "No templates yet."}</p>
         </div>
       ) : (
         <div className="card-grid">
@@ -70,6 +75,7 @@ export default function EmailTemplatesPage() {
           ))}
         </div>
       )}
+      {!list.loading && <Pagination page={list.page} pageSize={PAGE_SIZE} total={list.total} onChange={list.goToPage} />}
     </div>
   );
 }

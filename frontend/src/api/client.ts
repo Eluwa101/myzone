@@ -77,6 +77,10 @@ async function fetchWithWakeRetry(input: string, init: RequestInit): Promise<Res
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return (await requestFull<T>(path, options)).body;
+}
+
+async function requestFull<T>(path: string, options: RequestInit = {}): Promise<{ body: T; headers: Headers }> {
   const token = getToken();
   const headers = new Headers(options.headers);
   if (options.body !== undefined) headers.set("Content-Type", "application/json");
@@ -89,7 +93,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError(0, "Could not reach the server. Please check your connection and try again.");
   }
 
-  if (res.status === 204) return undefined as T;
+  if (res.status === 204) return { body: undefined as T, headers: res.headers };
 
   const isJson = res.headers.get("content-type")?.includes("application/json") ?? false;
   const body = isJson ? await res.json() : await res.text();
@@ -111,13 +115,35 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const detail = isJson && body && typeof body === "object" && "detail" in body ? body.detail : body;
     throw new ApiError(res.status, detail);
   }
-  return body as T;
+  return { body: body as T, headers: res.headers };
+}
+
+export interface Paged<T> {
+  items: T[];
+  total: number;
 }
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
+  /** A list endpoint that returns a plain array plus its full match count in
+   * the X-Total-Count header (so the public API's array shape is unchanged). */
+  getPaged: async <T>(path: string): Promise<Paged<T>> => {
+    const { body, headers } = await requestFull<T[]>(path);
+    const total = Number(headers.get("X-Total-Count"));
+    return { items: body, total: Number.isFinite(total) && headers.has("X-Total-Count") ? total : body.length };
+  },
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: "POST", body: body !== undefined ? JSON.stringify(body) : undefined }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: "PATCH", body: JSON.stringify(body ?? {}) }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: "PUT", body: JSON.stringify(body ?? {}) }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
+
+/** ?a=1&b=2 from the defined, non-empty values (or "" if there are none). */
+export function queryString(params: Record<string, string | number | boolean | undefined | null>): string {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== "" && value !== false) qs.set(key, String(value));
+  }
+  const text = qs.toString();
+  return text ? `?${text}` : "";
+}

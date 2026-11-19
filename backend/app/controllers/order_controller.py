@@ -1,9 +1,12 @@
 from uuid import UUID
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.controllers import notification_controller, webhook_controller
 from app.controllers.customer_controller import get_customer
+from app.core.paging import contains_any, like_pattern
+from app.models.customer import Customer
 from app.models.order import Order
 from app.schemas.order import OrderCreate, OrderUpdate
 
@@ -46,11 +49,25 @@ def list_orders(db: Session, org_id: UUID, customer_id: UUID) -> list[Order]:
     )
 
 
-def list_all_orders(db: Session, org_id: UUID, pending_only: bool = False) -> list[Order]:
+def query_all_orders(db: Session, org_id: UUID, pending_only: bool = False, search: str | None = None):
     q = db.query(Order).options(joinedload(Order.customer)).filter(Order.org_id == org_id)
     if pending_only:
         q = q.filter(Order.delivered.is_(False))
-    return q.order_by(Order.order_date.desc()).all()
+    pattern = like_pattern(search)
+    if pattern:
+        q = q.filter(
+            or_(
+                contains_any(pattern, Order.notes, Order.items),
+                Order.customer_id.in_(
+                    db.query(Customer.id).filter(Customer.org_id == org_id, contains_any(pattern, Customer.name))
+                ),
+            )
+        )
+    return q.order_by(Order.order_date.desc(), Order.id)
+
+
+def list_all_orders(db: Session, org_id: UUID, pending_only: bool = False, search: str | None = None) -> list[Order]:
+    return query_all_orders(db, org_id, pending_only, search).all()
 
 
 def _get_order(db: Session, org_id: UUID, customer_id: UUID, order_id: UUID) -> Order:

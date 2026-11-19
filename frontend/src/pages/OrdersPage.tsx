@@ -1,14 +1,18 @@
 import { Heart, Package, Receipt } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { listAllOrders, type OrderWithCustomer } from "../api/orders";
-import { errorMessage } from "../api/errorMessage";
+import { listAllOrdersPaged, type OrderWithCustomer } from "../api/orders";
 import { getSummary } from "../api/summary";
 import type { InterestRollup } from "../api/types";
 import ErrorText from "../components/ErrorText";
+import Pagination from "../components/Pagination";
+import SearchBox from "../components/SearchBox";
 import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
+import { usePagedList } from "../hooks/usePagedList";
 import { avatarStyle, initials } from "../utils/avatar";
+
+const PAGE_SIZE = 20;
 
 function itemsToText(items: OrderWithCustomer["items"]): string {
   return items.map((i) => (i.qty && i.qty !== 1 ? `${i.name} x${i.qty}` : i.name)).join(", ") || "(no items)";
@@ -18,15 +22,26 @@ export default function OrdersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const pending = searchParams.get("pending") === "true";
 
-  const [orders, setOrders] = useState<OrderWithCustomer[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // switching tab keeps a typed search but starts again from page 1
+  function setPending(next: boolean) {
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        if (next) params.set("pending", "true");
+        else params.delete("pending");
+        params.delete("page");
+        return params;
+      },
+      { replace: true }
+    );
+  }
 
-  useEffect(() => {
-    setOrders(null);
-    listAllOrders({ pending })
-      .then(setOrders)
-      .catch((err) => setError(errorMessage(err)));
-  }, [pending]);
+  const list = usePagedList<OrderWithCustomer>({
+    fetcher: ({ search, page, pageSize }) => listAllOrdersPaged({ pending, search, page, pageSize }),
+    pageSize: PAGE_SIZE,
+    filterKey: String(pending),
+  });
+  const { items: orders, loading, error } = list;
 
   return (
     <div>
@@ -34,21 +49,24 @@ export default function OrdersPage() {
 
       <div className="page-actions">
         <div className="segmented" role="tablist" aria-label="Filter orders">
-          <button type="button" role="tab" aria-selected={!pending} className={!pending ? "active" : ""} onClick={() => setSearchParams({}, { replace: true })}>
+          <button type="button" role="tab" aria-selected={!pending} className={!pending ? "active" : ""} onClick={() => setPending(false)}>
             All orders
           </button>
-          <button type="button" role="tab" aria-selected={pending} className={pending ? "active" : ""} onClick={() => setSearchParams({ pending: "true" }, { replace: true })}>
+          <button type="button" role="tab" aria-selected={pending} className={pending ? "active" : ""} onClick={() => setPending(true)}>
             Awaiting delivery
           </button>
         </div>
+        <SearchBox value={list.search} onChange={list.setSearch} label="Search orders" placeholder="Search customer, item, note…" />
       </div>
 
       <ErrorText message={error} />
-      {!orders ? (
+      {loading ? (
         <Spinner />
       ) : (
         orders.length === 0 ? (
-          <p className="muted small page-note">{pending ? "No orders awaiting delivery." : "No orders yet."}</p>
+          <p className="muted small page-note">
+            {list.searching ? "No orders match that search." : pending ? "No orders awaiting delivery." : "No orders yet."}
+          </p>
         ) : (
           <div className="card-grid">
             {orders.map((o) => (
@@ -73,6 +91,8 @@ export default function OrdersPage() {
           </div>
         )
       )}
+
+      {!loading && <Pagination page={list.page} pageSize={PAGE_SIZE} total={list.total} onChange={list.goToPage} />}
 
       <InterestedInSection />
     </div>

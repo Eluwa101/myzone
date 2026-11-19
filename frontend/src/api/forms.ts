@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, queryString, type Paged } from "./client";
 import type { CustomForm, FormFieldDef, FormSubmission, PublicForm } from "./types";
 
 export interface FormInput {
@@ -39,4 +39,12 @@ export function getPublicForm(token: string): Promise<PublicForm> {
 
 export function submitPublicForm(token: string, data: Record<string, unknown>): Promise<{ status: string; customer_created: boolean }> {
   return api.post(`/api/public/forms/${token}/submit`, data);
+}
+
+export function listSubmissionsPaged(formId: string, params: { page: number; pageSize: number }): Promise<Paged<FormSubmission>> {
+  return api.getPaged<FormSubmission>(`/api/forms/${formId}/submissions${queryString({ page: params.page, page_size: params.pageSize })}`);
+}
+
+export function listFormsPaged(params: { search?: string; page: number; pageSize: number }): Promise<Paged<CustomForm>> {
+  return api.getPaged<CustomForm>(`/api/forms${queryString({ search: params.search, page: params.page, page_size: params.pageSize })}`);
 }

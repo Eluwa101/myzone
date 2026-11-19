@@ -26,7 +26,9 @@ const LegalPage = lazy(() => import("./pages/LegalPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const MessageComposePage = lazy(() => import("./pages/MessageComposePage"));
 const MessagesPage = lazy(() => import("./pages/MessagesPage"));
+const MessageDetailPage = lazy(() => import("./pages/MessageDetailPage"));
 const NotesPage = lazy(() => import("./pages/NotesPage"));
+const NoteDetailPage = lazy(() => import("./pages/NoteDetailPage"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 const OrdersPage = lazy(() => import("./pages/OrdersPage"));
 const PublicFormPage = lazy(() => import("./pages/PublicFormPage"));
@@ -69,8 +71,10 @@ export default function App() {
             <Route path="/dashboard/interests" element={<DashboardInterestsPage />} />
             <Route path="/ask" element={<AskDataPage />} />
             <Route path="/notes" element={<NotesPage />} />
+            <Route path="/notes/:id" element={<NoteDetailPage />} />
             <Route path="/messages" element={<MessagesPage />} />
             <Route path="/messages/compose" element={<MessageComposePage />} />
+            <Route path="/messages/:id" element={<MessageDetailPage />} />
             <Route path="/messages/templates" element={<EmailTemplatesPage />} />
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/forms" element={<FormsPage />} />

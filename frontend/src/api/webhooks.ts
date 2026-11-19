@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, queryString, type Paged } from "./client";
 import type { WebhookDelivery, WebhookSubscription } from "./types";
 
 export interface WebhookSubscriptionInput {
@@ -31,4 +31,12 @@ export function deleteSubscription(id: string): Promise<void> {
 
 export function listDeliveries(id: string): Promise<WebhookDelivery[]> {
   return api.get<WebhookDelivery[]>(`/api/webhooks/${id}/deliveries`);
+}
+
+export function listDeliveriesPaged(id: string, params: { page: number; pageSize: number }): Promise<Paged<WebhookDelivery>> {
+  return api.getPaged<WebhookDelivery>(`/api/webhooks/${id}/deliveries${queryString({ page: params.page, page_size: params.pageSize })}`);
+}
+
+export function listSubscriptionsPaged(params: { search?: string; page: number; pageSize: number }): Promise<Paged<WebhookSubscription>> {
+  return api.getPaged<WebhookSubscription>(`/api/webhooks${queryString({ search: params.search, page: params.page, page_size: params.pageSize })}`);
 }

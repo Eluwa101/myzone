@@ -1,15 +1,22 @@
 import { Check, ClipboardList, Copy, ExternalLink, Inbox, Link2, Package, Pencil, Power, PowerOff, QrCode, RefreshCw, ShoppingBag, Trash2, User, Webhook, X } from "lucide-react";
 import QRCodeLib from "qrcode";
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { BASE_URL } from "../api/client";
-import { createForm, deleteForm, listForms, listSubmissions, updateForm } from "../api/forms";
+import { createForm, deleteForm, listFormsPaged, listSubmissionsPaged, updateForm } from "../api/forms";
 import { errorMessage } from "../api/errorMessage";
 import type { CustomForm, FormFieldCategory, FormFieldDef, FormFieldType, FormSubmission } from "../api/types";
 import CardHead from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
+import Pagination from "../components/Pagination";
+import SearchBox from "../components/SearchBox";
 import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
+import { useLocalPagedList } from "../hooks/useLocalPagedList";
+import { usePagedList } from "../hooks/usePagedList";
+
+const PAGE_SIZE = 20;
+const SUB_PAGE_SIZE = 10;
 
 const CUSTOMER_FIELD_OPTIONS: { key: string; label: string; type: FormFieldType }[] = [
   { key: "first_name", label: "First name", type: "text" },
@@ -94,18 +101,14 @@ function slugify(label: string): string {
 }
 
 export default function FormsPage() {
-  const [forms, setForms] = useState<CustomForm[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [template, setTemplate] = useState<FormTemplate | null>(null);
-
-  function load() {
-    listForms()
-      .then(setForms)
-      .catch((err) => setError(errorMessage(err)));
-  }
-
-  useEffect(load, []);
+  const list = usePagedList<CustomForm>({
+    fetcher: ({ search, page, pageSize }) => listFormsPaged({ search, page, pageSize }),
+    pageSize: PAGE_SIZE,
+  });
+  const { items: forms, error } = list;
+  const load = list.reload;
 
   function cancelCreate() {
     setCreating(false);
@@ -127,6 +130,7 @@ export default function FormsPage() {
           <button type="button" className="btn-primary" onClick={() => setCreating(true)}>
             + New form
           </button>
+          <SearchBox value={list.search} onChange={list.setSearch} label="Search forms" placeholder="Search forms…" />
         </div>
       )}
       <div className={creating ? "card form-card" : undefined}>
@@ -153,10 +157,10 @@ export default function FormsPage() {
         )}
       </div>
 
-      {!forms ? (
+      {list.loading ? (
         <Spinner />
       ) : forms.length === 0 ? (
-        <p className="muted small page-note">No forms yet.</p>
+        <p className="muted small page-note">{list.searching ? "No forms match that search." : "No forms yet."}</p>
       ) : (
         <div className="card-grid">
           {forms.map((f) => (
@@ -164,6 +168,7 @@ export default function FormsPage() {
           ))}
         </div>
       )}
+      {!list.loading && <Pagination page={list.page} pageSize={PAGE_SIZE} total={list.total} onChange={list.goToPage} />}
     </div>
   );
 }
@@ -373,13 +378,13 @@ function WebhookPanel({ form, onChanged, open }: { form: CustomForm; onChanged: 
 }
 
 function SubmissionsList({ formId, fields }: { formId: string; fields: FormFieldDef[] }) {
-  const [items, setItems] = useState<FormSubmission[] | null>(null);
+  const { items, total, page, setPage } = useLocalPagedList<FormSubmission>(
+    (p, size) => listSubmissionsPaged(formId, { page: p, pageSize: size }),
+    SUB_PAGE_SIZE,
+    formId
+  );
   const labelByKey = new Map(fields.map((f) => [f.key, f.label]));
   const categoryByKey = new Map(fields.map((f) => [f.key, f.category]));
-
-  useEffect(() => {
-    listSubmissions(formId).then(setItems);
-  }, [formId]);
 
   if (!items) return <p className="muted small">Loading…</p>;
   if (items.length === 0) return <p className="muted small">No submissions yet.</p>;
@@ -412,6 +417,7 @@ function SubmissionsList({ formId, fields }: { formId: string; fields: FormField
           </div>
         </div>
       ))}
+      <Pagination page={page} pageSize={SUB_PAGE_SIZE} total={total} onChange={setPage} />
     </div>
   );
 }

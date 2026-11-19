@@ -1,10 +1,13 @@
+import html
+import re
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.controllers import messaging_controller
 from app.core.database import get_db
+from app.core.paging import paginate
 from app.agent.email_draft import EmailDraftError, draft_email
 from app.controllers import segment_controller
 from app.controllers.merge_tag_suggestions import describe_segment, suggest_for_segment
@@ -12,7 +15,7 @@ from app.core.merge_tags import TAG_PATTERN, available_merge_tags, find_placehol
 from app.models.org_settings import OrgSettings
 from app.models.organization import Organization
 from app.core.security import get_current_user
-from app.models.outbound_message import OutboundMessage
+from app.models.outbound_message import MessageChannel, MessageStatus, OutboundMessage
 from app.models.user import User
 from app.schemas.messaging import (
     EmailDraftOut,
@@ -23,6 +26,7 @@ from app.schemas.messaging import (
     MergeTagOut,
     MessagePreviewOut,
     MessagePreviewRequest,
+    OutboundMessageDetailOut,
     OutboundMessageOut,
     SendEmailRequest,
     SendEmailResult,
@@ -38,8 +42,15 @@ def list_merge_tags(db: Session = Depends(get_db), current_user: User = Depends(
 
 
 @router.get("/templates", response_model=list[EmailTemplateOut])
-def list_templates(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return messaging_controller.list_templates(db, current_user.org_id)
+def list_templates(
+    response: Response,
+    search: str | None = None,
+    page: int | None = None,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return paginate(messaging_controller.query_templates(db, current_user.org_id, search), response, page, page_size)
 
 
 @router.post("/templates", response_model=EmailTemplateOut, status_code=status.HTTP_201_CREATED)
@@ -143,14 +154,49 @@ def send(data: SendEmailRequest, db: Session = Depends(get_db), current_user: Us
     return messaging_controller.send_email_batch(db, current_user.org_id, data)
 
 
+def _preview(body: str, length: int = 160) -> str:
+    text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", body or "", flags=re.IGNORECASE | re.DOTALL)
+    text = html.unescape(re.sub(r"<[^>]+>", " ", text))
+    text = re.sub(r"\s+", " ", text).strip()
+    return text if len(text) <= length else text[: length - 1].rstrip() + "…"
+
+
+def _message_out(m: OutboundMessage, with_body: bool = False):
+    fields = dict(
+        id=m.id,
+        customer_id=m.customer_id,
+        customer_name=m.customer.name if m.customer else None,
+        channel=m.channel.value,
+        status=m.status.value,
+        subject=m.subject,
+        body_preview=_preview(m.body),
+        error=m.error,
+        created_at=m.created_at,
+    )
+    return OutboundMessageDetailOut(**fields, body=m.body) if with_body else OutboundMessageOut(**fields)
+
+
 @router.get("/history", response_model=list[OutboundMessageOut])
 def history(
+    response: Response,
     customer_id: UUID | None = None,
+    channel: MessageChannel | None = None,
+    status_filter: MessageStatus | None = Query(default=None, alias="status"),
+    search: str | None = None,
+    page: int | None = None,
+    page_size: int = 20,
     limit: int = 50,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = db.query(OutboundMessage).filter(OutboundMessage.org_id == current_user.org_id)
-    if customer_id:
-        q = q.filter(OutboundMessage.customer_id == customer_id)
-    return q.order_by(OutboundMessage.created_at.desc()).limit(limit).all()
+    q = messaging_controller.query_history(db, current_user.org_id, customer_id, channel, status_filter, search)
+    # without ?page= the old "most recent `limit`" behaviour is kept
+    return [_message_out(m) for m in paginate(q, response, page, page_size, limit=limit)]
+
+
+@router.get("/history/{message_id}", response_model=OutboundMessageDetailOut)
+def history_detail(message_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    try:
+        return _message_out(messaging_controller.get_history_message(db, current_user.org_id, message_id), with_body=True)
+    except messaging_controller.OutboundMessageNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found.")

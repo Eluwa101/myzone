@@ -1,8 +1,10 @@
 from uuid import UUID
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.controllers import notification_controller, webhook_controller
+from app.core.paging import contains_any, like_pattern
 from app.models.customer import Customer
 from app.models.org_note import OrgNote
 from app.schemas.note import NoteCreate, NoteUpdate
@@ -42,13 +44,33 @@ def create_note(
     return note
 
 
-def list_notes(db: Session, org_id: UUID, customer_id: UUID | None = None, pending_only: bool = False) -> list[OrgNote]:
+def query_notes(
+    db: Session, org_id: UUID, customer_id: UUID | None = None, pending_only: bool = False, search: str | None = None
+):
     q = db.query(OrgNote).options(joinedload(OrgNote.customers)).filter(OrgNote.org_id == org_id)
     if customer_id:
-        q = q.join(OrgNote.customers).filter(Customer.id == customer_id)
+        q = q.filter(OrgNote.customers.any(Customer.id == customer_id))
     if pending_only:
         q = q.filter(OrgNote.is_pending_review.is_(True))
-    return q.order_by(OrgNote.created_at.desc()).all()
+    pattern = like_pattern(search)
+    if pattern:
+        q = q.filter(
+            or_(
+                contains_any(pattern, OrgNote.title, OrgNote.content),
+                OrgNote.customers.any(contains_any(pattern, Customer.name)),
+            )
+        )
+    return q.order_by(OrgNote.created_at.desc(), OrgNote.id)
+
+
+def list_notes(
+    db: Session, org_id: UUID, customer_id: UUID | None = None, pending_only: bool = False, search: str | None = None
+) -> list[OrgNote]:
+    return query_notes(db, org_id, customer_id, pending_only, search).all()
+
+
+def get_note(db: Session, org_id: UUID, note_id: UUID) -> OrgNote:
+    return _get_note(db, org_id, note_id)
 
 
 def count_pending(db: Session, org_id: UUID) -> int:

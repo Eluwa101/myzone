@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.controllers import webhook_controller
 from app.core.database import get_db
+from app.core.paging import paginate
 from app.core.security import get_current_user
 from app.models.user import User
 from app.schemas.webhook import (
@@ -24,8 +25,15 @@ def list_event_types():
 
 
 @router.get("", response_model=list[WebhookSubscriptionOut])
-def list_subscriptions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return webhook_controller.list_subscriptions(db, current_user.org_id)
+def list_subscriptions(
+    response: Response,
+    search: str | None = None,
+    page: int | None = None,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return paginate(webhook_controller.query_subscriptions(db, current_user.org_id, search), response, page, page_size)
 
 
 @router.post("", response_model=WebhookSubscriptionOut, status_code=status.HTTP_201_CREATED)
@@ -56,8 +64,17 @@ def delete_subscription(subscription_id: UUID, db: Session = Depends(get_db), cu
 
 
 @router.get("/{subscription_id}/deliveries", response_model=list[WebhookDeliveryOut])
-def list_deliveries(subscription_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_deliveries(
+    subscription_id: UUID,
+    response: Response,
+    page: int | None = None,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
-        return webhook_controller.list_deliveries(db, current_user.org_id, subscription_id)
+        return paginate(
+            webhook_controller.query_deliveries(db, current_user.org_id, subscription_id), response, page, page_size, limit=50
+        )
     except webhook_controller.WebhookSubscriptionNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook subscription not found.")

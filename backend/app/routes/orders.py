@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.controllers import customer_controller, order_controller
 from app.core.database import get_db
+from app.core.paging import paginate
 from app.core.security import get_current_user
 from app.models.user import User
 from app.schemas.order import OrderCreate, OrderOut, OrderUpdate, OrderWithCustomerOut
@@ -16,11 +17,15 @@ all_orders_router = APIRouter(prefix="/api/orders", tags=["orders"])
 
 @all_orders_router.get("", response_model=list[OrderWithCustomerOut])
 def list_all_orders(
+    response: Response,
     pending: bool = False,
+    search: str | None = None,
+    page: int | None = None,
+    page_size: int = 20,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    orders = order_controller.list_all_orders(db, current_user.org_id, pending_only=pending)
+    orders = paginate(order_controller.query_all_orders(db, current_user.org_id, pending, search), response, page, page_size)
     return [
         OrderWithCustomerOut(
             id=o.id,
