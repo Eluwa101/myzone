@@ -12,6 +12,7 @@ import NoteForm from "../components/NoteForm";
 import Pagination from "../components/Pagination";
 import SearchBox from "../components/SearchBox";
 import Spinner from "../components/Spinner";
+import InfoTip from "../components/InfoTip";
 import TopBar from "../components/TopBar";
 import { usePagedList } from "../hooks/usePagedList";
 
@@ -38,10 +39,11 @@ export default function NotesPage() {
 
   return (
     <div>
-      <TopBar title="Notes" backTo="/data" />
-      <p className="muted small page-note">
-        Define your own notes - creditors, VIPs, anything you want to flag - and attach them to one or many customers.
-      </p>
+      <TopBar
+        title="Notes"
+        backTo="/data"
+        actions={<InfoTip>Define your own notes - creditors, VIPs, anything you want to flag - and attach them to one or many customers.</InfoTip>}
+      />
 
       <ErrorText message={error} />
 

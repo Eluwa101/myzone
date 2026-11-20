@@ -27,7 +27,6 @@ const ICONS: Record<string, LucideIcon> = {
   email: Mail,
   sms: MessageCircle,
   whatsapp: MessageCircle,
-  whatsapp_opened: MessageCircle,
   order_created: ShoppingBag,
   order_updated: Pencil,
   order_deleted: Trash2,

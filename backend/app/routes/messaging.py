@@ -9,6 +9,7 @@ from app.controllers import messaging_controller
 from app.core.database import get_db
 from app.core.paging import paginate
 from app.agent.email_draft import EmailDraftError, draft_email
+from app.agent.rewrite import RewriteError, build_rewrite_context, rewrite_message
 from app.controllers import segment_controller
 from app.controllers.merge_tag_suggestions import describe_segment, suggest_for_segment
 from app.core.merge_tags import TAG_PATTERN, available_merge_tags, find_placeholders, merge_tag_problems
@@ -24,8 +25,13 @@ from app.schemas.messaging import (
     EmailTemplateOut,
     EmailTemplateUpdate,
     MergeTagOut,
+    MessagePreviewBatchItem,
+    MessagePreviewBatchOut,
+    MessagePreviewBatchRequest,
     MessagePreviewOut,
     MessagePreviewRequest,
+    RewriteOut,
+    RewriteRequest,
     OutboundMessageDetailOut,
     OutboundMessageOut,
     SendEmailRequest,
@@ -90,6 +96,25 @@ def preview(data: MessagePreviewRequest, db: Session = Depends(get_db), current_
     )
 
 
+@router.post("/preview-batch", response_model=MessagePreviewBatchOut)
+def preview_batch(data: MessagePreviewBatchRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """The same merge-tag resolution as /preview, for up to 50 customers at once
+    - used to fill a page of WhatsApp chats in one request."""
+    previews, missing = [], []
+    for customer_id in dict.fromkeys(data.customer_ids):
+        result = messaging_controller.preview(db, current_user.org_id, customer_id, data.subject, data.body_html)
+        if result is None:
+            missing.append(customer_id)
+        else:
+            previews.append(MessagePreviewBatchItem(customer_id=customer_id, subject=result[0], body_html=result[1]))
+    return MessagePreviewBatchOut(
+        previews=previews,
+        problems=merge_tag_problems(db, current_user.org_id, data.subject, data.body_html),
+        placeholders=find_placeholders(data.subject, data.body_html),
+        missing=missing,
+    )
+
+
 def _segment_or_404(db: Session, org_id, segment_id: UUID):
     try:
         return segment_controller.get_segment(db, org_id, segment_id)
@@ -142,6 +167,24 @@ def draft(data: EmailDraftRequest, db: Session = Depends(get_db), current_user: 
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Couldn't write that email - try describing it differently.",
         )
+
+
+@router.post("/rewrite", response_model=RewriteOut)
+def rewrite(data: RewriteRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Shorten, reformat, make friendlier or rewrite a message that is already written.
+    With keep_merge_tags on, every merge tag is guaranteed to come back as it went in -
+    otherwise the original is returned with a warning, never a damaged message."""
+    org_id = current_user.org_id
+    business_text, tags_text = build_rewrite_context(db, org_id)
+    try:
+        result = rewrite_message(
+            channel=data.channel, action=data.action, body=data.body, subject=data.subject, instruction=data.instruction,
+            keep_merge_tags=data.keep_merge_tags, tags_text=tags_text, business_text=business_text,
+            check=lambda subject, body: merge_tag_problems(db, org_id, subject, body),
+        )
+    except RewriteError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e).capitalize() + ".")
+    return {**result, "placeholders": find_placeholders(result["subject"] or "", result["body"])}
 
 
 @router.post("/send", response_model=SendEmailResult)

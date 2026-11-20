@@ -11,6 +11,7 @@ import {
 } from "../api/messaging";
 import CardHead from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
+import InfoTip from "../components/InfoTip";
 import MergeTagPicker from "../components/MergeTagPicker";
 import EmailBodyEditor, { type EmailBodyEditorHandle } from "../components/EmailBodyEditor";
 import HtmlPreviewFrame from "../components/HtmlPreviewFrame";
@@ -35,8 +36,11 @@ export default function EmailTemplatesPage() {
     <div>
       <TopBar title="Email templates" backTo="/messages" />
       <p className="muted small page-note">
-        Reusable email content with merge tags - pick one from the compose screen instead of writing from scratch each time.
-        Switch the body to HTML to design with tables, colours and images.
+        Reusable email content.{" "}
+        <InfoTip>
+          Reusable email content with merge tags - pick one from the compose screen instead of writing from scratch each time.
+          Switch the body to HTML to design with tables, colours and images.
+        </InfoTip>
       </p>
       <ErrorText message={error} />
 

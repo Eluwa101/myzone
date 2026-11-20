@@ -6,6 +6,7 @@ import { errorMessage } from "../api/errorMessage";
 import type { ImportResult } from "../api/types";
 import type { CardTone } from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
+import InfoTip from "../components/InfoTip";
 import TopBar from "../components/TopBar";
 
 const TILES: { to: string; title: string; text: string; icon: ReactNode; tone: CardTone }[] = [
@@ -20,8 +21,9 @@ const TILES: { to: string; title: string; text: string; icon: ReactNode; tone: C
 function SectionHead({ title, text }: { title: string; text: string }) {
   return (
     <div className="section-head">
-      <h2>{title}</h2>
-      <p className="muted small">{text}</p>
+      <h2>
+        {title} <InfoTip>{text}</InfoTip>
+      </h2>
     </div>
   );
 }
@@ -94,9 +96,9 @@ export default function DataPage() {
       <div className="card-grid">
       <div className="card">
         <h3>
-          <Download size={15} className="h3-icon" /> Export customers
+          <Download size={15} className="h3-icon" /> Export customers{" "}
+          <InfoTip>Download every customer and their transactions as a CSV file.</InfoTip>
         </h3>
-        <p className="muted small">Download every customer and their transactions as a CSV file.</p>
         <button className="btn-primary" onClick={onExport}>
           <Download size={15} /> Export CSV
         </button>
@@ -105,12 +107,12 @@ export default function DataPage() {
 
       <div className="card">
         <h3>
-          <Upload size={15} className="h3-icon" /> Import customers
+          <Upload size={15} className="h3-icon" /> Import customers{" "}
+          <InfoTip>
+            Only a name column is required. Common headings (Phone, Occupation, Country, Product, Price…) are recognized, and
+            other columns become custom fields. Duplicates are merged automatically.
+          </InfoTip>
         </h3>
-        <p className="muted small">
-          Only a name column is required. Common headings (Phone, Occupation, Country, Product, Price…) are recognized, and
-          other columns become custom fields. Duplicates are merged automatically.
-        </p>
         <input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={onFileChosen} />
         <label htmlFor="import-paste">…or paste CSV text (first line = column names)</label>
         <textarea id="import-paste" rows={6} value={importText} onChange={(e) => setImportText(e.target.value)} />

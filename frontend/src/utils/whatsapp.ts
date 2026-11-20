@@ -75,3 +75,15 @@ export function htmlToPlainText(html: string): string {
   doc.querySelectorAll("p, div, li, tr, h1, h2, h3, h4, blockquote").forEach((node) => node.append(doc.createTextNode("\n")));
   return (doc.body.textContent ?? "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
+
+/** The reverse of htmlToPlainText, for text typed straight into the WhatsApp box:
+ *  HTML-escapes it and turns line breaks into <br> so it can go through the same
+ *  merge-tag resolver as an email body. `{{ ... }}` tags are left exactly as typed -
+ *  escaping them would break conditions like {{#if total > 100}}. */
+export function plainTextToHtml(text: string): string {
+  const escape = (part: string) => part.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\r?\n/g, "<br>");
+  return text
+    .split(/(\{\{[\s\S]*?\}\})/g)
+    .map((part, i) => (i % 2 === 1 ? part : escape(part)))
+    .join("");
+}

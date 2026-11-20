@@ -18,6 +18,9 @@ class MessageStatus(str, enum.Enum):
     sent = "sent"
     failed = "failed"
     skipped = "skipped"
+    # WhatsApp only: the chat was opened with the message pre-filled. wa.me
+    # can't tell us whether it was then actually sent.
+    opened = "opened"
 
 
 class OutboundMessage(Base):

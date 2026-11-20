@@ -1,5 +1,7 @@
 import { Check, ChevronRight, Trash2 } from "lucide-react";
 import { useState } from "react";
+import CardMenu from "./CardMenu";
+import InfoTip from "./InfoTip";
 
 export interface SelectOption {
   value: string;
@@ -31,12 +33,10 @@ export default function InfoFieldRow({
 }: InfoFieldRowProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value ?? "");
-  const [armedDelete, setArmedDelete] = useState(false);
   const [busy, setBusy] = useState(false);
 
   function startEdit() {
     setDraft(value ?? "");
-    setArmedDelete(false);
     setOpen(true);
   }
 
@@ -52,10 +52,6 @@ export default function InfoFieldRow({
 
   async function remove() {
     if (!onDelete) return;
-    if (!armedDelete) {
-      setArmedDelete(true);
-      return;
-    }
     setBusy(true);
     try {
       await onDelete();
@@ -79,8 +75,10 @@ export default function InfoFieldRow({
 
   return (
     <div className="info-row-editing">
-      <label className="info-row-label">{label}</label>
-      {type === "tel" && <p className="muted small">Include the country code to use WhatsApp links, e.g. +234 801 234 5678.</p>}
+      <div className="row" style={{ gap: 4, marginBottom: 2 }}>
+        <label className="info-row-label" style={{ marginBottom: 0 }}>{label}</label>
+        {type === "tel" && <InfoTip label="About phone numbers">Include the country code to use WhatsApp links, e.g. +234 801 234 5678.</InfoTip>}
+      </div>
       {type === "textarea" ? (
         <textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={placeholder} autoFocus />
       ) : type === "select" ? (
@@ -103,9 +101,12 @@ export default function InfoFieldRow({
           Cancel
         </button>
         {deletable && onDelete && (
-          <button type="button" className="btn-danger" onClick={remove} disabled={busy} style={{ marginLeft: "auto" }}>
-            <Trash2 size={15} /> {armedDelete ? "Confirm?" : "Delete"}
-          </button>
+          <div style={{ marginLeft: "auto" }}>
+            <CardMenu
+              label={`More actions for ${label}`}
+              items={[{ key: "delete", label: "Delete", icon: <Trash2 />, danger: true, confirm: "Really delete?", disabled: busy, onSelect: remove }]}
+            />
+          </div>
         )}
       </div>
     </div>

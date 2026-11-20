@@ -4,6 +4,7 @@ import { askData } from "../api/agent";
 import { errorMessage } from "../api/errorMessage";
 import { createWidget } from "../api/widgets";
 import ErrorText from "../components/ErrorText";
+import InfoTip from "../components/InfoTip";
 import MarkdownMessage from "../components/MarkdownMessage";
 import TopBar from "../components/TopBar";
 import { useVoiceAutoSend } from "../hooks/useVoiceAutoSend";
@@ -74,17 +75,19 @@ export default function AskDataPage() {
       <TopBar
         title="Ask your data"
         actions={
-          messages.length > 0 ? (
-            <button className="btn-ghost icon-btn" onClick={() => setMessages([])} aria-label="New chat" title="New chat">
-              <SquarePen size={18} />
-            </button>
-          ) : undefined
+          <>
+            <InfoTip>
+              Read-only — looks across all your customers to answer questions, but can never change a record. Ask it to edit
+              something and it'll tell you how to do that in the app instead.
+            </InfoTip>
+            {messages.length > 0 && (
+              <button className="btn-ghost icon-btn" onClick={() => setMessages([])} aria-label="New chat" title="New chat">
+                <SquarePen size={18} />
+              </button>
+            )}
+          </>
         }
       />
-      <p className="muted small page-note">
-        Read-only — looks across all your customers to answer questions, but can never change a record. Ask it to edit
-        something and it'll tell you how to do that in the app instead.
-      </p>
 
       {messages.length === 0 && (
         <div className="row page-note" style={{ flexWrap: "wrap" }}>

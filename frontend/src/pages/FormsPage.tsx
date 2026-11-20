@@ -8,6 +8,7 @@ import { errorMessage } from "../api/errorMessage";
 import type { CustomForm, FormFieldCategory, FormFieldDef, FormFieldType, FormSubmission } from "../api/types";
 import CardHead from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
+import InfoTip from "../components/InfoTip";
 import Pagination from "../components/Pagination";
 import SearchBox from "../components/SearchBox";
 import Spinner from "../components/Spinner";
@@ -119,9 +120,12 @@ export default function FormsPage() {
     <div>
       <TopBar title="Forms" backTo="/data" />
       <p className="muted small page-note">
-        Build a custom intake form, share its link with customers, or use the link's API directly from Zapier, a Google
-        Form's Apps Script, or any other tool that can POST JSON. Every form always collects first name, last name, phone,
-        and email.
+        Share a form link with customers, or POST to it from other tools.{" "}
+        <InfoTip>
+          Build a custom intake form, share its link with customers, or use the link's API directly from Zapier, a Google
+          Form's Apps Script, or any other tool that can POST JSON. Every form always collects first name, last name,
+          phone, and email.
+        </InfoTip>
       </p>
       <ErrorText message={error} />
 
@@ -327,11 +331,13 @@ function WebhookPanel({ form, onChanged, open }: { form: CustomForm; onChanged: 
     <div>
       {open && (
         <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
-          <p className="muted small">
-            POST JSON matching this form's field keys to the URL below from Zapier, Make, or any other tool - it behaves
-            exactly like a submission, including creating or updating the matching customer record.
-          </p>
-          <label>Webhook URL (POST)</label>
+          <label>
+            Webhook URL (POST){" "}
+            <InfoTip>
+              POST JSON matching this form's field keys to the URL below from Zapier, Make, or any other tool - it behaves
+              exactly like a submission, including creating or updating the matching customer record.
+            </InfoTip>
+          </label>
           <div className="row" style={{ alignItems: "center" }}>
             <code className="small" style={{ wordBreak: "break-all" }}>
               {submitUrl}

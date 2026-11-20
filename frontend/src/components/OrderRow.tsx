@@ -6,6 +6,7 @@ import type { Order } from "../api/types";
 import { listOutbox, subscribeOutbox } from "../offline/outbox";
 import { withOfflineFallback } from "../offline/queue";
 import CurrencySelect from "./CurrencySelect";
+import CardMenu from "./CardMenu";
 import ErrorText from "./ErrorText";
 import OrderItemsEditor, { hasPricedItems, itemsTotal } from "./OrderItemsEditor";
 import PendingSyncBadge from "./PendingSyncBadge";
@@ -32,7 +33,6 @@ export default function OrderRow({
   const [paid, setPaid] = useState(order.paid);
   const [delivered, setDelivered] = useState(order.delivered);
   const [error, setError] = useState<string | null>(null);
-  const [armedDelete, setArmedDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [queuedOverride, setQueuedOverride] = useState<Partial<Order> | null>(null);
   const [queuedId, setQueuedId] = useState<string | null>(null);
@@ -60,7 +60,6 @@ export default function OrderRow({
     setCurrency(order.currency ?? "");
     setPaid(order.paid);
     setDelivered(order.delivered);
-    setArmedDelete(false);
     setError(null);
     setOpen(true);
   }
@@ -104,10 +103,6 @@ export default function OrderRow({
   }
 
   async function remove() {
-    if (!armedDelete) {
-      setArmedDelete(true);
-      return;
-    }
     setBusy(true);
     try {
       await deleteOrder(customerId, order.id);
@@ -177,9 +172,12 @@ export default function OrderRow({
         <button type="button" onClick={() => setOpen(false)} disabled={busy}>
           Cancel
         </button>
-        <button type="button" className="btn-danger" onClick={remove} disabled={busy} style={{ marginLeft: "auto" }}>
-          <Trash2 size={15} /> {armedDelete ? "Confirm?" : "Delete"}
-        </button>
+        <div style={{ marginLeft: "auto" }}>
+          <CardMenu
+            label="More actions"
+            items={[{ key: "delete", label: "Delete order", icon: <Trash2 />, danger: true, confirm: "Really delete?", disabled: busy, onSelect: remove }]}
+          />
+        </div>
       </div>
     </div>
   );

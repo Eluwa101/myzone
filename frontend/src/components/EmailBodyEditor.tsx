@@ -1,5 +1,6 @@
 import { Code2, LayoutTemplate, Type } from "lucide-react";
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { looksLikeCustomHtml } from "../utils/composer";
 import HtmlPreviewFrame from "./HtmlPreviewFrame";
 import RichTextEditor, { type RichTextEditorHandle } from "./RichTextEditor";
 
@@ -8,12 +9,6 @@ export interface EmailBodyEditorHandle {
 }
 
 type Mode = "visual" | "html";
-
-/** Markup the visual editor can't represent - opening it there would
- * silently strip the layout, so a body like this starts in HTML mode. */
-export function looksLikeCustomHtml(html: string): boolean {
-  return /<(table|style|div|section|center|font)\b|<[a-z0-9]+[^>]*\sstyle\s*=\s*["'][^"']*(background|border|padding|width|font-family)/i.test(html);
-}
 
 /** The visual editor's idea of "empty" is <p><br></p>, not "". */
 function isBlank(html: string): boolean {

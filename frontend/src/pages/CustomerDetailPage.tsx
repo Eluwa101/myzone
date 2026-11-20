@@ -1,7 +1,8 @@
 import { Bot, Check, History, Mail, Mic, Pencil, Plus, Receipt, Send, ShoppingBag, Square, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ActivityLog from "../components/ActivityLog";
+import ComposeSheet from "../components/ComposeSheet";
 import CardMenu from "../components/CardMenu";
 import {
   addOrder,
@@ -23,6 +24,7 @@ import type { Customer, CustomerStatus, Order, OrgNote, PendingAction } from "..
 import CurrencySelect from "../components/CurrencySelect";
 import ErrorText from "../components/ErrorText";
 import InfoFieldRow from "../components/InfoFieldRow";
+import InfoTip from "../components/InfoTip";
 import MarkdownMessage from "../components/MarkdownMessage";
 import OrderItemsEditor, { hasPricedItems, itemsTotal } from "../components/OrderItemsEditor";
 import OrderRow from "../components/OrderRow";
@@ -62,6 +64,8 @@ export default function CustomerDetailPage() {
     initialTab === "transactions" || initialTab === "orders" || initialTab === "assistant" || initialTab === "activity" ? initialTab : "info"
   );
   const autoOpenAdd = searchParams.get("new") === "1";
+  // the message composer slides over the record, so writing to someone never loses your place
+  const [composing, setComposing] = useState(searchParams.get("compose") === "1");
 
   function loadCustomer() {
     if (!id || isNew) return;
@@ -167,9 +171,11 @@ export default function CustomerDetailPage() {
           <input id="cf-first-name" value={form.first_name ?? ""} onChange={(e) => set("first_name", e.target.value)} required autoFocus />
           <label htmlFor="cf-last-name">Last name</label>
           <input id="cf-last-name" value={form.last_name ?? ""} onChange={(e) => set("last_name", e.target.value)} />
-          <label htmlFor="cf-phone">Phone / WhatsApp</label>
+          <div className="row" style={{ gap: 4 }}>
+            <label htmlFor="cf-phone" style={{ marginBottom: 0 }}>Phone / WhatsApp</label>
+            <InfoTip label="About phone numbers">Include the country code (for example, +234 801 234 5678) to use WhatsApp links.</InfoTip>
+          </div>
           <input id="cf-phone" type="tel" inputMode="tel" pattern="\\+?[1-9][0-9\\s().-]{6,20}" title="Enter the country code, e.g. +234 801 234 5678" placeholder="+234 801 234 5678" value={form.phone ?? ""} onChange={(e) => set("phone", e.target.value)} />
-          <p className="muted small">Include the country code (for example, +234 801 234 5678) to use WhatsApp links.</p>
           <label htmlFor="cf-email">Email</label>
           <input id="cf-email" type="email" value={form.email ?? ""} onChange={(e) => set("email", e.target.value)} />
           <label htmlFor="cf-interests">Interested in</label>
@@ -179,7 +185,6 @@ export default function CustomerDetailPage() {
             onChange={(e) => set("interests", e.target.value)}
             placeholder="Generator, Rice (comma-separated)"
           />
-          <p className="muted small">You can add more info, transactions, and custom fields once this is saved.</p>
 
           <ErrorText message={error} />
           {conflict && (
@@ -196,9 +201,12 @@ export default function CustomerDetailPage() {
             </div>
           )}
 
-          <button className="btn-primary" type="submit" disabled={saving} style={{ marginTop: 12 }}>
-            {saving ? "Saving…" : "Save"}
-          </button>
+          <div className="row" style={{ marginTop: 12, gap: 6 }}>
+            <button className="btn-primary" type="submit" disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <InfoTip label="What happens after saving">You can add more info, transactions, and custom fields once this is saved.</InfoTip>
+          </div>
         </form>
       </div>
     );
@@ -213,9 +221,9 @@ export default function CustomerDetailPage() {
         backTo="/customers"
         actions={
           <>
-            <Link to={`/messages/compose?customer_id=${customer.id}`} className="icon-btn btn-ghost" aria-label="Message this customer" title="Message this customer">
+            <button type="button" className="icon-btn btn-ghost" aria-label="Message this customer" title="Message this customer" onClick={() => setComposing(true)}>
               <Mail size={18} />
-            </Link>
+            </button>
             <CardMenu
               label="More actions for this customer"
               items={[
@@ -228,6 +236,12 @@ export default function CustomerDetailPage() {
             />
           </>
         }
+      />
+      <ComposeSheet
+        open={composing}
+        onClose={() => setComposing(false)}
+        title={`Message ${customer.name}`}
+        recipients={[{ id: customer.id, name: customer.name, email: customer.email ?? null, phone: customer.phone ?? null }]}
       />
       <p className="muted small customer-display-id-row">{customer.display_id}</p>
       <Tabs
@@ -717,8 +731,10 @@ function AssistantTab({ customer, onChanged }: { customer: Customer; onChanged: 
   return (
     <div className="card assistant-tab">
       <p className="muted small">
-        <Bot size={13} className="h3-icon" /> Ask it to log an order, add a transaction or note, or update info for{" "}
-        <b>{customer.name}</b> - it already knows which customer you mean.
+        <Bot size={13} className="h3-icon" /> Assistant for <b>{customer.name}</b>{" "}
+        <InfoTip label="What the assistant can do">
+          Ask it to log an order, add a transaction or note, or update info for {customer.name} - it already knows which customer you mean.
+        </InfoTip>
       </p>
 
       {pending.map((p) => (

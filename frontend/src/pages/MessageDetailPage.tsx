@@ -7,7 +7,7 @@ import HtmlPreviewFrame from "../components/HtmlPreviewFrame";
 import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
 
-const STATUS_LABEL: Record<string, string> = { sent: "Sent", failed: "Failed", skipped: "Skipped" };
+const STATUS_LABEL: Record<string, string> = { sent: "Sent", failed: "Failed", skipped: "Skipped", opened: "Opened - not confirmed sent" };
 const CHANNEL_LABEL: Record<string, string> = { email: "Email", whatsapp: "WhatsApp", sms: "SMS" };
 
 /** One sent message in full - what the "Recent activity" list clips to a preview. */
@@ -30,7 +30,9 @@ export default function MessageDetailPage() {
         error ? null : <Spinner />
       ) : (
         <div className="card">
-          <h2 style={{ marginTop: 0, overflowWrap: "anywhere" }}>{message.subject || "(no subject)"}</h2>
+          <h2 style={{ marginTop: 0, overflowWrap: "anywhere" }}>
+            {message.subject || (message.channel === "email" ? "(no subject)" : `${CHANNEL_LABEL[message.channel] ?? message.channel} message`)}
+          </h2>
           <p className="muted small">
             {CHANNEL_LABEL[message.channel] ?? message.channel} · {STATUS_LABEL[message.status] ?? message.status} ·{" "}
             {new Date(message.created_at).toLocaleString()}

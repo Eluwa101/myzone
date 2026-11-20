@@ -8,6 +8,7 @@ import ErrorText from "../components/ErrorText";
 import Pagination from "../components/Pagination";
 import SearchBox from "../components/SearchBox";
 import Spinner from "../components/Spinner";
+import InfoTip from "../components/InfoTip";
 import TopBar from "../components/TopBar";
 import { usePagedList } from "../hooks/usePagedList";
 import { avatarStyle, initials } from "../utils/avatar";
@@ -112,9 +113,8 @@ function InterestedInSection() {
   return (
     <div className="card">
       <h3>
-        <Heart size={15} className="h3-icon" /> Interested in
+        <Heart size={15} className="h3-icon" /> Interested in <InfoTip>Turn a stated interest straight into a sale.</InfoTip>
       </h3>
-      <p className="muted small">Turn a stated interest straight into a sale.</p>
       {interests.map((i) => (
         <div key={i.interest} className="interest-convert-group">
           <b className="small">{i.interest}</b>

@@ -276,3 +276,38 @@ def test_send_with_unknown_template_404s(client, auth_headers):
 def test_messages_require_auth(client):
     assert client.get("/api/messages/templates").status_code == 401
     assert client.get("/api/messages/merge-tags").status_code == 401
+
+
+def test_preview_batch_resolves_each_customer_and_reports_draft_problems_once(client, auth_headers):
+    ada = client.post("/api/customers", json={"first_name": "Ada", "last_name": "Obi"}, headers=auth_headers).json()
+    bola = client.post("/api/customers", json={"first_name": "Bola", "last_name": "Ade"}, headers=auth_headers).json()
+    resp = client.post(
+        "/api/messages/preview-batch",
+        json={"customer_ids": [ada["id"], bola["id"], ada["id"]], "subject": "Hi {{customer.first_name}}", "body_html": "<p>Hello {{customer.first_name}} [discount]</p>"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    by_id = {p["customer_id"]: p for p in body["previews"]}
+    assert len(body["previews"]) == 2  # the repeated id is resolved once
+    assert by_id[ada["id"]]["subject"] == "Hi Ada" and "Hello Ada" in by_id[ada["id"]]["body_html"]
+    assert "Hello Bola" in by_id[bola["id"]]["body_html"]
+    assert body["placeholders"] == ["[discount]"] and body["problems"] == [] and body["missing"] == []
+
+
+def test_preview_batch_skips_other_orgs_customers_and_caps_size(client, auth_headers):
+    from tests.conftest import verify_user_email
+
+    mine = client.post("/api/customers", json={"name": "Ada Obi"}, headers=auth_headers).json()
+    client.post("/api/auth/signup", json={"org_name": "Other Co", "email": "bola@example.com", "password": "supersecret"})
+    verify_user_email("bola@example.com")
+    token = client.post("/api/auth/login", json={"email": "bola@example.com", "password": "supersecret"}).json()["access_token"]
+    other = {"Authorization": f"Bearer {token}"}
+
+    resp = client.post("/api/messages/preview-batch", json={"customer_ids": [mine["id"]], "body_html": "<p>x</p>"}, headers=other)
+    assert resp.status_code == 200
+    assert resp.json()["previews"] == [] and resp.json()["missing"] == [mine["id"]]  # never resolves someone else's customer
+
+    too_many = [mine["id"]] * 51
+    assert client.post("/api/messages/preview-batch", json={"customer_ids": too_many, "body_html": "x"}, headers=auth_headers).status_code == 422
+    assert client.post("/api/messages/preview-batch", json={"customer_ids": [], "body_html": "x"}, headers=auth_headers).status_code == 422

@@ -25,7 +25,8 @@ class CustomerEvent(Base):
     customer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("customers.id"), index=True)
 
     # profile_updated | merged | order_updated | order_deleted | transaction_updated |
-    # transaction_deleted | whatsapp_opened
+    # transaction_deleted
+    # (WhatsApp opens live in outbound_messages, channel=whatsapp, status=opened)
     kind: Mapped[str] = mapped_column(String(40))
     summary: Mapped[str] = mapped_column(String(500))
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)

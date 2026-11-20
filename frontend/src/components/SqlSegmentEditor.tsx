@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { errorMessage } from "../api/errorMessage";
 import { getSqlSchema, suggestSegmentSql, type SandboxTable } from "../api/segments";
 import ErrorText from "./ErrorText";
+import InfoTip from "./InfoTip";
 
 const EXAMPLES: { label: string; sql: string }[] = [
   {
@@ -110,7 +111,13 @@ export default function SqlSegmentEditor({ sql, onChange }: { sql: string; onCha
         <ErrorText message={suggestError} />
       </div>
 
-      <label htmlFor="seg-sql">SQL</label>
+      <label htmlFor="seg-sql">
+        SQL{" "}
+        <InfoTip>
+          Return the customer <code>id</code>. Runs on a private, read-only copy of your own data (SQLite). Dates are{" "}
+          <code>'YYYY-MM-DD'</code>, e.g. <code>date('now', '-30 days')</code>; yes/no columns are <code>1</code>/<code>0</code>.
+        </InfoTip>
+      </label>
       <textarea
         id="seg-sql"
         ref={textareaRef}
@@ -121,10 +128,6 @@ export default function SqlSegmentEditor({ sql, onChange }: { sql: string; onCha
         onChange={(e) => onChange(e.target.value)}
         placeholder={"SELECT c.id\nFROM customers c\nWHERE …"}
       />
-      <p className="muted small" style={{ marginTop: 4 }}>
-        Return the customer <code>id</code>. Runs on a private, read-only copy of your own data (SQLite). Dates are{" "}
-        <code>'YYYY-MM-DD'</code>, e.g. <code>date('now', '-30 days')</code>; yes/no columns are <code>1</code>/<code>0</code>.
-      </p>
 
       <details className="sql-reference">
         <summary className="small">Examples</summary>
@@ -138,7 +141,7 @@ export default function SqlSegmentEditor({ sql, onChange }: { sql: string; onCha
       </details>
 
       <details className="sql-reference">
-        <summary className="small">Tables you can use</summary>
+        <summary className="small">Tables you can use (click a name to insert it)</summary>
         {schema === null ? (
           <p className="muted small">Loading…</p>
         ) : (
@@ -163,7 +166,6 @@ export default function SqlSegmentEditor({ sql, onChange }: { sql: string; onCha
             </div>
           ))
         )}
-        <p className="muted small">Click a name to insert it at the cursor. Hover a column for details.</p>
       </details>
     </div>
   );

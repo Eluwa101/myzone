@@ -51,6 +51,49 @@ class MessagePreviewOut(BaseModel):
     placeholders: list[str] = []
 
 
+class MessagePreviewBatchRequest(BaseModel):
+    # a page of recipients at a time - each one is resolved separately
+    customer_ids: list[UUID] = Field(min_length=1, max_length=50)
+    subject: str = ""
+    body_html: str
+
+
+class MessagePreviewBatchItem(BaseModel):
+    customer_id: UUID
+    subject: str
+    body_html: str
+
+
+class MessagePreviewBatchOut(BaseModel):
+    previews: list[MessagePreviewBatchItem]
+    # tag problems and [placeholders] are about the draft, not the recipient,
+    # so they are reported once
+    problems: list[str] = []
+    placeholders: list[str] = []
+    # ids that don't belong to this business (or no longer exist) - skipped, not an error
+    missing: list[UUID] = []
+
+
+class RewriteRequest(BaseModel):
+    channel: Literal["email", "whatsapp"]
+    action: Literal["shorten", "reformat", "friendlier", "rewrite"]
+    # email: the HTML body (and subject); whatsapp: the plain text
+    body: str = Field(min_length=1, max_length=100_000)
+    subject: str | None = Field(default=None, max_length=500)
+    instruction: str | None = Field(default=None, max_length=1000)
+    # on: every merge tag comes back exactly as written (checked, not just requested)
+    keep_merge_tags: bool = True
+
+
+class RewriteOut(BaseModel):
+    subject: str | None = None
+    body: str
+    # the original is being handed back because no safe rewrite came out
+    unchanged: bool = False
+    warning: str | None = None
+    placeholders: list[str] = []
+
+
 class SendEmailRequest(BaseModel):
     customer_ids: list[UUID] = Field(min_length=1, max_length=500)
     subject: str = Field(min_length=1, max_length=300)

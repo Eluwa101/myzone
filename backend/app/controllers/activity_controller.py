@@ -26,7 +26,7 @@ from app.models.customer import Customer
 from app.models.customer_event import CustomerEvent
 from app.models.document_scan import DocumentScan
 from app.models.org_note import OrgNote
-from app.models.outbound_message import OutboundMessage
+from app.models.outbound_message import MessageChannel, MessageStatus, OutboundMessage
 from app.schemas.activity import ActivityItem
 
 MAX_PAGE_SIZE = 100
@@ -115,8 +115,15 @@ def record_changes(db: Session, org_id: UUID, customer_id: UUID, kind: str, noun
 
 
 def record_whatsapp_opened(db: Session, org_id: UUID, customer_id: UUID, message: str) -> None:
-    text = " ".join((message or "").split())
-    record(db, org_id, customer_id, "whatsapp_opened", "WhatsApp chat opened", text[:500] or None, {"message_length": len(text)})
+    """A WhatsApp chat was opened with `message` pre-filled. Goes in the message
+    log (channel whatsapp, status opened) - the same place emails live - so the
+    Messages page and the Activity log show it without a second copy."""
+    db.add(
+        OutboundMessage(
+            org_id=org_id, customer_id=customer_id, channel=MessageChannel.whatsapp, status=MessageStatus.opened,
+            subject=None, body=(message or "").strip(),
+        )
+    )
     db.commit()
 
 
@@ -172,9 +179,12 @@ def build_timeline(db: Session, org_id: UUID, customer: Customer) -> list[Activi
     for m in db.query(OutboundMessage).filter(OutboundMessage.org_id == org_id, OutboundMessage.customer_id == cid).all():
         channel = m.channel.value
         label = {"email": "Email", "whatsapp": "WhatsApp", "sms": "SMS"}.get(channel, channel)
-        outcome = {"sent": "sent", "failed": "failed", "skipped": "skipped"}[m.status.value]
-        title = f"{label} {outcome}" + (f": {m.subject}" if m.subject else "")
-        items.append(ActivityItem(id=f"msg:{m.id}", kind=channel, at=_aware(m.created_at), title=title, detail=m.error, status=m.status.value, link=f"/messages/{m.id}"))
+        if m.status == MessageStatus.opened:
+            title, detail = f"{label} chat opened", " ".join((m.body or "").split())[:300] or None
+        else:
+            title = f"{label} {m.status.value}" + (f": {m.subject}" if m.subject else "")
+            detail = m.error
+        items.append(ActivityItem(id=f"msg:{m.id}", kind=channel, at=_aware(m.created_at), title=title, detail=detail, status=m.status.value, link=f"/messages/{m.id}"))
 
     for o in customer.orders:
         detail = _items_text(o.items, "name")
@@ -199,10 +209,7 @@ def build_timeline(db: Session, org_id: UUID, customer: Customer) -> list[Activi
         items.append(ActivityItem(id=f"form:{sub.id}", kind="form_submission", at=_aware(sub.created_at), title=f"Submitted the form '{forms.get(sub.form_id, 'deleted form')}'"))
 
     for e in db.query(CustomerEvent).filter(CustomerEvent.org_id == org_id, CustomerEvent.customer_id == cid).all():
-        items.append(ActivityItem(
-            id=f"event:{e.id}", kind=e.kind, at=_aware(e.created_at), title=e.summary, detail=e.detail,
-            status="opened" if e.kind == "whatsapp_opened" else None,
-        ))
+        items.append(ActivityItem(id=f"event:{e.id}", kind=e.kind, at=_aware(e.created_at), title=e.summary, detail=e.detail))
 
     items.sort(key=lambda i: (i.at, i.id), reverse=True)
     return items

@@ -5,6 +5,7 @@ import { listCustomers } from "../api/customers";
 import { deleteNote, getNote, updateNote } from "../api/notes";
 import { errorMessage } from "../api/errorMessage";
 import type { Customer, OrgNote } from "../api/types";
+import CardMenu from "../components/CardMenu";
 import ErrorText from "../components/ErrorText";
 import NoteForm from "../components/NoteForm";
 import Spinner from "../components/Spinner";
@@ -17,7 +18,6 @@ export default function NoteDetailPage() {
   const [note, setNote] = useState<OrgNote | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [editing, setEditing] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,7 +77,16 @@ export default function NoteDetailPage() {
         <div className="card">
           <div className="row-between">
             <h2 style={{ margin: 0 }}>{note.title}</h2>
-            {note.is_pending_review && <span className="badge badge-lead">Needs review</span>}
+            <div className="row" style={{ gap: 6 }}>
+              {note.is_pending_review && <span className="badge badge-lead">Needs review</span>}
+              <CardMenu
+                items={[
+                  { key: "edit", label: "Edit", icon: <Pencil />, disabled: busy, onSelect: () => setEditing(true) },
+                  { key: "div", divider: true },
+                  { key: "delete", label: "Delete note", icon: <Trash2 />, danger: true, confirm: "Really delete?", disabled: busy, onSelect: remove },
+                ]}
+              />
+            </div>
           </div>
           <p className="muted small">
             {note.created_by_agent ? "From Assistant · " : ""}
@@ -95,25 +104,13 @@ export default function NoteDetailPage() {
             </div>
           )}
 
-          <div className="card-actions" style={{ marginTop: 12 }}>
-            {note.is_pending_review && (
+          {note.is_pending_review && (
+            <div className="card-actions" style={{ marginTop: 12 }}>
               <button type="button" className="btn-primary" onClick={markReviewed} disabled={busy}>
                 <CheckCheck size={14} /> Mark reviewed
               </button>
-            )}
-            <button type="button" onClick={() => setEditing(true)} disabled={busy}>
-              <Pencil size={14} /> Edit
-            </button>
-            {confirmDelete ? (
-              <button type="button" className="btn-danger" onClick={remove} disabled={busy}>
-                <Trash2 size={14} /> Really delete?
-              </button>
-            ) : (
-              <button type="button" onClick={() => setConfirmDelete(true)} disabled={busy}>
-                <Trash2 size={14} /> Delete
-              </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

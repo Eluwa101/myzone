@@ -13,6 +13,7 @@ import { errorMessage } from "../api/errorMessage";
 import type { WebhookDelivery, WebhookSubscription } from "../api/types";
 import CardHead from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
+import InfoTip from "../components/InfoTip";
 import Pagination from "../components/Pagination";
 import SearchBox from "../components/SearchBox";
 import Spinner from "../components/Spinner";
@@ -46,8 +47,11 @@ export default function WebhooksPage() {
     <div>
       <TopBar title="Webhooks" backTo="/data" />
       <p className="muted small page-note">
-        Get notified the moment something changes in your Shop - new customers, orders, transactions, or notes - by having
-        this app POST a signed JSON event to a URL you control.
+        Send a signed event to your own URL when something changes.{" "}
+        <InfoTip>
+          Get notified the moment something changes in your Shop - new customers, orders, transactions, or notes - by
+          having this app POST a signed JSON event to a URL you control.
+        </InfoTip>
       </p>
       <ErrorText message={error} />
 
@@ -265,7 +269,10 @@ function SubscriptionCard({ sub, eventTypes, onChanged }: { sub: WebhookSubscrip
 
       {showSecret && (
         <div className="secret-panel">
-          <div className="muted small">Signing secret</div>
+          <div className="muted small">
+            Signing secret{" "}
+            <InfoTip>Every delivery includes an X-MyShop-Signature header: HMAC-SHA256 of the JSON body using this secret.</InfoTip>
+          </div>
           <div className="row" style={{ alignItems: "center", flexWrap: "nowrap" }}>
             <code className="small" style={{ wordBreak: "break-all", flex: 1 }}>
               {sub.secret}
@@ -273,13 +280,10 @@ function SubscriptionCard({ sub, eventTypes, onChanged }: { sub: WebhookSubscrip
             <button type="button" onClick={copySecret} aria-label="Copy secret">
               <Copy size={13} />
             </button>
-            <button type="button" onClick={regenerateSecret} title="Invalidates the current secret">
-              <RefreshCw size={13} /> New
+            <button type="button" onClick={regenerateSecret} title="New secret (invalidates the current one)" aria-label="New secret (invalidates the current one)">
+              <RefreshCw size={13} />
             </button>
           </div>
-          <p className="muted small" style={{ margin: "6px 0 0" }}>
-            Every delivery includes an X-MyShop-Signature header: HMAC-SHA256 of the JSON body using this secret.
-          </p>
           {copyStatus && <p className="muted small" style={{ margin: "4px 0 0" }}>{copyStatus}</p>}
         </div>
       )}

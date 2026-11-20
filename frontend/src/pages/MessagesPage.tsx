@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { listMessageHistoryPaged, type OutboundMessage } from "../api/messaging";
 import ErrorText from "../components/ErrorText";
+import InfoTip from "../components/InfoTip";
 import Pagination from "../components/Pagination";
 import SearchBox from "../components/SearchBox";
 import Spinner from "../components/Spinner";
@@ -10,7 +11,8 @@ import TopBar from "../components/TopBar";
 import { usePagedList } from "../hooks/usePagedList";
 
 const PAGE_SIZE = 20;
-const STATUS_LABEL: Record<string, string> = { sent: "Sent", failed: "Failed", skipped: "Skipped" };
+const STATUS_LABEL: Record<string, string> = { sent: "Sent", failed: "Failed", skipped: "Skipped", opened: "Opened in WhatsApp" };
+const CHANNEL_LABEL: Record<string, string> = { email: "Email", whatsapp: "WhatsApp", sms: "SMS" };
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -24,35 +26,42 @@ function timeAgo(iso: string): string {
 
 export default function MessagesPage() {
   const [status, setStatus] = useState("");
+  const [channel, setChannel] = useState("");
   const list = usePagedList<OutboundMessage>({
-    fetcher: ({ search, page, pageSize }) => listMessageHistoryPaged({ status, search, page, pageSize }),
+    fetcher: ({ search, page, pageSize }) => listMessageHistoryPaged({ channel, status, search, page, pageSize }),
     pageSize: PAGE_SIZE,
-    filterKey: status,
+    filterKey: `${channel}|${status}`,
   });
   const { items: history, loading, error } = list;
 
   return (
     <div>
       <TopBar title="Messages" backTo="/data" />
-      <p className="muted small page-note">Email customers directly, with merge tags filled in per recipient.</p>
-
       <div className="page-actions">
         <Link to="/messages/compose" className="btn-primary pill-link">
-          <Plus size={15} /> Compose email
+          <Plus size={15} /> Compose message
         </Link>
         <Link to="/messages/templates" className="pill-link">
           <FileText size={15} /> Manage templates
         </Link>
       </div>
 
-      <h2 className="settings-section-heading">Recent activity</h2>
+      <h2 className="settings-section-heading">
+        Recent activity <InfoTip>Every email sent and WhatsApp chat opened with your customers.</InfoTip>
+      </h2>
       <div className="toolbar">
         <SearchBox value={list.search} onChange={list.setSearch} label="Search messages" placeholder="Search subject, message, customer…" />
+        <select aria-label="Filter by channel" value={channel} onChange={(e) => setChannel(e.target.value)}>
+          <option value="">All channels</option>
+          <option value="email">Email</option>
+          <option value="whatsapp">WhatsApp</option>
+        </select>
         <select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All statuses</option>
           <option value="sent">Sent</option>
           <option value="failed">Failed</option>
           <option value="skipped">Skipped</option>
+          <option value="opened">Opened in WhatsApp</option>
         </select>
       </div>
       <ErrorText message={error} />
@@ -61,16 +70,17 @@ export default function MessagesPage() {
       ) : history.length === 0 ? (
         <div className="empty-state">
           <Mail size={40} className="empty-state-icon" strokeWidth={1.5} />
-          <p>{list.searching || status ? "No messages match." : "No emails sent yet."}</p>
+          <p>{list.searching || status || channel ? "No messages match." : "No messages yet."}</p>
         </div>
       ) : (
         <div className="card">
           {history.map((m) => (
             <Link key={m.id} to={`/messages/${m.id}`} className="info-row">
               <div className="info-row-text">
-                <div className="info-row-label">{m.subject || "(no subject)"}</div>
+                <div className="info-row-label">{m.subject || (m.channel === "email" ? "(no subject)" : `${CHANNEL_LABEL[m.channel] ?? m.channel} message`)}</div>
                 <div className="info-row-value muted">
                   {m.customer_name ? `${m.customer_name} · ` : ""}
+                  {m.channel !== "email" && m.subject ? `${CHANNEL_LABEL[m.channel] ?? m.channel} · ` : ""}
                   {STATUS_LABEL[m.status] ?? m.status} · {timeAgo(m.created_at)}
                   {m.error ? ` · ${m.error}` : ""}
                 </div>

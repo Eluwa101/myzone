@@ -4,6 +4,7 @@ import { deleteTransaction, updateTransaction } from "../api/customers";
 import { errorMessage } from "../api/errorMessage";
 import type { Transaction } from "../api/types";
 import CurrencySelect from "./CurrencySelect";
+import CardMenu from "./CardMenu";
 import ErrorText from "./ErrorText";
 import TransactionLinesEditor, { type TransactionLine } from "./TransactionLinesEditor";
 
@@ -33,14 +34,12 @@ export default function TransactionRow({
   const [lines, setLines] = useState<TransactionLine[]>(toLines(transaction.items));
   const [currency, setCurrency] = useState(transaction.currency);
   const [error, setError] = useState<string | null>(null);
-  const [armedDelete, setArmedDelete] = useState(false);
   const [busy, setBusy] = useState(false);
 
   function startEdit() {
     setDate(transaction.date);
     setLines(toLines(transaction.items));
     setCurrency(transaction.currency);
-    setArmedDelete(false);
     setError(null);
     setOpen(true);
   }
@@ -69,10 +68,6 @@ export default function TransactionRow({
   }
 
   async function remove() {
-    if (!armedDelete) {
-      setArmedDelete(true);
-      return;
-    }
     setBusy(true);
     try {
       await deleteTransaction(customerId, transaction.id);
@@ -119,9 +114,12 @@ export default function TransactionRow({
         <button type="button" onClick={() => setOpen(false)} disabled={busy}>
           Cancel
         </button>
-        <button type="button" className="btn-danger" onClick={remove} disabled={busy} style={{ marginLeft: "auto" }}>
-          <Trash2 size={15} /> {armedDelete ? "Confirm?" : "Delete"}
-        </button>
+        <div style={{ marginLeft: "auto" }}>
+          <CardMenu
+            label="More actions"
+            items={[{ key: "delete", label: "Delete transaction", icon: <Trash2 />, danger: true, confirm: "Really delete?", disabled: busy, onSelect: remove }]}
+          />
+        </div>
       </div>
     </div>
   );

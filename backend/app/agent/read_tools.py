@@ -33,10 +33,11 @@ from app.controllers import (
     summary_controller,
     webhook_controller,
 )
+from app.agent.rewrite import RewriteError, build_rewrite_context, rewrite_message as run_rewrite
 from app.controllers.merge_tag_suggestions import suggest_for_segment
 from app.controllers.segment_fields import FIELD_REGISTRY, OPERATORS_BY_TYPE, list_custom_field_keys
 from app.controllers.segment_sql import SegmentSQLError, run_sql_segment, sandbox_schema, schema_as_text
-from app.core.merge_tags import MERGE_TAG_GUIDE, TAG_PATTERN, available_merge_tags
+from app.core.merge_tags import MERGE_TAG_GUIDE, TAG_PATTERN, available_merge_tags, merge_tag_problems
 from app.models.customer import CustomerStatus
 from app.models.outbound_message import MessageChannel, MessageStatus
 from app.schemas.customer import CustomerOut
@@ -342,7 +343,7 @@ def build_read_tools(db: Session, org_id: UUID) -> list:
         """The log of messages sent to customers, newest first: who got
         what, when, and whether it was sent, failed or skipped (and why -
         no email, no consent, unsubscribed). Optional filters: customer_id,
-        status (sent, failed, skipped), channel (email), and a search word
+        status (sent, failed, skipped, opened - WhatsApp chats opened), channel (email, whatsapp), and a search word
         (matches subject, body or customer name). Use this to answer "did
         that email go out?" or "who did we email last week?"."""
         cid = parse_uuid(customer_id) if customer_id.strip() else None
@@ -448,6 +449,32 @@ def build_read_tools(db: Session, org_id: UUID) -> list:
             "problems": merge_tag_problems(db, org_id, subject, body_html),
             "placeholders": find_placeholders(subject, body_html),
         }
+
+    @tool
+    def rewrite_message(
+        text: str, channel: str = "whatsapp", action: str = "shorten", instruction: str = "", keep_merge_tags: bool = True, subject: str = ""
+    ) -> dict:
+        """Trim, reformat, make friendlier or rewrite a message that is already written, and
+        return the new text - it changes and sends nothing. channel is "whatsapp" (plain text)
+        or "email" (text is the HTML body; pass the subject too). action is "shorten",
+        "reformat", "friendlier" or "rewrite" (rewrite needs an instruction, e.g. "make it more
+        formal"). With keep_merge_tags true (the default) every {{merge tag}} comes back exactly
+        as written, links and [placeholders] are kept, and if a safe rewrite isn't possible the
+        original comes back with a warning. Set keep_merge_tags false only when the user wants
+        the tags reworded or removed."""
+        business_text, tags_text = build_rewrite_context(db, org_id)
+        try:
+            result = run_rewrite(
+                channel=channel.strip().lower(), action=action.strip().lower(), body=text, subject=clean(subject),
+                instruction=clean(instruction), keep_merge_tags=keep_merge_tags, tags_text=tags_text, business_text=business_text,
+                check=lambda s, b: merge_tag_problems(db, org_id, s, b),
+            )
+        except RewriteError as e:
+            return {"status": "error", "message": str(e)}
+        out = {"text": result["body"], "unchanged": result["unchanged"], "warning": result["warning"]}
+        if result["subject"] is not None:
+            out["subject"] = result["subject"]
+        return out
 
     # ---------------------------------------------------------------- segments
 
@@ -661,7 +688,7 @@ def build_read_tools(db: Session, org_id: UUID) -> list:
         search_customers, find_customer_by_id, get_customer, get_customer_activity, find_duplicate_customers, list_custom_fields,
         list_transactions, list_orders, list_notes,
         get_dashboard_summary, get_sales_report,
-        list_messages, get_message, list_email_templates, get_email_template, get_merge_tag_guide, preview_email,
+        list_messages, get_message, list_email_templates, get_email_template, get_merge_tag_guide, preview_email, rewrite_message,
         list_segments, get_segment, list_segment_members, get_segment_fields, get_segment_sql_schema, preview_segment,
         get_settings, list_forms, list_form_submissions, list_scans, list_notifications,
         list_webhooks, list_webhook_deliveries,

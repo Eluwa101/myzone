@@ -5,7 +5,7 @@ import { getCustomer, listCustomers } from "../api/customers";
 import { errorMessage } from "../api/errorMessage";
 import { getSegmentMembers } from "../api/segments";
 import type { Customer } from "../api/types";
-import EmailComposer, { type Recipient } from "../components/EmailComposer";
+import Composer, { type Recipient } from "../components/Composer";
 import ErrorText from "../components/ErrorText";
 import Spinner from "../components/Spinner";
 import TopBar from "../components/TopBar";
@@ -36,7 +36,7 @@ export default function MessageComposePage() {
 
   return (
     <div>
-      <TopBar title="Compose email" backTo="/messages" />
+      <TopBar title="Compose message" backTo="/messages" />
 
       <div className="card">
         <h3>Recipients</h3>
@@ -54,7 +54,7 @@ export default function MessageComposePage() {
       </div>
       <ErrorText message={error} />
 
-      <EmailComposer recipients={recipients} segmentId={segmentId} initialTemplateId={searchParams.get("template_id")} />
+      <Composer recipients={recipients} segmentId={segmentId} initialTemplateId={searchParams.get("template_id")} />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { errorMessage } from "../api/errorMessage";
 import type { PendingAction } from "../api/types";
 import ChatHistoryPanel from "../components/ChatHistoryPanel";
 import ErrorText from "../components/ErrorText";
+import InfoTip from "../components/InfoTip";
 import MarkdownMessage from "../components/MarkdownMessage";
 import PendingActionCard from "../components/PendingActionCard";
 import TopBar from "../components/TopBar";
@@ -111,6 +112,10 @@ export default function ChatPage() {
         title="Assistant"
         actions={
           <>
+            <InfoTip>
+              Ask it to look things up, add or update customers and transactions, or snap a photo of a note or form to read into
+              a record. Deleting or merging customers always needs your confirmation below first.
+            </InfoTip>
             <button className="btn-ghost icon-btn" onClick={() => setHistoryOpen(true)} aria-label="Chat history" title="Past chats">
               <History size={18} />
             </button>
@@ -122,11 +127,6 @@ export default function ChatPage() {
           </>
         }
       />
-      <p className="muted small page-note">
-        Ask it to look things up, add or update customers and transactions, or snap a photo of a note or form to read into
-        a record. Deleting or merging customers always needs your confirmation below first.
-      </p>
-
       {historyOpen && <ChatHistoryPanel onSelect={openThread} onClose={() => setHistoryOpen(false)} />}
 
       {pending.map((p) => (

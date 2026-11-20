@@ -5,6 +5,7 @@ import { listSegmentsPaged } from "../api/segments";
 import type { Segment } from "../api/types";
 import CardHead from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
+import InfoTip from "../components/InfoTip";
 import Pagination from "../components/Pagination";
 import SearchBox from "../components/SearchBox";
 import SegmentBuilder, { describeFilters } from "../components/SegmentBuilder";
@@ -26,8 +27,11 @@ export default function SegmentsPage() {
     <div>
       <TopBar title="Segments" backTo="/data" />
       <p className="muted small page-note">
-        Define a group of customers by filters - always resolved live, never a stale snapshot. Open a segment to see who is
-        in it and to email or WhatsApp them.
+        Groups of customers, always up to date.{" "}
+        <InfoTip>
+          Define a group of customers by filters - always resolved live, never a stale snapshot. Open a segment to see who is
+          in it and to email or WhatsApp them.
+        </InfoTip>
       </p>
       <ErrorText message={error} />
 

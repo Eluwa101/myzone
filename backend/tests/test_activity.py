@@ -126,10 +126,11 @@ def test_whatsapp_opened_is_logged_honestly(client, auth_headers):
     c = _customer(client, auth_headers, phone="+2348012345678")
     resp = client.post(f"/api/customers/{c['id']}/activity/whatsapp", json={"message": "Hi Ada,\n\nyour order   is ready"}, headers=auth_headers)
     assert resp.status_code == 204
-    item = next(i for i in _activity(client, auth_headers, c["id"])["items"] if i["kind"] == "whatsapp_opened")
+    item = next(i for i in _activity(client, auth_headers, c["id"])["items"] if i["kind"] == "whatsapp")
     assert item["title"] == "WhatsApp chat opened"  # never claims "sent"
     assert item["status"] == "opened"
     assert item["detail"] == "Hi Ada, your order is ready"
+    assert item["link"].startswith("/messages/")  # it is a message-log row now, so it links to the message
 
 
 def test_merge_keeps_whole_history_on_the_survivor(client, auth_headers, db_session):
@@ -153,7 +154,7 @@ def test_merge_keeps_whole_history_on_the_survivor(client, auth_headers, db_sess
 
     data = _activity(client, auth_headers, keep["id"])
     kinds = _kinds(data)
-    for expected in ("merged", "order_created", "transaction_added", "note_added", "email", "whatsapp_opened"):
+    for expected in ("merged", "order_created", "transaction_added", "note_added", "email", "whatsapp"):
         assert expected in kinds, (expected, kinds)
     merged_item = next(i for i in data["items"] if i["kind"] == "merged")
     assert "Ada O." in merged_item["title"] and "1 order(s) moved" in merged_item["detail"]
@@ -204,3 +205,35 @@ def test_assistant_read_tool_returns_the_same_history(db_session, seeded_org):
     assert out["customer"] == "Ada Obi"
     assert [a["kind"] for a in out["activity"]] == ["profile_updated", "customer_created"]
     assert tools["get_customer_activity"].invoke({"customer_id": "nope"})["status"] == "error"
+
+
+def test_whatsapp_open_appears_in_message_history_with_channel_filter(client, auth_headers):
+    c = _customer(client, auth_headers, phone="+2348012345678", email="ada@mail.com")
+    client.post(f"/api/customers/{c['id']}/activity/whatsapp", json={"message": "Hi Ada,\nyour order is ready"}, headers=auth_headers)
+
+    everything = client.get("/api/messages/history", headers=auth_headers).json()
+    assert [m["channel"] for m in everything] == ["whatsapp"]
+    assert everything[0]["status"] == "opened" and everything[0]["customer_name"] == "Ada Obi"
+    assert everything[0]["body_preview"] == "Hi Ada, your order is ready"
+
+    assert len(client.get("/api/messages/history?channel=whatsapp", headers=auth_headers).json()) == 1
+    assert client.get("/api/messages/history?channel=email", headers=auth_headers).json() == []
+    assert len(client.get("/api/messages/history?status=opened", headers=auth_headers).json()) == 1
+    assert client.get("/api/messages/history?status=sent", headers=auth_headers).json() == []
+
+    detail = client.get(f"/api/messages/history/{everything[0]['id']}", headers=auth_headers).json()
+    assert detail["body"] == "Hi Ada,\nyour order is ready"  # the text as typed, not HTML-mangled
+    assert client.get(f"/api/messages/history?customer_id={c['id']}", headers=auth_headers).json()[0]["id"] == detail["id"]
+
+
+def test_assistant_message_tool_sees_whatsapp_opens(db_session, seeded_org):
+    from app.agent.tools import build_tools
+
+    org_id, user_id = seeded_org
+    tools = {t.name: t for t in build_tools(db_session, org_id, user_id)}
+    ada = tools["create_customer"].invoke({"name": "Ada Obi", "phone": "0801"})
+    from app.controllers import activity_controller
+
+    activity_controller.record_whatsapp_opened(db_session, org_id, UUID(ada["id"]), "Hello Ada")
+    out = tools["list_messages"].invoke({"channel": "whatsapp", "status": "opened"})
+    assert out["total"] == 1 and out["messages"][0]["preview"] == "Hello Ada"

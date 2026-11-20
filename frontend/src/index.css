@@ -3403,3 +3403,152 @@ button.card-body {
 .activity-muted .activity-title {
   color: var(--text-muted);
 }
+
+/* Slide-over composer */
+
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sheet-panel {
+  width: min(560px, 100%);
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg, var(--surface));
+  padding: 14px 16px 28px;
+  box-shadow: -8px 0 24px rgba(15, 23, 42, 0.18);
+  outline: none;
+  animation: sheet-in 180ms ease-out;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-panel {
+    animation: none;
+  }
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sheet-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.wa-row {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+}
+
+.wa-preview pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 6px 0 0;
+}
+
+/* ⓘ tooltips */
+
+.infotip {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+.infotip-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 4px;
+  min-width: 0;
+  min-height: 0;
+  line-height: 0;
+  border-radius: 50%;
+  cursor: help;
+}
+
+.infotip-btn:hover,
+.infotip-btn:focus-visible,
+.infotip-btn[aria-expanded="true"] {
+  color: var(--accent);
+}
+
+.infotip-bubble {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(calc(-50% + var(--tip-shift, 0px)));
+  width: max-content;
+  max-width: min(280px, 80vw);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--text);
+  color: var(--surface);
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);
+}
+
+/* Declutter - owned by the three page groups; append only inside your own marker */
+/* declutter:A */
+/* declutter:B */
+/* declutter:C */
+/* declutter:D */
+
+/* Improve menu (composer) */
+
+.improve {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.improve-list {
+  min-width: 240px;
+}
+
+.improve-rewrite {
+  display: flex;
+  gap: 6px;
+  padding: 4px 6px 6px;
+}
+
+.improve-rewrite input {
+  flex: 1;
+  min-width: 0;
+}
+
+.improve-keep {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: normal;
+}

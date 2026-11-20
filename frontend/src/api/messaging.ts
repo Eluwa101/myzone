@@ -88,6 +88,55 @@ export function previewMessage(customerId: string, subject: string, bodyHtml: st
   });
 }
 
+export type RewriteAction = "shorten" | "reformat" | "friendlier" | "rewrite";
+
+export interface RewriteResult {
+  subject: string | null;
+  body: string;
+  /** the original came back because no safe rewrite was possible */
+  unchanged: boolean;
+  warning: string | null;
+  placeholders: string[];
+}
+
+/** Shorten / reformat / soften / rewrite a message that is already written. With keepMergeTags on
+ * the server guarantees every merge tag comes back exactly as written. */
+export function rewriteMessage(data: {
+  channel: "email" | "whatsapp";
+  action: RewriteAction;
+  body: string;
+  subject?: string | null;
+  instruction?: string;
+  keepMergeTags: boolean;
+}): Promise<RewriteResult> {
+  return api.post<RewriteResult>("/api/messages/rewrite", {
+    channel: data.channel,
+    action: data.action,
+    body: data.body,
+    subject: data.subject ?? null,
+    instruction: data.instruction ?? null,
+    keep_merge_tags: data.keepMergeTags,
+  });
+}
+
+export interface MessagePreviewBatch {
+  previews: { customer_id: string; subject: string; body_html: string }[];
+  /** about the draft, not any one recipient - reported once */
+  problems: string[];
+  placeholders: string[];
+  /** ids that no longer exist - skipped */
+  missing: string[];
+}
+
+/** The same merge-tag resolution as previewMessage, for up to 50 customers in one call. */
+export function previewMessageBatch(customerIds: string[], subject: string, bodyHtml: string): Promise<MessagePreviewBatch> {
+  return api.post<MessagePreviewBatch>("/api/messages/preview-batch", {
+    customer_ids: customerIds,
+    subject,
+    body_html: bodyHtml,
+  });
+}
+
 export function sendEmail(data: SendEmailInput): Promise<SendEmailResult> {
   return api.post<SendEmailResult>("/api/messages/send", data);
 }

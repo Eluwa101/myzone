@@ -3,8 +3,10 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { errorMessage } from "../api/errorMessage";
 import { listScans, startScan, type DocumentScan, type ScanStatus } from "../api/scans";
+import CardMenu from "../components/CardMenu";
 import ErrorText from "../components/ErrorText";
 import Spinner from "../components/Spinner";
+import InfoTip from "../components/InfoTip";
 import TopBar from "../components/TopBar";
 import { fileToCompressedDataUrl } from "../utils/image";
 
@@ -67,11 +69,15 @@ export default function ScanPage() {
 
   return (
     <div>
-      <TopBar title="Scan documents" />
-      <p className="muted small page-note">
-        Photograph a receipt, order slip, form or note with a customer ID on it (like CR004). It's read automatically and recorded on
-        that customer: sales, orders, contact details and anything else on it. The bell tells you what was done.
-      </p>
+      <TopBar
+        title="Scan documents"
+        actions={
+          <InfoTip>
+            Photograph a receipt, order slip, form or note with a customer ID on it (like CR004). It's read automatically and recorded on
+            that customer: sales, orders, contact details and anything else on it. The bell tells you what was done.
+          </InfoTip>
+        }
+      />
 
       <div className="card scan-actions">
         <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={onFiles} />
@@ -80,9 +86,7 @@ export default function ScanPage() {
           <button type="button" className="btn-primary" onClick={() => cameraRef.current?.click()}>
             <Camera size={16} /> Take photo
           </button>
-          <button type="button" onClick={() => filesRef.current?.click()}>
-            <ImageUp size={16} /> Upload photos
-          </button>
+          <CardMenu items={[{ key: "upload", label: "Upload photos", icon: <ImageUp />, onSelect: () => filesRef.current?.click() }]} />
         </div>
         <label htmlFor="scan-hint" className="small" style={{ marginTop: 10 }}>
           Anything the reader should know? (optional)

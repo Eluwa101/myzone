@@ -5,6 +5,7 @@ import { createApiKey, listApiKeys, revokeApiKey, type ApiKey, type CreatedApiKe
 import { errorMessage } from "../api/errorMessage";
 import CardMenu from "./CardMenu";
 import ErrorText from "./ErrorText";
+import InfoTip from "./InfoTip";
 
 function when(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "never";
@@ -71,12 +72,12 @@ export default function ApiKeysCard() {
   return (
     <div className="card">
       <h3>
-        <KeyRound size={15} className="h3-icon" /> API keys
+        <KeyRound size={15} className="h3-icon" /> API keys{" "}
+        <InfoTip>
+          Let another app or a script read and update your data - see the <Link to="/developers">developer guide</Link>.
+        </InfoTip>
       </h3>
-      <p className="muted small">
-        Let another app or a script read and update your data - see the <Link to="/developers">developer guide</Link>. A key can do
-        anything you can in the app, so keep it secret and revoke it if it leaks.
-      </p>
+      <p className="muted small">Keys can do anything you can - keep them secret and revoke any that leak.</p>
 
       <form className="row" onSubmit={onCreate}>
         <input aria-label="Key name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, e.g. Zapier or Website form" style={{ flex: 1 }} maxLength={100} />

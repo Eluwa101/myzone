@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import ApiKeysCard from "../components/ApiKeysCard";
 import CloseAccountCard from "../components/CloseAccountCard";
 import CurrencySelect from "../components/CurrencySelect";
+import InfoTip from "../components/InfoTip";
 import ThemeToggle from "../components/ThemeToggle";
 import { errorMessage } from "../api/errorMessage";
 import { getSettings, updateSettings } from "../api/settings";
@@ -136,16 +137,17 @@ export default function SettingsPage() {
 
       <h2 className="settings-section-heading">General</h2>
       <div className="card">
-        <h3>Appearance</h3>
-        <p className="muted small">Choose how the app looks, or follow your device's setting.</p>
+        <h3>
+          Appearance <InfoTip>Choose how the app looks, or follow your device's setting.</InfoTip>
+        </h3>
         <ThemeToggle />
       </div>
 
       <div className="card">
         <h3>
-          <Building2 size={15} className="h3-icon" /> Business profile
+          <Building2 size={15} className="h3-icon" /> Business profile{" "}
+          <InfoTip>More about your setup - used to tailor the app for your business.</InfoTip>
         </h3>
-        <p className="muted small">More about your setup - used to tailor the app for your business.</p>
         <label htmlFor="prof-industry">Industry / business type</label>
         <input id="prof-industry" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Retail, Salon, Restaurant" />
         <label htmlFor="prof-team-size">Team size</label>
@@ -158,10 +160,14 @@ export default function SettingsPage() {
         <input id="prof-phone" value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" />
         <label htmlFor="prof-address">Business address</label>
         <input id="prof-address" value={address} onChange={(e) => setAddress(e.target.value)} />
-        <label htmlFor="prof-currency">Default currency</label>
+        <label htmlFor="prof-currency">
+          Default currency <InfoTip>Used to pre-fill the currency when adding new orders and transactions.</InfoTip>
+        </label>
         <CurrencySelect id="prof-currency" value={defaultCurrency} onChange={setDefaultCurrency} />
-        <p className="muted small">Used to pre-fill the currency when adding new orders and transactions.</p>
-        <label htmlFor="prof-support-email">Support email</label>
+        <label htmlFor="prof-support-email">
+          Support email{" "}
+          <InfoTip>Where replies to your emails go. If left empty, replies go to the account owner's login email.</InfoTip>
+        </label>
         <input
           id="prof-support-email"
           type="email"
@@ -169,10 +175,13 @@ export default function SettingsPage() {
           onChange={(e) => setSupportEmail(e.target.value)}
           placeholder="e.g. hello@yourbusiness.com"
         />
-        <p className="muted small">
-          Where replies to your emails go. If left empty, replies go to the account owner's login email.
-        </p>
-        <label htmlFor="prof-sender-handle">Sending address</label>
+        <label htmlFor="prof-sender-handle">
+          Sending address{" "}
+          <InfoTip>
+            Emails you send to customers come from this address. It can't receive mail, so replies go to your support email
+            above. Letters and numbers only.
+          </InfoTip>
+        </label>
         <div className="row" style={{ alignItems: "center", flexWrap: "nowrap" }}>
           <input
             id="prof-sender-handle"
@@ -184,10 +193,6 @@ export default function SettingsPage() {
             @{senderDomain}
           </span>
         </div>
-        <p className="muted small">
-          Emails you send to customers come from this address. It can't receive mail, so replies go to your support email
-          above. Letters and numbers only.
-        </p>
         <label htmlFor="prof-color">Brand color</label>
         <div className="row" style={{ alignItems: "center" }}>
           <input id="prof-color" type="color" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} style={{ width: 48, padding: 2 }} />
@@ -208,10 +213,18 @@ export default function SettingsPage() {
         </h3>
         <label htmlFor="set-biz">Business name (shown on the sign)</label>
         <input id="set-biz" value={bizName} onChange={(e) => setBizName(e.target.value)} placeholder="e.g. Ada's Store" />
-        <label htmlFor="set-number">WhatsApp number</label>
+        <label htmlFor="set-number">
+          WhatsApp number{" "}
+          <InfoTip>Include the country code. This number opens your WhatsApp chat from the QR code.</InfoTip>
+        </label>
         <input id="set-number" type="tel" value={number} onChange={(e) => setNumber(e.target.value)} placeholder="+234 801 234 5678" inputMode="tel" />
-        <p className="muted small">Include the country code. This number opens your WhatsApp chat from the QR code.</p>
-        <label htmlFor="set-country-code">Default country code for your customers</label>
+        <label htmlFor="set-country-code">
+          Default country code{" "}
+          <InfoTip>
+            Customers saved like 0801 234 5678 get this code added when you open their WhatsApp chat (0801… becomes +234
+            801…). Leave blank if all your numbers already include a country code.
+          </InfoTip>
+        </label>
         <input
           id="set-country-code"
           value={countryCode}
@@ -220,10 +233,6 @@ export default function SettingsPage() {
           inputMode="numeric"
           maxLength={4}
         />
-        <p className="muted small">
-          Customers saved like 0801 234 5678 get this code added when you open their WhatsApp chat (0801… becomes
-          +234 801…). Leave blank if all your numbers already include a country code.
-        </p>
         <label htmlFor="set-message">Message customers will send (they can edit it)</label>
         <textarea id="set-message" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />
         <div className="row" style={{ marginTop: 12 }}>
