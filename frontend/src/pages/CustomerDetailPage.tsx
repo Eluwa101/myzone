@@ -1,6 +1,7 @@
-import { Bot, Check, Mail, Mic, Pencil, Plus, Receipt, Send, ShoppingBag, Square, Trash2, X } from "lucide-react";
+import { Bot, Check, History, Mail, Mic, Pencil, Plus, Receipt, Send, ShoppingBag, Square, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import ActivityLog from "../components/ActivityLog";
 import CardMenu from "../components/CardMenu";
 import {
   addOrder,
@@ -56,8 +57,9 @@ export default function CustomerDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ message: string; existingId: string } | null>(null);
   const initialTab = searchParams.get("tab");
-  const [tab, setTab] = useState<"info" | "transactions" | "orders" | "assistant">(
-    initialTab === "transactions" || initialTab === "orders" || initialTab === "assistant" ? initialTab : "info"
+  // "activity" is opened from the ⋯ menu rather than being a tab of its own
+  const [tab, setTab] = useState<"info" | "transactions" | "orders" | "assistant" | "activity">(
+    initialTab === "transactions" || initialTab === "orders" || initialTab === "assistant" || initialTab === "activity" ? initialTab : "info"
   );
   const autoOpenAdd = searchParams.get("new") === "1";
 
@@ -219,6 +221,7 @@ export default function CustomerDetailPage() {
               items={[
                 { key: "tx", label: "Add transaction", icon: <Receipt />, to: `/customers/${customer.id}?tab=transactions&new=1` },
                 { key: "order", label: "Add order", icon: <ShoppingBag />, to: `/customers/${customer.id}?tab=orders&new=1` },
+                { key: "activity", label: "Activity log", icon: <History />, onSelect: () => setTab("activity") },
                 { key: "div", divider: true },
                 { key: "delete", label: "Delete customer", icon: <Trash2 />, danger: true, confirm: "Really delete everything?", disabled: saving, onSelect: onDeleteCustomer },
               ]}
@@ -251,6 +254,8 @@ export default function CustomerDetailPage() {
         <TransactionsTab customer={customer} onChanged={loadCustomer} autoOpenAdd={autoOpenAdd} />
       ) : tab === "orders" ? (
         <OrdersTab customer={customer} onChanged={loadCustomer} autoOpenAdd={autoOpenAdd} />
+      ) : tab === "activity" ? (
+        <ActivityLog key={customer.id} customerId={customer.id} />
       ) : (
         <AssistantTab customer={customer} onChanged={loadCustomer} />
       )}

@@ -145,6 +145,7 @@ def _fill_with_data(client, headers, db, org_email):
     c1 = client.post("/api/customers", json={"first_name": "Ada", "last_name": "Obi", "email": "c1@x.com", "consent_date": "2026-01-01"}, headers=headers).json()
     c2 = client.post("/api/customers", json={"name": "Bo Chen", "extra": {"Shoe": "42"}}, headers=headers).json()
     client.post(f"/api/customers/{c1['id']}/transactions", json={"date": "2026-11-01", "items": [{"item": "Rice", "amount": 5}]}, headers={**headers, "Idempotency-Key": f"k-{org_email}"})
+    client.patch(f"/api/customers/{c1['id']}", json={"job": "Baker"}, headers=headers)  # leaves a customer_events row
     client.post(f"/api/customers/{c1['id']}/orders", json={"order_date": "2026-11-01", "items": [{"name": "Oil"}]}, headers=headers)
     client.post("/api/notes", json={"title": "n", "content": "shared", "customer_ids": [c1["id"], c2["id"]]}, headers=headers)
     client.post("/api/segments", json={"name": "All"}, headers=headers)

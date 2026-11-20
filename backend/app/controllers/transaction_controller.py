@@ -2,7 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.controllers import webhook_controller
+from app.controllers import activity_controller, webhook_controller
 from app.controllers.customer_controller import get_customer, recompute_derived_fields
 from app.models.transaction import Transaction
 from app.schemas.transaction import TransactionCreate, TransactionItem, TransactionUpdate
@@ -43,6 +43,7 @@ def get_transaction(db: Session, org_id: UUID, customer_id: UUID, transaction_id
 
 def update_transaction(db: Session, org_id: UUID, customer_id: UUID, transaction_id: UUID, data: TransactionUpdate) -> Transaction:
     tx = get_transaction(db, org_id, customer_id, transaction_id)
+    before = activity_controller.snapshot(tx, activity_controller.TRANSACTION_FIELDS)
     updates = data.model_dump(exclude_unset=True)
     if "items" in updates and updates["items"] is not None:
         tx.items = updates.pop("items")
@@ -51,6 +52,10 @@ def update_transaction(db: Session, org_id: UUID, customer_id: UUID, transaction
         setattr(tx, field, value)
     customer = get_customer(db, org_id, customer_id)
     recompute_derived_fields(customer)
+    activity_controller.record_changes(
+        db, org_id, customer_id, "transaction_updated", f"Purchase ({tx.date})",
+        activity_controller.diff(before, activity_controller.snapshot(tx, activity_controller.TRANSACTION_FIELDS)),
+    )
     db.commit()
     db.refresh(tx)
     webhook_controller.dispatch_event(db, org_id, "transaction.updated", webhook_controller.transaction_payload(tx))
@@ -60,6 +65,11 @@ def update_transaction(db: Session, org_id: UUID, customer_id: UUID, transaction
 def delete_transaction(db: Session, org_id: UUID, customer_id: UUID, transaction_id: UUID) -> None:
     tx = get_transaction(db, org_id, customer_id, transaction_id)
     payload = webhook_controller.transaction_payload(tx)
+    activity_controller.record(
+        db, org_id, customer_id, "transaction_deleted", f"Purchase deleted ({tx.date})",
+        f"{activity_controller._items_text(tx.items, 'item')} · {activity_controller._money(tx.amount, tx.currency)}",
+        {"transaction_id": str(tx.id)},
+    )
     db.delete(tx)
     db.flush()
     customer = get_customer(db, org_id, customer_id)

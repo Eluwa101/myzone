@@ -13,6 +13,7 @@ import SegmentBuilder, { describeFilters } from "../components/SegmentBuilder";
 import Spinner from "../components/Spinner";
 import Tabs from "../components/Tabs";
 import TopBar from "../components/TopBar";
+import { logWhatsappOpened } from "../api/customers";
 import { buildWaLink, normalizePhone } from "../utils/whatsapp";
 
 // pulls in the rich-text editor, so only load it once the Email tab is opened
@@ -289,7 +290,10 @@ function WhatsappTab({ segmentId, members }: { segmentId: string; members: Segme
                   target="_blank"
                   rel="noreferrer"
                   className="row-between"
-                  onClick={() => setOpened((prev) => new Set(prev).add(m.id))}
+                  onClick={() => {
+                    logWhatsappOpened(m.id, personalize(message, m));
+                    setOpened((prev) => new Set(prev).add(m.id));
+                  }}
                 >
                   <span>
                     {m.name}

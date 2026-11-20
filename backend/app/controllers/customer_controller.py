@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import Text, func, or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.controllers import notification_controller, webhook_controller
+from app.controllers import activity_controller, notification_controller, webhook_controller
 from app.models.customer import Customer, CustomerStatus
 from app.models.organization import Organization
 from app.models.transaction import Transaction
@@ -264,6 +264,8 @@ def create_customer(db: Session, org_id: UUID, data: CustomerCreate, force: bool
 
 def update_customer(db: Session, org_id: UUID, customer_id: UUID, data: CustomerUpdate) -> Customer:
     customer = get_customer(db, org_id, customer_id)
+    before = activity_controller.snapshot(customer, activity_controller.CUSTOMER_FIELDS)
+    before_extra = dict(customer.extra or {})
     updates = data.model_dump(exclude_unset=True)
     status = updates.pop("status", "__unset__")
     for field, value in updates.items():
@@ -275,6 +277,9 @@ def update_customer(db: Session, org_id: UUID, customer_id: UUID, data: Customer
     if status != "__unset__":
         _apply_status(customer, status)
     recompute_derived_fields(customer)
+    changes = activity_controller.diff(before, activity_controller.snapshot(customer, activity_controller.CUSTOMER_FIELDS))
+    changes += activity_controller.extra_diff(before_extra, customer.extra)
+    activity_controller.record_changes(db, org_id, customer.id, "profile_updated", "Profile", changes)
     db.commit()
     db.refresh(customer)
     webhook_controller.dispatch_event(db, org_id, "customer.updated", webhook_controller.customer_payload(customer))
@@ -293,9 +298,11 @@ def merge_customers(db: Session, org_id: UUID, keep_id: UUID, merge_id: UUID) ->
     keep = get_customer(db, org_id, keep_id)
     merge = get_customer(db, org_id, merge_id)
 
+    filled = []
     for field in ["phone", "email", "job", "nationality", "pet", "birthday", "address", "consent_date"]:
         if not getattr(keep, field) and getattr(merge, field):
             setattr(keep, field, getattr(merge, field))
+            filled.append(field.replace("_", " "))
 
     seen, parts = set(), []
     for part in (keep.interests or "").split(",") + (merge.interests or "").split(","):
@@ -318,9 +325,26 @@ def merge_customers(db: Session, org_id: UUID, keep_id: UUID, merge_id: UUID) ->
         if key in existing_keys:
             db.delete(tx)
         else:
-            tx.customer_id = keep.id
+            # via the relationship, not the FK column: otherwise the merged record's
+            # still-loaded collection cascade-deletes this transaction with it
+            tx.customer = keep
             existing_keys.add(key)
+    # orders move with the customer too (through the relationship, so deleting
+    # the merged record below doesn't cascade-delete them)
+    moved_orders = len(merge.orders)
+    for order in list(merge.orders):
+        order.customer = keep
     db.flush()
+
+    # emails, notes, scans, form submissions and the merged record's own
+    # history are re-pointed at the survivor so the lifetime log stays whole
+    activity_controller.move_history(db, org_id, merge.id, keep.id)
+    activity_controller.record(
+        db, org_id, keep.id, "merged", f"Merged in duplicate record '{merge.name}' ({merge.display_id})",
+        f"{moved_orders} order(s) moved" + (f"; filled in: {', '.join(filled)}" if filled else ""),
+        {"merged_id": str(merge.id), "merged_name": merge.name, "merged_display_id": merge.display_id, "filled": filled},
+    )
+    db.expire(merge, ["events"])
 
     recompute_derived_fields(keep)
     db.delete(merge)

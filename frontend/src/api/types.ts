@@ -279,3 +279,20 @@ export interface ImportResult {
   failed: number;
   errors: string[];
 }
+
+export interface ActivityItem {
+  id: string;
+  kind: string;
+  at: string;
+  title: string;
+  detail: string | null;
+  status: string | null;
+  link: string | null;
+}
+
+export interface ActivityResult {
+  items: ActivityItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}

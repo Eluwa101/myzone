@@ -21,6 +21,7 @@ from langchain.tools import tool
 from sqlalchemy.orm import Session
 
 from app.controllers import (
+    activity_controller,
     customer_controller,
     form_controller,
     messaging_controller,
@@ -192,6 +193,25 @@ def build_read_tools(db: Session, org_id: UUID) -> list:
                 for g in groups
             ]
         }
+
+    @tool
+    def get_customer_activity(customer_id: str, limit: int = 30) -> dict:
+        """A customer's whole history, newest first: emails and WhatsApp chats
+        (WhatsApp is logged as "opened" - it can't be confirmed sent), orders,
+        purchases, notes, scans, form submissions, profile/status changes,
+        merges, and orders or purchases that were edited or deleted. Use it
+        to answer "what has happened with this customer?" or "when did we
+        last contact them?"."""
+        customer, err = None, None
+        cid = parse_uuid(customer_id)
+        if not cid:
+            return {"status": "error", "message": "customer_id must be a customer id - use search_customers to find it."}
+        try:
+            customer = customer_controller.get_customer(db, org_id, cid)
+        except customer_controller.CustomerNotFoundError:
+            return {"status": "error", "message": "No customer with that id."}
+        items, total = activity_controller.get_activity(db, org_id, customer, page=1, page_size=cap(limit))
+        return {"customer": customer.name, "total": total, "activity": [i.model_dump(mode="json", exclude={"id", "link"}) for i in items]}
 
     @tool
     def list_custom_fields() -> dict:
@@ -638,7 +658,7 @@ def build_read_tools(db: Session, org_id: UUID) -> list:
         }
 
     return [
-        search_customers, find_customer_by_id, get_customer, find_duplicate_customers, list_custom_fields,
+        search_customers, find_customer_by_id, get_customer, get_customer_activity, find_duplicate_customers, list_custom_fields,
         list_transactions, list_orders, list_notes,
         get_dashboard_summary, get_sales_report,
         list_messages, get_message, list_email_templates, get_email_template, get_merge_tag_guide, preview_email,

@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Customer, CustomerListResult, CustomerStatus, DuplicateGroup, ImportResult, Order, OrderItem, Transaction, TransactionLineItem } from "./types";
+import type { ActivityResult, Customer, CustomerListResult, CustomerStatus, DuplicateGroup, ImportResult, Order, OrderItem, Transaction, TransactionLineItem } from "./types";
 
 export interface CustomerInput {
   name?: string;
@@ -106,4 +106,16 @@ export function exportCsv(): Promise<string> {
 
 export function importCsv(csvText: string): Promise<ImportResult> {
   return api.post<ImportResult>("/api/customers/import", { csv_text: csvText });
+}
+
+export function getCustomerActivity(id: string, page = 1, pageSize = 30): Promise<ActivityResult> {
+  return api.get<ActivityResult>(`/api/customers/${id}/activity?page=${page}&page_size=${pageSize}`);
+}
+
+/** Records that a WhatsApp chat was opened for this customer. wa.me can't tell us the message was
+ * actually sent, so it's logged as "opened". Fire-and-forget: a logging hiccup must never block the chat. */
+export function logWhatsappOpened(id: string, message: string): void {
+  api.post<void>(`/api/customers/${id}/activity/whatsapp`, { message }).catch(() => {
+    /* non-fatal */
+  });
 }

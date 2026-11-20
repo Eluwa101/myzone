@@ -3,11 +3,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
-from app.controllers import customer_controller
+from app.controllers import activity_controller, customer_controller
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.customer import CustomerStatus
 from app.models.user import User
+from app.schemas.activity import ActivityOut, WhatsappOpenedRequest
 from app.schemas.customer import (
     CustomerCreate,
     CustomerListOut,
@@ -120,4 +121,40 @@ def delete_customer(customer_id: UUID, db: Session = Depends(get_db), current_us
         customer_controller.delete_customer(db, current_user.org_id, customer_id)
     except customer_controller.CustomerNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found.")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{customer_id}/activity", response_model=ActivityOut)
+def get_activity(
+    customer_id: UUID,
+    page: int = 1,
+    page_size: int = 30,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """The customer's whole history, newest first: emails, WhatsApp chats,
+    orders, purchases, notes, scans, form submissions, profile and status
+    changes, merges and deletions."""
+    try:
+        customer = customer_controller.get_customer(db, current_user.org_id, customer_id)
+    except customer_controller.CustomerNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found.")
+    items, total = activity_controller.get_activity(db, current_user.org_id, customer, page, page_size)
+    return ActivityOut(items=items, total=total, page=max(1, page), page_size=min(max(1, page_size), activity_controller.MAX_PAGE_SIZE))
+
+
+@router.post("/{customer_id}/activity/whatsapp", status_code=status.HTTP_204_NO_CONTENT)
+def log_whatsapp_opened(
+    customer_id: UUID,
+    data: WhatsappOpenedRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Called when someone opens a WhatsApp chat with this customer. wa.me
+    can't confirm the message was actually sent, so it is logged as opened."""
+    try:
+        customer = customer_controller.get_customer(db, current_user.org_id, customer_id)
+    except customer_controller.CustomerNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found.")
+    activity_controller.record_whatsapp_opened(db, current_user.org_id, customer.id, data.message)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -2,6 +2,7 @@ import { AlertTriangle, MessageCircle, Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { errorMessage } from "../api/errorMessage";
 import { getDefaultCountryCode } from "../api/settings";
+import { logWhatsappOpened } from "../api/customers";
 import { buildWaLink, htmlToPlainText, normalizePhone } from "../utils/whatsapp";
 import {
   draftEmail,
@@ -252,6 +253,7 @@ export default function EmailComposer({
     }
     setWhatsappArmed(false);
     window.open(whatsappLink.url, "_blank", "noopener,noreferrer");
+    logWhatsappOpened(whatsappRecipient.id, whatsappText);
     setWhatsappOpened((prev) => new Set(prev).add(whatsappRecipient.id));
   }
 

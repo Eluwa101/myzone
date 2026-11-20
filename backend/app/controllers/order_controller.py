@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.controllers import notification_controller, webhook_controller
+from app.controllers import activity_controller, notification_controller, webhook_controller
 from app.controllers.customer_controller import get_customer
 from app.core.paging import contains_any, like_pattern
 from app.models.customer import Customer
@@ -84,11 +84,16 @@ def _get_order(db: Session, org_id: UUID, customer_id: UUID, order_id: UUID) -> 
 
 def update_order(db: Session, org_id: UUID, customer_id: UUID, order_id: UUID, data: OrderUpdate) -> Order:
     order = _get_order(db, org_id, customer_id, order_id)
+    before = activity_controller.snapshot(order, activity_controller.ORDER_FIELDS)
     updates = data.model_dump(exclude_unset=True)
     if "items" in updates:
         updates["items"] = [item if isinstance(item, dict) else item.model_dump() for item in updates["items"]]
     for field, value in updates.items():
         setattr(order, field, value)
+    activity_controller.record_changes(
+        db, org_id, customer_id, "order_updated", f"Order ({order.order_date})",
+        activity_controller.diff(before, activity_controller.snapshot(order, activity_controller.ORDER_FIELDS)),
+    )
     db.commit()
     db.refresh(order)
     webhook_controller.dispatch_event(db, org_id, "order.updated", webhook_controller.order_payload(order))
@@ -98,6 +103,10 @@ def update_order(db: Session, org_id: UUID, customer_id: UUID, order_id: UUID, d
 def delete_order(db: Session, org_id: UUID, customer_id: UUID, order_id: UUID) -> None:
     order = _get_order(db, org_id, customer_id, order_id)
     payload = webhook_controller.order_payload(order)
+    activity_controller.record(
+        db, org_id, customer_id, "order_deleted", f"Order deleted ({order.order_date})",
+        activity_controller._items_text(order.items, "name"), {"order_id": str(order.id)},
+    )
     db.delete(order)
     db.commit()
     webhook_controller.dispatch_event(db, org_id, "order.deleted", payload)

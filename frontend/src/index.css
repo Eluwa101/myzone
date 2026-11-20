@@ -3346,3 +3346,60 @@ button.card-body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Customer activity log */
+
+.activity-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.activity-day {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin: 14px 0 6px;
+}
+
+.activity-row {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.activity-icon {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-hover);
+  color: var(--accent);
+}
+
+.activity-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.activity-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.activity-detail {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.activity-bad .activity-icon {
+  color: var(--danger, #b91c1c);
+}
+
+.activity-muted .activity-title {
+  color: var(--text-muted);
+}

@@ -52,3 +52,4 @@ class Customer(Base):
     organization = relationship("Organization", back_populates="customers")
     transactions = relationship("Transaction", back_populates="customer", cascade="all, delete-orphan")
     orders = relationship("Order", back_populates="customer", cascade="all, delete-orphan")
+    events = relationship("CustomerEvent", cascade="all, delete-orphan", passive_deletes=False)

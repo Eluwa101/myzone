@@ -21,6 +21,7 @@ from app.models.outbound_message import OutboundMessage, MessageChannel, Message
 from app.models.api_key import ApiKey
 from app.models.document_scan import DocumentScan
 from app.models.admin_access_log import AdminAccessLog
+from app.models.customer_event import CustomerEvent
 
 __all__ = [
     "AdminAccessLog",
@@ -52,4 +53,5 @@ __all__ = [
     "OutboundMessage",
     "MessageChannel",
     "MessageStatus",
+    "CustomerEvent",
 ]
