@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.controllers import messaging_controller
 from app.core.database import get_db
 from app.core.paging import paginate
-from app.agent.email_draft import EmailDraftError, draft_email
+from app.agent.email_draft import EmailDraftError, WhatsappDraftError, draft_email, draft_whatsapp
 from app.agent.rewrite import RewriteError, build_rewrite_context, rewrite_message
 from app.controllers import segment_controller
 from app.controllers.merge_tag_suggestions import describe_segment, suggest_for_segment
@@ -31,6 +31,8 @@ from app.schemas.messaging import (
     MessagePreviewOut,
     MessagePreviewRequest,
     RewriteOut,
+    WhatsappDraftOut,
+    WhatsappDraftRequest,
     RewriteRequest,
     OutboundMessageDetailOut,
     OutboundMessageOut,
@@ -167,6 +169,31 @@ def draft(data: EmailDraftRequest, db: Session = Depends(get_db), current_user: 
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Couldn't write that email - try describing it differently.",
         )
+
+
+@router.post("/draft-whatsapp", response_model=WhatsappDraftOut)
+def draft_whatsapp_message(data: WhatsappDraftRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """The assistant writes (or rewrites) a WhatsApp message from a description - plain text, with
+    merge tags that are filled in per customer."""
+    org_id = current_user.org_id
+    business_text, tags_text = build_rewrite_context(db, org_id)
+    segment_text = suggested_text = None
+    if data.segment_id:
+        segment = _segment_or_404(db, org_id, data.segment_id)
+        segment_text = describe_segment(segment)
+        suggested_text = "\n".join(f"- {s['label']} ({s['reason']}): {s['tag']}" for s in suggest_for_segment(db, org_id, segment))
+    try:
+        result = draft_whatsapp(
+            description=data.description, tags_text=tags_text, business_text=business_text, segment_text=segment_text,
+            suggested_text=suggested_text, current_text=data.current_text,
+            check=lambda subject, body: merge_tag_problems(db, org_id, subject, body),
+        )
+    except WhatsappDraftError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Couldn't write that message - try describing it differently.",
+        )
+    return {**result, "placeholders": find_placeholders(result["text"])}
 
 
 @router.post("/rewrite", response_model=RewriteOut)

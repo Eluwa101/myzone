@@ -234,6 +234,9 @@ export interface Segment {
   filters: SegmentFilters;
   /** when set, the segment is defined by this SQL and `filters` is ignored */
   sql?: string | null;
+  /** people in the segment's stored list - a segment is a snapshot of who matched when it was last run */
+  member_count?: number;
+  refreshed_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -250,6 +253,16 @@ export interface SegmentMember {
 export interface SegmentResult {
   total: number;
   members: SegmentMember[];
+  /** set for a saved segment's stored list; absent for a live preview */
+  refreshed_at?: string | null;
+}
+
+/** What running a segment's definition again would change. */
+export interface SegmentChanges {
+  to_add: number;
+  to_remove: number;
+  add_sample: string[];
+  remove_sample: string[];
 }
 
 export interface SavedWidget {

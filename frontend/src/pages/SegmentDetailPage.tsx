@@ -1,9 +1,9 @@
-import { Code2, Mail, Pencil, Trash2, UsersRound } from "lucide-react";
+import { Code2, Mail, Pencil, RefreshCw, Trash2, UserPlus, UsersRound } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { deleteSegment, getSegment, getSegmentMembers } from "../api/segments";
+import { deleteSegment, getSegment, getSegmentChanges, getSegmentMembers, refreshSegment } from "../api/segments";
 import { errorMessage } from "../api/errorMessage";
-import type { Segment, SegmentMember, SegmentResult } from "../api/types";
+import type { Segment, SegmentChanges, SegmentMember, SegmentResult } from "../api/types";
 import CardHead from "../components/CardHead";
 import ErrorText from "../components/ErrorText";
 import InfoTip from "../components/InfoTip";
@@ -47,6 +47,9 @@ export default function SegmentDetailPage() {
   const composer = useComposer({ recipients, segmentId: id });
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // what running the definition again would change - the list itself only changes when asked to
+  const [changes, setChanges] = useState<SegmentChanges | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   function load() {
     Promise.all([getSegment(id), getSegmentMembers(id)])
@@ -56,8 +59,25 @@ export default function SegmentDetailPage() {
         setError(null);
       })
       .catch((err) => setError(errorMessage(err)));
+    // a failing definition (e.g. SQL naming a removed field) must not hide the list
+    getSegmentChanges(id)
+      .then(setChanges)
+      .catch(() => setChanges(null));
   }
   useEffect(load, [id]);
+
+  async function refresh(mode: "add" | "rerun") {
+    setRefreshing(true);
+    setError(null);
+    try {
+      await refreshSegment(id, mode);
+      load();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   async function remove() {
     try {
@@ -96,13 +116,55 @@ export default function SegmentDetailPage() {
               icon={segment.sql ? <Code2 /> : <UsersRound />}
               tone="violet"
               title={segment.name}
-              subtitle={`${members.total} customer${members.total === 1 ? "" : "s"} right now`}
+              subtitle={
+                <>
+                  {members.total} customer{members.total === 1 ? "" : "s"}
+                  {members.refreshed_at ? ` · as of ${new Date(members.refreshed_at).toLocaleDateString()}` : ""}{" "}
+                  <InfoTip label="About this list">
+                    This list stays as it is, so the people you picked don't change under you. New customers who match are
+                    offered below; add them, or rerun the segment from the ⋯ menu to rebuild the list from scratch.
+                  </InfoTip>
+                </>
+              }
               items={[
                 { key: "edit", label: "Edit segment", icon: <Pencil />, onSelect: () => setEditing(true) },
+                {
+                  key: "rerun",
+                  label: "Rerun segment",
+                  icon: <RefreshCw />,
+                  disabled: refreshing,
+                  confirm: changes && changes.to_remove > 0 ? `Drop ${changes.to_remove} who no longer match?` : "Rebuild the list?",
+                  onSelect: () => refresh("rerun"),
+                },
                 { key: "div", divider: true },
                 { key: "delete", label: "Delete segment", icon: <Trash2 />, danger: true, confirm: "Really delete?", onSelect: remove },
               ]}
             />
+            {changes && (changes.to_add > 0 || changes.to_remove > 0) && (
+              <div className="segment-changes">
+                {changes.to_add > 0 && (
+                  <div className="row-between">
+                    <span className="small">
+                      <b>{changes.to_add}</b> new customer{changes.to_add === 1 ? " matches" : "s match"} now
+                      <span className="muted">
+                        {" "}
+                        - {changes.add_sample.join(", ")}
+                        {changes.to_add > changes.add_sample.length ? "…" : ""}
+                      </span>
+                    </span>
+                    <button type="button" className="btn-primary" disabled={refreshing} onClick={() => refresh("add")}>
+                      <UserPlus size={14} /> {refreshing ? "Adding…" : `Add ${changes.to_add}`}
+                    </button>
+                  </div>
+                )}
+                {changes.to_remove > 0 && (
+                  <p className="muted small" style={{ margin: "4px 0 0" }}>
+                    {changes.to_remove} in the list no longer match ({changes.remove_sample.join(", ")}
+                    {changes.to_remove > changes.remove_sample.length ? "…" : ""}) - they stay until you rerun the segment.
+                  </p>
+                )}
+              </div>
+            )}
             {segment.sql ? (
               <details className="sql-reference">
                 <summary className="muted small">

@@ -539,7 +539,7 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         Recipients: either customer_ids (comma-separated customer ids - look
         them up with search_customers or find_customer_by_id first, not
         names) or segment_name (a saved segment - see list_segments; everyone
-        in it right now).
+        in its stored list).
         Content: either template_name (an existing saved template - check
         list_email_templates first) or your own subject and body_html (HTML).
         body_html can use merge tags filled in per recipient - call
@@ -663,7 +663,8 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         buyers"). Define it with filters_json (see get_segment_fields for the
         format) OR a SELECT query in sql (see get_segment_sql_schema), not
         both. Check who it matches with preview_segment first. Reversible, so
-        it saves immediately."""
+        it saves immediately. The segment keeps a stored list of who matched when it was
+        created; it does not change by itself later."""
         if not name.strip():
             return {"status": "error", "message": "name is required."}
         if find_segment(db, org_id, name) and find_segment(db, org_id, name).name.lower() == name.strip().lower():
@@ -688,7 +689,8 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
     def update_segment(segment: str, new_name: str = "", filters_json: str = "", sql: str = "") -> dict:
         """Change a saved segment (by name or id): rename it, or replace its
         filters_json or its sql (pass at most one definition). Read it with
-        get_segment first. Reversible, so it saves immediately."""
+        get_segment first. Changing the filters or SQL re-runs the segment (the old list no
+        longer applies); renaming does not. Reversible, so it saves immediately."""
         found = find_segment(db, org_id, segment)
         if not found:
             return {"status": "error", "message": f"No segment {segment!r} - check list_segments."}
@@ -714,6 +716,35 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
             return {"status": "error", "message": f"That query doesn't work: {e}"}
         result = {"status": "updated", "id": str(updated.id), "name": updated.name, "members": members}
         log("update_segment", {"segment": segment, **{k: (v if isinstance(v, str) else "filters") for k, v in data.items()}}, result)
+        return result
+
+    @tool
+    def refresh_segment(segment: str, mode: str = "add") -> dict:
+        """Bring a segment's stored list up to date. mode "add" (the default) keeps everyone
+        already in the list and adds whoever matches now - it only ever adds, so it runs
+        immediately. mode "rerun" replaces the list with exactly who matches now, which can
+        drop people, so it never acts immediately: a human must confirm first. Check
+        get_segment_changes first and tell the user what will change."""
+        found = find_segment(db, org_id, segment)
+        if not found:
+            return {"status": "error", "message": f"No segment {segment!r} - check list_segments."}
+        mode = mode.strip().lower()
+        if mode not in ("add", "rerun"):
+            return {"status": "error", "message": 'mode must be "add" or "rerun".'}
+        try:
+            to_add, to_remove = segment_controller.segment_changes(db, found)
+        except SegmentSQLError as e:
+            return {"status": "error", "message": f"That segment's SQL doesn't run: {e}"}
+        if mode == "rerun" and to_remove:
+            names = ", ".join(c.name for c in to_remove[:5]) + ("..." if len(to_remove) > 5 else "")
+            return stage(
+                "rerun_segment", {"segment_id": str(found.id)},
+                f"Rerun the segment '{found.name}': add {len(to_add)} new match(es) and drop {len(to_remove)} who no longer match ({names}).",
+            )
+        added, removed = segment_controller.refresh_segment(db, found, mode)
+        db.refresh(found)
+        result = {"status": "updated", "segment": found.name, "added": added, "removed": removed, "members": found.member_count}
+        log("refresh_segment", {"segment": segment, "mode": mode}, result)
         return result
 
     @tool
@@ -951,7 +982,7 @@ def build_tools(db: Session, org_id: UUID, user_id: UUID) -> list:
         set_customer_custom_field, rename_customer_custom_field, remove_customer_custom_field,
         add_customer_note, create_shared_note, update_note, delete_note,
         delete_customer, merge_customers, import_customers_csv,
-        create_segment, update_segment, delete_segment,
+        create_segment, update_segment, refresh_segment, delete_segment,
         create_email_template, update_email_template, delete_email_template, send_customer_email,
         update_settings,
         create_form, update_form, delete_form,

@@ -27,10 +27,10 @@ export default function SegmentsPage() {
     <div>
       <TopBar title="Segments" backTo="/data" />
       <p className="muted small page-note">
-        Groups of customers, always up to date.{" "}
+        Saved groups of customers.{" "}
         <InfoTip>
-          Define a group of customers by filters - always resolved live, never a stale snapshot. Open a segment to see who is
-          in it and to email or WhatsApp them.
+          Define a group by filters. A segment keeps its list of people until you update it - open one to add new matches or
+          rerun it, and to email or WhatsApp everyone in it.
         </InfoTip>
       </p>
       <ErrorText message={error} />
@@ -60,7 +60,7 @@ export default function SegmentsPage() {
                 icon={s.sql ? <Code2 /> : <UsersRound />}
                 tone="violet"
                 title={s.name}
-                subtitle={s.sql ? "Custom SQL" : undefined}
+                subtitle={`${s.member_count ?? 0} customer${s.member_count === 1 ? "" : "s"}${s.sql ? " · Custom SQL" : ""}`}
               />
               {!s.sql && <p className="muted small clamp-text segment-filters">{describeFilters(s.filters)}</p>}
             </Link>

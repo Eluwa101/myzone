@@ -1,5 +1,5 @@
 import { api, queryString, type Paged } from "./client";
-import type { Segment, SegmentFieldsCatalog, SegmentFilters, SegmentResult } from "./types";
+import type { Segment, SegmentChanges, SegmentFieldsCatalog, SegmentFilters, SegmentResult } from "./types";
 
 export interface SegmentInput {
   name: string;
@@ -39,6 +39,16 @@ export function previewSegment(filters: SegmentFilters): Promise<SegmentResult> 
 
 export function getSegmentMembers(id: string): Promise<SegmentResult> {
   return api.get<SegmentResult>(`/api/segments/${id}/members`);
+}
+
+/** Who matches the definition now but isn't in the list yet, and who is in the list but no longer matches. */
+export function getSegmentChanges(id: string): Promise<SegmentChanges> {
+  return api.get<SegmentChanges>(`/api/segments/${id}/changes`);
+}
+
+/** "add" keeps the list and adds new matches; "rerun" replaces it with exactly who matches now. */
+export function refreshSegment(id: string, mode: "add" | "rerun"): Promise<{ added: number; removed: number; total: number }> {
+  return api.post<{ added: number; removed: number; total: number }>(`/api/segments/${id}/refresh`, { mode });
 }
 
 export function suggestSegmentFilters(description: string): Promise<SegmentFilters> {

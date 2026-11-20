@@ -137,6 +137,14 @@ def move_history(db: Session, org_id: UUID, from_id: UUID, to_id: UUID) -> None:
     for model in (CustomerEvent, OutboundMessage, FormSubmission):
         db.execute(update(model).where(model.customer_id == from_id).values(customer_id=to_id))
     db.execute(update(DocumentScan).where(DocumentScan.customer_id == from_id).values(customer_id=to_id))
+    from app.models.segment import SegmentMember
+
+    already_in = {r[0] for r in db.execute(select(SegmentMember.segment_id).where(SegmentMember.customer_id == to_id))}
+    for (segment_id,) in db.execute(select(SegmentMember.segment_id).where(SegmentMember.customer_id == from_id)).all():
+        if segment_id in already_in:
+            db.execute(SegmentMember.__table__.delete().where(SegmentMember.segment_id == segment_id, SegmentMember.customer_id == from_id))
+        else:
+            db.execute(update(SegmentMember).where(SegmentMember.segment_id == segment_id, SegmentMember.customer_id == from_id).values(customer_id=to_id))
     already = {r[0] for r in db.execute(select(note_customers.c.note_id).where(note_customers.c.customer_id == to_id))}
     for (note_id,) in db.execute(select(note_customers.c.note_id).where(note_customers.c.customer_id == from_id)).all():
         if note_id in already:

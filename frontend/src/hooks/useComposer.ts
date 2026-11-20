@@ -78,6 +78,16 @@ export function useComposer({
       .catch(() => setSuggestions([]));
   }, [segmentId]);
 
+  /** a template was just saved from the draft: list it, and mark the draft as based on it */
+  function addTemplate(t: EmailTemplate) {
+    setTemplates((prev) => [...prev.filter((x) => x.id !== t.id), t].sort((a, b) => a.name.localeCompare(b.name)));
+    setTemplateId(t.id);
+  }
+
+  function replaceTemplate(t: EmailTemplate) {
+    setTemplates((prev) => prev.map((x) => (x.id === t.id ? t : x)));
+  }
+
   function selectTemplate(id: string) {
     setTemplateId(id);
     const t = templates.find((tpl) => tpl.id === id);
@@ -110,6 +120,8 @@ export function useComposer({
     templates,
     templateId,
     selectTemplate,
+    addTemplate,
+    replaceTemplate,
     subject,
     setSubject,
     bodyHtml,

@@ -144,6 +144,19 @@ class EmailDraftRequest(BaseModel):
     current_body: str | None = Field(default=None, max_length=100_000)
 
 
+class WhatsappDraftRequest(BaseModel):
+    description: str = Field(min_length=1, max_length=2000)
+    segment_id: UUID | None = None
+    # when given, the assistant edits this message instead of starting over
+    current_text: str | None = Field(default=None, max_length=10_000)
+
+
+class WhatsappDraftOut(BaseModel):
+    text: str
+    problems: list[str] = []
+    placeholders: list[str] = []
+
+
 class EmailDraftOut(BaseModel):
     subject: str
     body_html: str

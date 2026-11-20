@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { createSegment, getSegmentFields, previewSegment, previewSqlSegment, suggestSegmentFilters, updateSegment } from "../api/segments";
 import { errorMessage } from "../api/errorMessage";
 import type { Segment, SegmentFieldsCatalog, SegmentFilters, SegmentNode, SegmentResult } from "../api/types";
+import InfoTip from "./InfoTip";
 import ErrorText from "./ErrorText";
 import SegmentQueryBuilder, { emptyGroup, OPERATOR_LABELS } from "./SegmentQueryBuilder";
 import SqlSegmentEditor from "./SqlSegmentEditor";
@@ -196,6 +197,11 @@ export default function SegmentBuilder({
         <button type="button" onClick={onCancel} disabled={busy}>
           <X size={15} /> Cancel
         </button>
+        {initial && (
+          <InfoTip label="About saving changes">
+            Saving a changed definition rebuilds the list from it - the old list no longer applies. Renaming alone keeps the list.
+          </InfoTip>
+        )}
       </div>
     </form>
   );

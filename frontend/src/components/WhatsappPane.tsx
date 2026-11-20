@@ -2,10 +2,11 @@ import { Copy, ExternalLink, MessageCircle, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { logWhatsappOpened } from "../api/customers";
 import { errorMessage } from "../api/errorMessage";
-import { previewMessageBatch } from "../api/messaging";
+import { draftWhatsapp, previewMessageBatch } from "../api/messaging";
 import type { ComposerState } from "../hooks/useComposer";
 import { findPlaceholders, isBlankHtml } from "../utils/composer";
 import { buildWaLink, htmlToPlainText, plainTextToHtml } from "../utils/whatsapp";
+import AssistantCard from "./AssistantCard";
 import ErrorText from "./ErrorText";
 import ImproveMenu from "./ImproveMenu";
 import InfoTip from "./InfoTip";
@@ -102,6 +103,16 @@ export default function WhatsappPane({ composer }: { composer: ComposerState }) 
     });
   }
 
+  async function onDraft(description: string): Promise<boolean> {
+    const draft = await draftWhatsapp({
+      description,
+      segmentId: composer.segmentId,
+      currentText: editorValue.trim() ? editorValue : null,
+    });
+    composer.setWhatsappText(draft.text); // it becomes WhatsApp's own wording; the email is untouched
+    return true;
+  }
+
   function open(recipient: (typeof shown)[number]) {
     const text = texts[recipient.id];
     if (loading || !text) {
@@ -154,6 +165,13 @@ export default function WhatsappPane({ composer }: { composer: ComposerState }) 
         <p className="muted small">No one here has a usable phone number on file.</p>
       ) : (
         <>
+          <AssistantCard
+            hasContent={!!editorValue.trim()}
+            noun="message"
+            placeholderChange="e.g. make it shorter and friendlier, and mention they can collect after 4pm"
+            placeholderNew="e.g. tell them their order is ready for collection and thank them for shopping with us"
+            onSubmit={onDraft}
+          />
           <label htmlFor="whatsapp-message">Message</label>
           <textarea
             id="whatsapp-message"

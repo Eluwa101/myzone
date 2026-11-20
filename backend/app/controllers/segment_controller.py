@@ -7,7 +7,7 @@ from app.controllers.segment_fields import field_type
 from app.controllers.segment_sql import run_sql_segment, validate_sql
 from app.core.paging import contains_any, like_pattern
 from app.models.customer import Customer
-from app.models.segment import Segment
+from app.models.segment import Segment, SegmentMember
 from app.schemas.segment import SegmentCondition, SegmentCreate, SegmentFilters, SegmentGroup, SegmentUpdate
 
 
@@ -24,7 +24,12 @@ def _clean_sql(sql: str | None) -> str | None:
 def create_segment(db: Session, org_id: UUID, data: SegmentCreate) -> Segment:
     segment = Segment(org_id=org_id, name=data.name, filters=data.filters.model_dump(mode="json"), sql=_clean_sql(data.sql))
     db.add(segment)
-    db.commit()
+    db.flush()
+    try:
+        refresh_segment(db, segment, "rerun")  # the first run - commits
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(segment)
     return segment
 
@@ -54,9 +59,20 @@ def update_segment(db: Session, org_id: UUID, segment_id: UUID, data: SegmentUpd
         segment.name = data.name
     if data.filters is not None:
         segment.filters = data.filters.model_dump(mode="json")
+    redefined = data.filters is not None or data.sql is not None
     if data.sql is not None:
         segment.sql = _clean_sql(data.sql)
-    db.commit()
+    if redefined:
+        # a new definition makes the old list meaningless - run it fresh. Done before
+        # anything is committed, so a query that fails leaves the segment as it was.
+        db.flush()
+        try:
+            refresh_segment(db, segment, "rerun")
+        except Exception:
+            db.rollback()
+            raise
+    else:
+        db.commit()
     db.refresh(segment)
     return segment
 
@@ -200,10 +216,83 @@ def resolve_members(db: Session, org_id: UUID, filters: SegmentFilters) -> list[
     return [c for c in customers if _evaluate(filters, c)]
 
 
-def resolve_segment(db: Session, segment: Segment) -> list[Customer]:
-    """A saved segment's members - by its SQL when it has one, otherwise by
-    its visual filters. Raises SegmentSQLError if saved SQL no longer runs
-    (e.g. it names a custom field that has since been removed)."""
+def resolve_live(db: Session, segment: Segment) -> list[Customer]:
+    """Who matches the segment's definition RIGHT NOW. Raises SegmentSQLError if saved
+    SQL no longer runs (e.g. it names a custom field that has since been removed)."""
     if segment.sql:
         return run_sql_segment(db, segment.org_id, segment.sql)
     return resolve_members(db, segment.org_id, SegmentFilters(**segment.filters))
+
+
+# --- stored lists -----------------------------------------------------------
+#
+# A segment is a snapshot, not a live query: opening it, emailing it and the
+# assistant's tools all use the stored list, so "the 42 customers I picked" stays
+# 42 until someone chooses to pull in new matches ("add") or run it again from
+# scratch ("rerun"). Each member's details (name, email, phone, ...) are still read
+# live from the customer, so only *who belongs* is frozen.
+
+
+def ensure_snapshot(db: Session, segment: Segment) -> None:
+    """A segment from before snapshots has never been run - run it once, now. If its
+    definition can't run, it stays un-run (and shows empty) rather than failing the page."""
+    if segment.refreshed_at is not None:
+        return
+    try:
+        refresh_segment(db, segment, "rerun")
+    except Exception:  # noqa: BLE001 - SegmentSQLError or a bad stored filter
+        db.rollback()
+
+
+def resolve_segment(db: Session, segment: Segment) -> list[Customer]:
+    """A saved segment's STORED members (see above), in name order."""
+    ensure_snapshot(db, segment)
+    return (
+        db.query(Customer)
+        .join(SegmentMember, SegmentMember.customer_id == Customer.id)
+        .filter(SegmentMember.segment_id == segment.id, Customer.org_id == segment.org_id)
+        .order_by(Customer.name, Customer.id)
+        .all()
+    )
+
+
+def _stored_ids(db: Session, segment: Segment) -> set[UUID]:
+    return {r[0] for r in db.query(SegmentMember.customer_id).filter(SegmentMember.segment_id == segment.id).all()}
+
+
+def segment_changes(db: Session, segment: Segment) -> tuple[list[Customer], list[Customer]]:
+    """(customers who match now but aren't in the list, customers in the list who no longer
+    match). Raises SegmentSQLError if the definition can't run."""
+    ensure_snapshot(db, segment)
+    live = {c.id: c for c in resolve_live(db, segment)}
+    stored = _stored_ids(db, segment)
+    to_add = sorted((c for cid, c in live.items() if cid not in stored), key=lambda c: (c.name, str(c.id)))
+    gone = stored - live.keys()
+    to_remove = (
+        db.query(Customer).filter(Customer.org_id == segment.org_id, Customer.id.in_(gone)).order_by(Customer.name, Customer.id).all()
+        if gone
+        else []
+    )
+    return to_add, to_remove
+
+
+def refresh_segment(db: Session, segment: Segment, mode: str) -> tuple[int, int]:
+    """mode "add": keep everyone already in the list and add whoever matches now.
+    mode "rerun": replace the list with exactly who matches now (people who no longer
+    match drop out). Returns (added, removed). Commits."""
+    if mode not in ("add", "rerun"):
+        raise ValueError("mode must be 'add' or 'rerun'")
+    live = {c.id for c in resolve_live(db, segment)}  # raises first, so a failing query changes nothing
+    stored = _stored_ids(db, segment)
+    to_add = live - stored
+    to_remove = (stored - live) if mode == "rerun" else set()
+    if to_remove:
+        db.query(SegmentMember).filter(SegmentMember.segment_id == segment.id, SegmentMember.customer_id.in_(to_remove)).delete(
+            synchronize_session=False
+        )
+    for cid in to_add:
+        db.add(SegmentMember(segment_id=segment.id, customer_id=cid))
+    segment.refreshed_at = datetime.datetime.now(datetime.timezone.utc)
+    db.commit()
+    db.expire(segment, ["member_rows"])
+    return len(to_add), len(to_remove)

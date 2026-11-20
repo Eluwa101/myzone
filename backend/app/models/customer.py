@@ -53,3 +53,5 @@ class Customer(Base):
     transactions = relationship("Transaction", back_populates="customer", cascade="all, delete-orphan")
     orders = relationship("Order", back_populates="customer", cascade="all, delete-orphan")
     events = relationship("CustomerEvent", cascade="all, delete-orphan", passive_deletes=False)
+    # segment lists this customer is in - gone with them
+    segment_memberships = relationship("SegmentMember", cascade="all, delete-orphan")

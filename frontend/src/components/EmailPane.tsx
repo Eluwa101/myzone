@@ -1,9 +1,11 @@
-import { AlertTriangle, Send, Sparkles } from "lucide-react";
+import { AlertTriangle, FilePlus2, Save, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { errorMessage } from "../api/errorMessage";
-import { draftEmail, previewMessage, sendEmail, type MessagePreview } from "../api/messaging";
+import { createEmailTemplate, draftEmail, previewMessage, sendEmail, updateEmailTemplate, type MessagePreview } from "../api/messaging";
 import type { ComposerState } from "../hooks/useComposer";
 import { findPlaceholders, isBlankHtml } from "../utils/composer";
+import AssistantCard from "./AssistantCard";
+import CardMenu from "./CardMenu";
 import EmailBodyEditor, { type EmailBodyEditorHandle } from "./EmailBodyEditor";
 import ErrorText from "./ErrorText";
 import HtmlPreviewFrame from "./HtmlPreviewFrame";
@@ -20,9 +22,11 @@ import SuggestedTagPicker from "./SuggestedTagPicker";
 export default function EmailPane({ composer, embedded = false }: { composer: ComposerState; embedded?: boolean }) {
   const { recipients, subject, setSubject, bodyHtml, setBodyHtml, templateId, templates, suggestions } = composer;
   const [previewFor, setPreviewFor] = useState<MessagePreview | null>(null);
-  const [draftPrompt, setDraftPrompt] = useState("");
-  const [drafting, setDrafting] = useState(false);
-  const [draftError, setDraftError] = useState<string | null>(null);
+  // saving the draft as a reusable template
+  const [namingTemplate, setNamingTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateNote, setTemplateNote] = useState<{ text: string; error: boolean } | null>(null);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -43,34 +47,62 @@ export default function EmailPane({ composer, embedded = false }: { composer: Co
   useEffect(() => setPreviewFor(null), [templateId]);
   useEffect(() => setArmedSend(false), [subject, bodyHtml]);
 
-  async function onDraft() {
-    if (!draftPrompt.trim()) return;
-    setDrafting(true);
-    setDraftError(null);
+  async function onDraft(description: string): Promise<boolean> {
+    const draft = await draftEmail({
+      description,
+      segment_id: composer.segmentId,
+      format: composer.draftFormat,
+      current_subject: subject || null,
+      current_body: hasBody ? bodyHtml : null,
+    });
+    setSubject(draft.subject);
+    setBodyHtml(draft.body_html);
+    composer.bumpEditor();
+    setPreviewFor(null);
+    const first = recipients?.[0];
+    if (first) {
+      setPreviewIndex(0);
+      previewMessage(first.id, draft.subject, draft.body_html)
+        .then(setPreviewFor)
+        .catch(() => {});
+    }
+    return true;
+  }
+
+  const currentTemplate = templates.find((t) => t.id === templateId) ?? null;
+  const canSaveTemplate = subject.trim().length > 0 && hasBody;
+
+  async function saveAsNewTemplate() {
+    const name = templateName.trim();
+    if (!name) return;
+    if (templates.some((t) => t.name.trim().toLowerCase() === name.toLowerCase())) {
+      setTemplateNote({ text: `A template called "${name}" already exists - pick another name, or update that one.`, error: true });
+      return;
+    }
+    setSavingTemplate(true);
+    setTemplateNote(null);
     try {
-      const draft = await draftEmail({
-        description: draftPrompt.trim(),
-        segment_id: composer.segmentId,
-        format: composer.draftFormat,
-        current_subject: subject || null,
-        current_body: hasBody ? bodyHtml : null,
-      });
-      setSubject(draft.subject);
-      setBodyHtml(draft.body_html);
-      composer.bumpEditor();
-      setDraftPrompt("");
-      setPreviewFor(null);
-      const first = recipients?.[0];
-      if (first) {
-        setPreviewIndex(0);
-        previewMessage(first.id, draft.subject, draft.body_html)
-          .then(setPreviewFor)
-          .catch(() => {});
-      }
+      const saved = await createEmailTemplate({ name, subject: subject.trim(), body_html: bodyHtml });
+      composer.addTemplate(saved);
+      setNamingTemplate(false);
+      setTemplateName("");
+      setTemplateNote({ text: `Saved as the template "${saved.name}".`, error: false });
     } catch (err) {
-      setDraftError(errorMessage(err));
+      setTemplateNote({ text: errorMessage(err), error: true });
     } finally {
-      setDrafting(false);
+      setSavingTemplate(false);
+    }
+  }
+
+  async function updateCurrentTemplate() {
+    if (!currentTemplate) return;
+    setTemplateNote(null);
+    try {
+      const saved = await updateEmailTemplate(currentTemplate.id, { subject: subject.trim(), body_html: bodyHtml });
+      composer.replaceTemplate(saved);
+      setTemplateNote({ text: `Updated the template "${saved.name}".`, error: false });
+    } catch (err) {
+      setTemplateNote({ text: errorMessage(err), error: true });
     }
   }
 
@@ -138,50 +170,92 @@ export default function EmailPane({ composer, embedded = false }: { composer: Co
 
   return (
     <div className="email-composer">
-      <div className="card assistant-suggest-card">
-        <label htmlFor="draft-prompt">
-          <Sparkles size={13} className="h3-icon" />{" "}
-          {hasBody ? "Describe a change, and the assistant will rewrite the email" : "Describe the email, and the assistant will write it"}
-        </label>
-        <textarea
-          id="draft-prompt"
-          rows={2}
-          value={draftPrompt}
-          onChange={(e) => setDraftPrompt(e.target.value)}
-          placeholder={
-            hasBody
-              ? "e.g. make it shorter, and add a line for anyone who hasn't paid their order"
-              : "e.g. thank them for their lighter purchases, list each one with the date and total, and if they've bought 3 or more offer [discount] on gas"
-          }
-        />
-        <div className="row" style={{ alignItems: "center" }}>
-          <select
-            aria-label="Email style"
-            value={composer.draftFormat}
-            onChange={(e) => composer.setDraftFormat(e.target.value as "simple" | "designed")}
-            style={{ width: "auto" }}
-          >
-            <option value="simple">Simple text</option>
-            <option value="designed">Designed (HTML layout)</option>
-          </select>
-          <button type="button" onClick={onDraft} disabled={drafting || !draftPrompt.trim()}>
-            <Sparkles size={14} /> {drafting ? "Writing…" : hasBody ? "Rewrite" : "Write email"}
-          </button>
-        </div>
-        <ErrorText message={draftError} />
-      </div>
+      <AssistantCard
+        hasContent={hasBody}
+        noun="email"
+        placeholderChange="e.g. make it shorter, and add a line for anyone who hasn't paid their order"
+        placeholderNew="e.g. thank them for their lighter purchases, list each one with the date and total, and if they've bought 3 or more offer [discount] on gas"
+        onSubmit={onDraft}
+      >
+        <select
+          aria-label="Email style"
+          value={composer.draftFormat}
+          onChange={(e) => composer.setDraftFormat(e.target.value as "simple" | "designed")}
+          style={{ width: "auto" }}
+        >
+          <option value="simple">Simple text</option>
+          <option value="designed">Designed (HTML layout)</option>
+        </select>
+      </AssistantCard>
 
       <div className={section}>
         {!embedded && <h3>Template (optional)</h3>}
         {embedded && <label>Template (optional)</label>}
-        <select aria-label="Choose a template" value={templateId} onChange={(e) => composer.selectTemplate(e.target.value)}>
-          <option value="">Start from scratch</option>
-          {templates.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
+        <div className="row" style={{ alignItems: "center", flexWrap: "nowrap" }}>
+          <select aria-label="Choose a template" value={templateId} onChange={(e) => composer.selectTemplate(e.target.value)} style={{ flex: 1 }}>
+            <option value="">Start from scratch</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          <CardMenu
+            label="Template options"
+            items={[
+              {
+                key: "save-new",
+                label: "Save as a new template…",
+                icon: <FilePlus2 />,
+                disabled: !canSaveTemplate,
+                onSelect: () => {
+                  setTemplateName(subject.trim());
+                  setTemplateNote(null);
+                  setNamingTemplate(true);
+                },
+              },
+              {
+                key: "update",
+                label: currentTemplate ? `Update "${currentTemplate.name}"` : "Update template",
+                icon: <Save />,
+                hidden: !currentTemplate,
+                disabled: !canSaveTemplate,
+                confirm: "Overwrite the saved template?",
+                onSelect: updateCurrentTemplate,
+              },
+            ]}
+          />
+        </div>
+        {namingTemplate && (
+          <form
+            className="row"
+            style={{ marginTop: 8, alignItems: "center" }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveAsNewTemplate();
+            }}
+          >
+            <input
+              autoFocus
+              aria-label="Template name"
+              placeholder="Template name"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button type="submit" className="btn-primary" disabled={savingTemplate || !templateName.trim()}>
+              {savingTemplate ? "Saving…" : "Save"}
+            </button>
+            <button type="button" onClick={() => setNamingTemplate(false)}>
+              Cancel
+            </button>
+          </form>
+        )}
+        {templateNote && (
+          <p className={templateNote.error ? "tag-problems small" : "muted small"} role={templateNote.error ? "alert" : "status"} style={{ margin: "6px 0 0" }}>
+            {templateNote.text}
+          </p>
+        )}
       </div>
 
       <div className={section}>

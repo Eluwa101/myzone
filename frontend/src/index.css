@@ -3552,3 +3552,13 @@ button.card-body {
   font-weight: 500;
   white-space: normal;
 }
+
+/* Segment list changes */
+
+.segment-changes {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-hover);
+}

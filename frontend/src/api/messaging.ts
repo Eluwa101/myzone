@@ -88,6 +88,21 @@ export function previewMessage(customerId: string, subject: string, bodyHtml: st
   });
 }
 
+export interface WhatsappDraft {
+  text: string;
+  problems: string[];
+  placeholders: string[];
+}
+
+/** The assistant writes (or, with currentText, rewrites) a WhatsApp message from a description. */
+export function draftWhatsapp(data: { description: string; segmentId?: string | null; currentText?: string | null }): Promise<WhatsappDraft> {
+  return api.post<WhatsappDraft>("/api/messages/draft-whatsapp", {
+    description: data.description,
+    segment_id: data.segmentId ?? null,
+    current_text: data.currentText ?? null,
+  });
+}
+
 export type RewriteAction = "shorten" | "reformat" | "friendlier" | "rewrite";
 
 export interface RewriteResult {

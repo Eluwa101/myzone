@@ -12,11 +12,14 @@ from app.core.paging import paginate
 from app.core.security import get_current_user
 from app.models.user import User
 from app.schemas.segment import (
+    SegmentChangesOut,
     SegmentCreate,
     SegmentFieldOut,
     SegmentFieldsOut,
     SegmentFilters,
     SegmentOut,
+    SegmentRefreshOut,
+    SegmentRefreshRequest,
     SandboxTableOut,
     SegmentResult,
     SegmentSQLRequest,
@@ -88,7 +91,10 @@ def list_segments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return paginate(segment_controller.query_segments(db, current_user.org_id, search), response, page, page_size)
+    segments = paginate(segment_controller.query_segments(db, current_user.org_id, search), response, page, page_size)
+    for s in segments:
+        segment_controller.ensure_snapshot(db, s)  # a segment from before snapshots gets its first run here
+    return segments
 
 
 @router.post("", response_model=SegmentOut, status_code=status.HTTP_201_CREATED)
@@ -108,7 +114,9 @@ def preview_segment(filters: SegmentFilters, db: Session = Depends(get_db), curr
 @router.get("/{segment_id}", response_model=SegmentOut)
 def get_segment(segment_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
-        return segment_controller.get_segment(db, current_user.org_id, segment_id)
+        segment = segment_controller.get_segment(db, current_user.org_id, segment_id)
+        segment_controller.ensure_snapshot(db, segment)
+        return segment
     except segment_controller.SegmentNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Segment not found.")
 
@@ -143,8 +151,44 @@ def get_segment_members(segment_id: UUID, db: Session = Depends(get_db), current
         segment = segment_controller.get_segment(db, current_user.org_id, segment_id)
     except segment_controller.SegmentNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Segment not found.")
+    members = segment_controller.resolve_segment(db, segment)
+    return SegmentResult(total=len(members), members=members, refreshed_at=segment.refreshed_at)
+
+
+@router.get("/{segment_id}/changes", response_model=SegmentChangesOut)
+def get_segment_changes(segment_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Who matches the definition now but isn't in the list yet, and who is in the list but no
+    longer matches - so the person can choose between adding the new ones and a full rerun."""
     try:
-        members = segment_controller.resolve_segment(db, segment)
+        segment = segment_controller.get_segment(db, current_user.org_id, segment_id)
+    except segment_controller.SegmentNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Segment not found.")
+    try:
+        to_add, to_remove = segment_controller.segment_changes(db, segment)
     except SegmentSQLError as e:
         raise _sql_error(e)
-    return SegmentResult(total=len(members), members=members)
+    return SegmentChangesOut(
+        to_add=len(to_add), to_remove=len(to_remove),
+        add_sample=[c.name for c in to_add[:5]], remove_sample=[c.name for c in to_remove[:5]],
+    )
+
+
+@router.post("/{segment_id}/refresh", response_model=SegmentRefreshOut)
+def refresh_segment(
+    segment_id: UUID,
+    data: SegmentRefreshRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """mode "add" pulls new matches into the list and keeps everyone already in it. mode
+    "rerun" replaces the list with exactly who matches now."""
+    try:
+        segment = segment_controller.get_segment(db, current_user.org_id, segment_id)
+    except segment_controller.SegmentNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Segment not found.")
+    try:
+        added, removed = segment_controller.refresh_segment(db, segment, data.mode)
+    except SegmentSQLError as e:
+        raise _sql_error(e)
+    db.refresh(segment)
+    return SegmentRefreshOut(added=added, removed=removed, total=segment.member_count, refreshed_at=segment.refreshed_at)

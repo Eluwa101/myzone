@@ -105,6 +105,13 @@ def _execute_delete_segment(db: Session, org_id: UUID, payload: dict) -> dict:
     return {"status": "deleted", "segment_id": payload["segment_id"]}
 
 
+def _execute_rerun_segment(db: Session, org_id: UUID, payload: dict) -> dict:
+    segment = segment_controller.get_segment(db, org_id, UUID(payload["segment_id"]))
+    added, removed = segment_controller.refresh_segment(db, segment, "rerun")
+    db.refresh(segment)
+    return {"status": "updated", "segment": segment.name, "added": added, "removed": removed, "members": segment.member_count}
+
+
 def _execute_delete_email_template(db: Session, org_id: UUID, payload: dict) -> dict:
     messaging_controller.delete_template(db, org_id, UUID(payload["template_id"]))
     return {"status": "deleted", "template_id": payload["template_id"]}
@@ -160,6 +167,7 @@ _EXECUTORS = {
     "delete_order": _execute_delete_order,
     "delete_note": _execute_delete_note,
     "delete_segment": _execute_delete_segment,
+    "rerun_segment": _execute_rerun_segment,
     "delete_email_template": _execute_delete_email_template,
     "delete_form": _execute_delete_form,
     "delete_webhook": _execute_delete_webhook,

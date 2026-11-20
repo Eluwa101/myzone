@@ -135,3 +135,91 @@ Change the email as follows, keeping everything that isn't asked to change: {des
     if draft is None:
         raise EmailDraftError("the model didn't return a usable draft")
     return {**draft, "problems": problems}
+
+
+class WhatsappDraftError(Exception):
+    pass
+
+
+def draft_whatsapp(
+    *,
+    description: str,
+    tags_text: str,
+    business_text: str,
+    segment_text: str | None,
+    suggested_text: str | None,
+    current_text: str | None,
+    check: Callable[[str, str], list[str]],
+) -> dict:
+    """Writes (or rewrites) a WhatsApp message - plain text, with merge tags filled in per
+    customer. Same approach as draft_email: one call, the tags checked with the same checker
+    the Preview button uses, one chance to fix them, and whatever problems remain are
+    returned so the person sees them instead of sending broken tags."""
+    from app.agent.rewrite import html_to_plain
+
+    system = f"""You write WhatsApp messages from a small business to its customers, with merge tags that are filled in per customer.
+
+{business_text}
+
+{MERGE_TAG_GUIDE}
+
+Single-value tags available to this business (use exactly these, nothing else):
+{tags_text}
+""" + (f"\nThe message goes to this customer segment:\n{segment_text}\n" if segment_text else "") + (
+        f"\nTags that fit this segment especially well:\n{suggested_text}\n" if suggested_text else ""
+    ) + """
+Format:
+Plain text only - no HTML, no markdown headings. WhatsApp formatting is fine: *bold* and _italic_. Short paragraphs with a blank
+line between them; keep it under about 900 characters. Greet by first name with {{customer.first_name}} when it fits. At most one
+or two emoji, only if the tone suits.
+For a list of the customer's items or orders, open the block right before the first character of a row and close it right after
+the row's line break, with no blank lines inside, for example:
+Your orders:
+{{#each orders}}• {{item}} - {{amount}}
+{{/each}}Thank you!
+
+Rules:
+- Use merge tags wherever the request refers to customer data - never write example data in their place.
+- Never invent facts the user didn't give (prices, discounts, deadlines, links, phone numbers). Leave a clear placeholder like
+  [discount] or [link] instead.
+- Keep it short, warm and in plain language unless asked otherwise.
+- Reply with ONLY a JSON object: {"text": "..."}"""
+
+    if current_text and current_text.strip():
+        user = f"Current message:\n{current_text}\n\nChange the message as follows, keeping everything that isn't asked to change: {description}"
+    else:
+        user = f"Write this WhatsApp message: {description}"
+
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    draft: str | None = None
+    problems: list[str] = []
+    for attempt in range(2):
+        result = call_with_fallback(get_model, lambda model: model.invoke(messages))
+        raw = extract_text(result.content)
+        try:
+            text = _strip_fences(raw)
+            start, end = text.find("{"), text.rfind("}")
+            if start == -1 or end <= start:
+                raise ValueError("no JSON object in the reply")
+            value = json.loads(text[start : end + 1]).get("text")
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("reply is missing text")
+            draft = html_to_plain(value) if re.search(r"<[a-z][^>]*>", value, re.IGNORECASE) else value.strip()
+        except (ValueError, json.JSONDecodeError):
+            if attempt == 1 or draft is not None:
+                break
+            messages += [
+                {"role": "assistant", "content": raw},
+                {"role": "user", "content": 'That wasn\'t valid JSON. Reply with only {"text": "..."}.'},
+            ]
+            continue
+        problems = check("", draft)
+        if not problems or attempt == 1:
+            break
+        messages += [
+            {"role": "assistant", "content": raw},
+            {"role": "user", "content": "Some merge tags won't work:\n- " + "\n- ".join(problems) + "\nFix them and reply with the full JSON again."},
+        ]
+    if draft is None:
+        raise WhatsappDraftError("the model didn't return a usable message")
+    return {"text": draft, "problems": problems}

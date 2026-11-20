@@ -344,7 +344,7 @@ def merge_customers(db: Session, org_id: UUID, keep_id: UUID, merge_id: UUID) ->
         f"{moved_orders} order(s) moved" + (f"; filled in: {', '.join(filled)}" if filled else ""),
         {"merged_id": str(merge.id), "merged_name": merge.name, "merged_display_id": merge.display_id, "filled": filled},
     )
-    db.expire(merge, ["events"])
+    db.expire(merge, ["events", "segment_memberships"])
 
     recompute_derived_fields(keep)
     db.delete(merge)

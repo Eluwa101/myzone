@@ -480,31 +480,57 @@ def build_read_tools(db: Session, org_id: UUID) -> list:
 
     @tool
     def list_segments() -> dict:
-        """List this org's saved customer segments (name, member count, and
-        whether it's defined by filters or custom SQL) - use a segment's name
-        with send_customer_email to email everyone in it."""
+        """List this org's saved customer segments (name, how many people are in
+        its stored list, when the list was last run, and whether it's defined by
+        filters or custom SQL) - use a segment's name with send_customer_email
+        to email everyone in it. A segment is a snapshot: its list stays as it is
+        until new matches are added or it is rerun (see get_segment_changes)."""
         out = []
         for s in segment_controller.list_segments(db, org_id):
-            try:
-                count = len(segment_controller.resolve_segment(db, s))
-            except SegmentSQLError:
-                count = None
-            out.append({"id": str(s.id), "name": s.name, "members": count, "defined_by": "sql" if s.sql else "filters"})
+            segment_controller.ensure_snapshot(db, s)
+            out.append({
+                "id": str(s.id), "name": s.name, "members": s.member_count, "defined_by": "sql" if s.sql else "filters",
+                "as_of": s.refreshed_at.isoformat() if s.refreshed_at else None,
+            })
         return {"segments": out}
+
+    @tool
+    def get_segment_changes(segment: str) -> dict:
+        """What running a segment's definition again would change, without changing
+        anything: how many customers match now but aren't in its list yet, and how many
+        are in the list but no longer match, with a few names of each. Use it before
+        refresh_segment."""
+        found = find_segment(db, org_id, segment)
+        if not found:
+            return {"status": "error", "message": f"No segment {segment!r} - check list_segments."}
+        try:
+            to_add, to_remove = segment_controller.segment_changes(db, found)
+        except SegmentSQLError as e:
+            return {"status": "error", "message": f"That segment's SQL doesn't run: {e}"}
+        return {
+            "segment": found.name, "in_list": found.member_count,
+            "new_matches": len(to_add), "new_match_names": [c.name for c in to_add[:10]],
+            "no_longer_match": len(to_remove), "no_longer_match_names": [c.name for c in to_remove[:10]],
+        }
 
     @tool
     def get_segment(segment: str) -> dict:
         """One segment's definition (its filter tree, or its SQL) by name or
-        id - read it before editing a segment."""
+        id, how many people are in its stored list and when it was last run -
+        read it before editing a segment."""
         found = find_segment(db, org_id, segment)
         if not found:
             return {"status": "error", "message": f"No segment {segment!r} - check list_segments."}
-        return {"id": str(found.id), "name": found.name, "filters": found.filters, "sql": found.sql}
+        return {
+            "id": str(found.id), "name": found.name, "filters": found.filters, "sql": found.sql,
+            "members": found.member_count, "as_of": found.refreshed_at.isoformat() if found.refreshed_at else None,
+        }
 
     @tool
     def list_segment_members(segment: str, limit: int = DEFAULT_LIMIT) -> dict:
-        """Who is in a saved segment right now (segments are live, never a
-        stale snapshot), by segment name or id."""
+        """Who is in a saved segment's stored list, by segment name or id. The list is
+        a snapshot as of its last run - it does not change by itself when customer data
+        changes (use get_segment_changes to see what a rerun would change)."""
         found = find_segment(db, org_id, segment)
         if not found:
             return {"status": "error", "message": f"No segment {segment!r} - check list_segments."}
@@ -689,7 +715,7 @@ def build_read_tools(db: Session, org_id: UUID) -> list:
         list_transactions, list_orders, list_notes,
         get_dashboard_summary, get_sales_report,
         list_messages, get_message, list_email_templates, get_email_template, get_merge_tag_guide, preview_email, rewrite_message,
-        list_segments, get_segment, list_segment_members, get_segment_fields, get_segment_sql_schema, preview_segment,
+        list_segments, get_segment, get_segment_changes, list_segment_members, get_segment_fields, get_segment_sql_schema, preview_segment,
         get_settings, list_forms, list_form_submissions, list_scans, list_notifications,
         list_webhooks, list_webhook_deliveries,
     ]

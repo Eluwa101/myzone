@@ -80,6 +80,9 @@ class SegmentOut(BaseModel):
     name: str
     filters: SegmentFilters
     sql: str | None = None
+    # people in the stored list, and when it was last run (a segment is a snapshot)
+    member_count: int = 0
+    refreshed_at: datetime.datetime | None = None
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
@@ -100,6 +103,29 @@ class SegmentMemberOut(BaseModel):
 class SegmentResult(BaseModel):
     total: int
     members: list[SegmentMemberOut]
+    # set for a saved segment's stored list; absent for a live preview
+    refreshed_at: datetime.datetime | None = None
+
+
+class SegmentChangesOut(BaseModel):
+    """What running the definition again would change, without changing anything."""
+
+    to_add: int
+    to_remove: int
+    add_sample: list[str] = []
+    remove_sample: list[str] = []
+
+
+class SegmentRefreshRequest(BaseModel):
+    # "add" keeps the list and adds new matches; "rerun" replaces it with exactly who matches now
+    mode: Literal["add", "rerun"]
+
+
+class SegmentRefreshOut(BaseModel):
+    added: int
+    removed: int
+    total: int
+    refreshed_at: datetime.datetime | None = None
 
 
 class SegmentFieldOut(BaseModel):

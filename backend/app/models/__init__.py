@@ -7,7 +7,7 @@ from app.models.org_note import OrgNote
 from app.models.org_settings import OrgSettings
 from app.models.saved_widget import SavedWidget
 from app.models.custom_form import CustomForm, FormSubmission
-from app.models.segment import Segment
+from app.models.segment import Segment, SegmentMember
 from app.models.pending_action import PendingAction
 from app.models.agent_action import AgentAction
 from app.models.chat_thread import ChatThread
@@ -54,4 +54,5 @@ __all__ = [
     "MessageChannel",
     "MessageStatus",
     "CustomerEvent",
+    "SegmentMember",
 ]
