@@ -6,7 +6,8 @@ import type { PendingAction } from "../api/types";
 
 function referencedCustomerLinks(action: PendingAction): { id: string; label: string }[] {
   const payload = action.payload as Record<string, unknown>;
-  if (action.tool_name === "delete_customer" && typeof payload.customer_id === "string") {
+  // delete_customer, delete_order, delete_transaction, remove_customer_custom_field all point at one customer
+  if (typeof payload.customer_id === "string") {
     return [{ id: payload.customer_id, label: "View customer" }];
   }
   if (action.tool_name === "merge_customers") {

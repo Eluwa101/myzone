@@ -62,9 +62,9 @@ The default `CORS_ORIGINS` allows the local frontend at `http://localhost:5173`.
 
 ## AI behavior and safeguards
 
-The general assistant can call tools for supported CRM operations. These tools route through the same controllers as API requests. Reversible actions can run immediately; destructive actions such as deleting or merging customers create pending actions that a user must confirm or reject. Tool results are recorded in the agent action log.
+The general assistant can read everything and write most things. Its tools route through the same controllers as API requests. Reversible actions (creating and updating customers, transactions, orders, notes, segments, email templates, forms, settings) run immediately. Destructive actions never do: every delete or removal, customer merges, sending email, creating a webhook and CSV imports create pending actions that a user must confirm or reject. Tool results are recorded in the agent action log.
 
-The Ask Your Data assistant is separate and read-only: it uses prepared customer and summary context to answer questions and cannot modify records. Model provider availability, limits, and data policies are controlled by the configured provider.
+The Ask Your Data assistant is separate and strictly read-only: it uses prepared customer and summary context and is handed only the read tools in `app/agent/read_tools.py` (orders, message history, notes, segments, templates, forms, and so on), so it cannot modify records. Secrets such as webhook and form signing secrets are never returned by any read tool. Model provider availability, limits, and data policies are controlled by the configured provider.
 
 ## Tests
 
